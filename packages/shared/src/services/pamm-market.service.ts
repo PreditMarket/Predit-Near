@@ -1,0 +1,700 @@
+import apiClient from '@/lib/axios';
+import type { InfinityPaginationResponse, MarketRules } from './market.service';
+import type { Category } from './categories.service';
+import type { PammMarketVersion, PammPositionModel } from './pamm/market-be';
+import type { PublicResolution } from '@/types/resolution';
+import type {
+  HighlightSection,
+  HighlightSectionResponse,
+} from '@/lib/pamm/highlight-section';
+
+export type PammMarketStatus =
+  | 'pending'
+  | 'pending_approval'
+  | 'active'
+  | 'pending_resolution'
+  | 'pending_resolve_review'
+  | 'resolved'
+  | 'cancelled';
+
+export type PammMarketResolution = 'yes' | 'no';
+
+/**
+ * AI ensemble verdict. `invalid` means "not determinable from the declared
+ * source" — the market cancels and refunds, it is not a failure state.
+ */
+export type PammAiVerdict = 'yes' | 'no' | 'invalid';
+
+export type PammMarketSort =
+  | 'newest'
+  | 'ending'
+  | 'volume'
+  | 'orders'
+  | 'participants';
+
+export type PammTradeSide =
+  | 'buy_yes'
+  | 'buy_no'
+  | 'sell_yes'
+  | 'sell_no'
+  | 'seed';
+
+export interface PammMarket {
+  id: string;
+  question: string;
+  description?: string | null;
+  thumbnail?: { id: string; path: string } | null;
+  thumbnailId?: string | null;
+  tweetUrl?: string | null;
+  creatorId: string;
+  yesLabel: string;
+  noLabel: string;
+  /** Parent group this market belongs to, if any (multi-candidate events). */
+  groupId?: string | null;
+  /** Display label of this market as an option within its group (e.g. "Trump"). */
+  groupOptionLabel?: string | null;
+  category?: Category | null;
+  categoryId?: string | null;
+  collateralMint?: string | null;
+  marketVersion: PammMarketVersion;
+  positionModel: PammPositionModel;
+  yesMint?: string | null;
+  noMint?: string | null;
+  lpMint?: string | null;
+  status: PammMarketStatus;
+  resolution: PammMarketResolution | null;
+  latestPriceYes: number;
+  expiryTs: number | string;
+  /**
+   * Seconds after resolution before winners may redeem, snapshotted from the
+   * pool. Null on markets created before the BE stored it — callers fall back
+   * to PAMM_CLAIM_DELAY_FALLBACK_SECS.
+   */
+  claimDelaySecs?: number | null;
+  resolvedAt?: string | null;
+  resolvedBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+  selectedAiModels?: string[] | null;
+  rules?: MarketRules | null;
+  suggestedOutcome?: string | null;
+  suggestionConfidence?: number | null;
+  suggestionReasoning?: string | null;
+  suggestId?: string | null;
+  /**
+   * Source the creator declared at creation time — the AI oracle resolves the
+   * market primarily against this. Required for creator/KOL markets (see
+   * `CreateKolMarketPayload.resolutionSourceUrl`).
+   */
+  resolutionSourceUrl?: string | null;
+  /**
+   * The AI ensemble's verdict. `invalid` is a *valid* conclusion, not an
+   * error: the outcome could not be determined from the declared source, so
+   * the market cancels and everyone is refunded.
+   */
+  aiVerdict?: PammAiVerdict | null;
+  /**
+   * Outcome the market will settle to once the creator-dispute window lapses.
+   * Null when `aiVerdict === 'invalid'` — nobody wins there.
+   */
+  pendingResolution?: 'yes' | 'no' | null;
+  /** When the AI produced its verdict — the start of the dispute window. */
+  aiResolvedAt?: string | null;
+  /**
+   * Hard deadline for the creator to report a wrong result. Server-computed:
+   * the window length is configurable (PAMM_CREATOR_DISPUTE_WINDOW_HOURS), so
+   * never derive it by adding 24h to `aiResolvedAt`.
+   */
+  creatorDisputeUntil?: string | null;
+  creatorDisputed?: boolean;
+  creatorDisputedAt?: string | null;
+  creatorDisputeReason?: string | null;
+  creatorDisputeEvidenceUrl?: string | null;
+  /**
+   * True = this market never auto-settles; a human admin has to decide. There
+   * is no deadline attached, so don't render a countdown for it.
+   */
+  requiresAdminReview?: boolean;
+  /**
+   * Trading halt from the trader early-resolve petition. The market stays
+   * `active` — it keeps its price and stays in the public list — so this flag,
+   * not `status`, is what tells the UI to stop taking trades. Cleared when an
+   * admin either closes the market for real or rejects the petition.
+   */
+  tradingPausedAt?: string | null;
+  tradingPausedReason?: string | null;
+  /** Set when the market was pushed into resolution ahead of `expiryTs`. */
+  earlyResolveTriggeredAt?: string | null;
+  /** `'creator'` or `'traders:3/10'`. */
+  earlyResolveTriggeredBy?: string | null;
+  resolveApprovalCount?: number;
+  isBonusXp?: boolean;
+  /**
+   * Global trading-pause flag (whole exchange, not per-market). When `true`,
+   * all Buy/Sell/Redeem actions are halted. Mirrored on the list, detail and
+   * realtime endpoints so any of them can drive the paused UI.
+   */
+  isPaused?: boolean;
+  // aggregated stats (populated by list endpoint)
+  tradeCount?: number;
+  uniqueTraderCount?: number;
+  totalVolumeUsdc?: number;
+  creatorShareBps?: number;
+  /** Set when this market was cloned from an external source (currently only Polymarket). */
+  sourceProvider?: 'polymarket' | 'kalshi' | null;
+  sourceMarketId?: string | null;
+  sourceUrl?: string | null;
+  /**
+   * Which bot/cron generated this short-term market, if any. `'quick'` = quick-market
+   * (Pyth oracle) cron; `'polymarket_clone'` = Polymarket up/down clone cron; `null`
+   * covers ordinary markets and manually-cloned Polymarket markets (see `sourceProvider`).
+   */
+  marketOrigin?: 'quick' | 'polymarket_clone' | null;
+  /** Internal — used by auto-resolve to pin down the winning side; not shown in UI. */
+  sourceYesTokenId?: string | null;
+  /** Set when the backend auto-resolved this market from its source resolving. */
+  autoResolvedAt?: string | null;
+  /** Deadline until which an admin can dispute the auto-resolve outcome. */
+  autoResolveDisputeUntil?: string | null;
+  autoResolveDisputed?: boolean;
+  /**
+   * Moderation state, orthogonal to `status`. When set to `under_review`
+   * an admin has flagged the market pending review — trading is halted at the
+   * BE/UI layer (sell + refund still allowed). Cleared to `clear` on unlock.
+   */
+  moderationStatus?: PammMarketModerationStatus;
+  moderationReason?: PammMarketModerationReason | null;
+  moderationStartedAt?: string | null;
+  moderationStartedBy?: string | null;
+  moderationRefId?: string | null;
+  /**
+   * `true` once an admin approves a Trending request — permanent unless an
+   * admin unfeatures it. Does NOT by itself mean the market is currently on
+   * the public Trending feed: a resolved/cancelled/expired market keeps this
+   * flag `true` in the DB but is excluded from `?isTrending=true` results.
+   * Always filter server-side rather than relying on this field client-side.
+   */
+  isTrending?: boolean;
+  /** ISO date the market was approved for Trending, if ever. */
+  trendingAt?: string | null;
+}
+
+export type PammMarketModerationStatus =
+  | 'clear'
+  | 'under_review'
+  | 'verified_clean';
+
+export type PammMarketModerationReason =
+  | 'community_report'
+  | 'ai_flag'
+  | 'admin_manual'
+  | 'content_filter'
+  | 'price_manipulation'
+  | 'duplicate_flag';
+
+export type PammTradeStatus = 'open' | 'won' | 'lost' | 'claimed' | 'closed';
+
+export interface PammMarketTrade {
+  id: string;
+  txSig: string;
+  marketId: string;
+  userId?: string | null;
+  side: PammTradeSide;
+  status?: PammTradeStatus;
+  amountIn: string;
+  /**
+   * Raw units out. Outcome tokens for v1/v2 (redeemable 1:1), but **share
+   * counts** for v3 — a v3 share is not worth 1 collateral at resolution, so
+   * never treat this as a payout there.
+   */
+  amountOut: string;
+  /**
+   * Raw token units still redeemable after netting sells against buys at
+   * resolution (set by the backend). Redeem this instead of `amountOut` for a
+   * winning position so a partially sold-back position never over-redeems.
+   * Null/absent until resolved or when not applicable.
+   */
+  redeemableAmount?: string | null;
+  /**
+   * V3 only — how the pool ACTUALLY settled on-chain (`PoolV3.mode`), which
+   * the market row cannot answer: a one-sided market auto-cancels into a
+   * refund even when the row records a winner. Null when not V3 or the pool
+   * could not be read — treat null as unknown and fall back to market status.
+   */
+  settlement?: 'unresolved' | 'resolved' | 'auto_cancelled' | null;
+  /**
+   * Which instruction this position must call to get paid. `refund` is the
+   * auto-cancelled path and applies to BOTH sides; `redeem` only to the
+   * winning side. Calling the wrong one reverts on-chain, so this — not the
+   * trade status — is what the claim button should follow.
+   */
+  claimAction?: 'redeem' | 'refund' | null;
+  /**
+   * Collateral owed, raw base units. Real money, unlike `redeemableAmount`
+   * (a SHARE COUNT on V3) — safe to format as an amount.
+   */
+  claimAmount?: string | null;
+  /**
+   * Raw token units still held by this buy after netting out sells —
+   * resolution-independent, unlike `redeemableAmount` (claim-specific, only
+   * set post-resolution). Null until a sell has ever netted against this
+   * buy, meaning the full `amountOut` is still held.
+   */
+  heldAmount?: string | null;
+  priceYes: number;
+  volumePxpEquivalent: number;
+  /**
+   * Whatever the pool counts per side after the trade: real reserves for v2,
+   * **share counts** for v3 (which has no reserves). Never recompute a price
+   * from these two — use `priceYes`, which the backend stores separately.
+   */
+  yesReserveAfter: string;
+  noReserveAfter: string;
+  traderAddress: string;
+  createdAt: string;
+  updatedAt?: string;
+  // populated by my-trades endpoint
+  market?: PammMarket | null;
+}
+
+export interface PammMarketStream {
+  marketId: string;
+  roomName: string;
+  chatEnabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ListPammMarketsParams {
+  status?: PammMarketStatus;
+  search?: string;
+  sort?: PammMarketSort;
+  order?: 'asc' | 'desc';
+  minVolume?: number;
+  maxVolume?: number;
+  page?: number;
+  limit?: number;
+  categoryId?: string;
+  /** Server-side excludes closed markets even though `isTrending` stays `true` on them — see {@link PammMarket.isTrending}. */
+  isTrending?: boolean;
+}
+
+/** One member row inside a `kind: 'group'` list item — a lighter summary
+ * than `GroupMemberMarket` (no `priceHistory`/`question`). */
+export interface PammGroupListMember {
+  marketId: string;
+  source: 'predit' | 'pamm';
+  optionLabel: string;
+  sortOrder: number;
+  yesPrice: number;
+  status: string;
+  /** Pool collateral mint — only populated for `source: 'pamm'` members. */
+  collateralMint?: string | null;
+  /** pamm: live buy-side volume from trades. predit: yesPool + noPool. */
+  volumeUsdc?: number;
+  /** pamm: distinct traders (excl. seed). predit: denormalized totalParticipants. */
+  participantCount?: number;
+}
+
+export interface PammGroupListSummary {
+  id: string;
+  slug: string;
+  title: string;
+  status: string;
+  isActive: boolean;
+  imageUrl?: string | null;
+  /** Plain sum of each candidate's volumeUsdc — not deduped across candidates. */
+  totalVolumeUsdc?: number;
+  /** Plain sum of each candidate's participantCount — not deduped across candidates. */
+  participantCount?: number;
+  /** MIN(closeAt) across all still-open candidates; absent until BE ships it on this list endpoint. */
+  closeAt?: string | null;
+  markets: PammGroupListMember[];
+}
+
+/**
+ * A listing row is either a standalone market or a whole group collapsed
+ * into one entry (grouped candidate markets no longer appear as separate
+ * rows in the listing — see market-group-pamm-batch-guide.md).
+ */
+export type PammMarketListItem =
+  | { kind: 'market'; market: PammMarket }
+  | { kind: 'group'; group: PammGroupListSummary };
+
+export interface ListPammMarketsResponse {
+  data: PammMarketListItem[];
+  hasNextPage: boolean;
+  total: number;
+}
+
+/**
+ * Accepts both the wrapped and the older bare-market listing shape, so the
+ * client works against a backend on either side of that change. Without this
+ * every field read downstream (`id`, `question`, `expiryTs`) is `undefined` —
+ * which surfaces as duplicate `pamm-undefined` React keys and an
+ * `Invalid time value` crash rather than anything that points at the cause.
+ */
+export function unwrapMarketListItems(
+  data: (PammMarket | PammMarketListItem)[] | undefined,
+): PammMarket[] {
+  if (!Array.isArray(data)) return [];
+  return data.flatMap((entry) => {
+    if (entry && typeof entry === 'object' && 'kind' in entry) {
+      const item = entry as PammMarketListItem;
+      return item.kind === 'market' && item.market ? [item.market] : [];
+    }
+    return [entry as PammMarket];
+  });
+}
+
+export interface ListPammTradesParams {
+  page?: number;
+  limit?: number;
+}
+
+export interface MyPammTradesParams {
+  page?: number;
+  limit?: number;
+}
+
+export interface ListPammTradesResponse {
+  data: PammMarketTrade[];
+  hasNextPage: boolean;
+  total: number;
+}
+
+export interface PammMarketRealtime {
+  latestPriceYes: number;
+  latestTrades: PammMarketTrade[];
+  /** Global trading-pause flag (whole exchange). See {@link PammMarket.isPaused}. */
+  isPaused?: boolean;
+}
+
+export interface PammViewerTokenResponse {
+  token: string;
+}
+
+/**
+ * Trade `side` for the record-trade request. Backend uses the lowercase enum
+ * (`buy_yes` | `buy_no` | `sell_yes` | `sell_no`); `seed` is server-only.
+ */
+export type RecordPammTradeSide = Exclude<PammTradeSide, 'seed'>;
+
+export interface RecordPammTradeDto {
+  txSig: string;
+  side: RecordPammTradeSide;
+  /** Raw token units as a string (e.g. 1 USDC at 6 decimals → "1000000"). */
+  amountIn: string;
+  /** Raw token units as a string. */
+  amountOut: string;
+  /** XP volume for the trade as a JSON number (USDC notional). */
+  volumePxpEquivalent: number;
+  /** Trader wallet pubkey. */
+  traderAddress: string;
+  // V2 omits priceYes / yesReserveAfter / noReserveAfter — the backend
+  // derives those from on-chain pool state.
+}
+
+/**
+ * Tolerates a backend still on the old flat-array shape (`PammMarket[]`,
+ * no `kind` wrapper) — e.g. during a rollout/rollback mismatch — by
+ * treating any item missing `kind` as a plain market. Without this, reading
+ * `.market.id` off an unwrapped item throws (`Cannot read properties of
+ * undefined`).
+ */
+export function normalizePammListItem(
+  item: PammMarketListItem | PammMarket,
+): PammMarketListItem {
+  if (item && typeof item === 'object' && 'kind' in item) {
+    return item;
+  }
+  return { kind: 'market', market: item as PammMarket };
+}
+
+export const getPammMarkets = async (
+  params?: ListPammMarketsParams,
+): Promise<ListPammMarketsResponse> => {
+  const response = await apiClient.get<
+    Omit<ListPammMarketsResponse, 'data'> & {
+      data: (PammMarket | PammMarketListItem)[];
+    }
+  >('/pamm-markets', { params });
+  return {
+    ...response.data,
+    data: (response.data.data ?? []).map(normalizePammListItem),
+  };
+};
+
+/** The /markets Highlight section, picked by the BE in one request. */
+export const getPammHighlight = async (): Promise<HighlightSection | null> =>
+  (await apiClient.get<HighlightSectionResponse>('/pamm-markets/highlight')).data
+    .section ?? null;
+
+export const getPammMarketById = async (id: string) => {
+  const response = await apiClient.get<PammMarket>(`/pamm-markets/${id}`);
+  return response.data;
+};
+
+/**
+ * Fetch just the global circuit-breaker flag. Cheaper than the market list;
+ * every trading surface (banner, swap, redeem) polls this instead of
+ * scraping `isPaused` off the first market row.
+ */
+export const getPammGlobalPause = async (): Promise<{
+  isPaused: boolean;
+  refreshedAt: number;
+}> => {
+  const response = await apiClient.get<{
+    isPaused: boolean;
+    refreshedAt: number;
+  }>('/pamm-markets/global-pause');
+  return response.data;
+};
+
+export const getPammMarketResolution = async (
+  id: string,
+): Promise<PublicResolution | null> => {
+  const response = await apiClient.get<PublicResolution | null>(
+    `/pamm-markets/${id}/resolution`,
+  );
+  return response.data;
+};
+
+export const getPammMarketRealtime = async (id: string) => {
+  const response = await apiClient.get<PammMarketRealtime>(
+    `/pamm-markets/${id}/realtime`,
+  );
+  return response.data;
+};
+
+export const getPammMarketTrades = async (
+  id: string,
+  params?: ListPammTradesParams,
+) => {
+  const response = await apiClient.get<ListPammTradesResponse>(
+    `/pamm-markets/${id}/trades`,
+    { params },
+  );
+  return response.data;
+};
+
+export const recordPammMarketTrade = async (
+  id: string,
+  payload: RecordPammTradeDto,
+) => {
+  const response = await apiClient.post<PammMarketTrade>(
+    `/pamm-markets/${id}/trades`,
+    payload,
+  );
+  return response.data;
+};
+
+export const getPammMarketStream = async (id: string) => {
+  const response = await apiClient.get<PammMarketStream>(
+    `/pamm-markets/${id}/stream`,
+  );
+  return response.data;
+};
+
+export const getPammMarketViewerToken = async (id: string) => {
+  const response = await apiClient.get<PammViewerTokenResponse>(
+    `/pamm-markets/${id}/stream/viewer-token`,
+  );
+  return response.data;
+};
+
+export const getPammMarketPublisherToken = async (id: string) => {
+  const response = await apiClient.get<PammViewerTokenResponse>(
+    `/pamm-markets/${id}/stream/publisher-token`,
+  );
+  return response.data;
+};
+
+export const stopPammMarketStream = async (id: string) => {
+  await apiClient.post(`/pamm-markets/${id}/stream/stop`);
+};
+
+// ─── Early resolution (trader-driven) ────────────────────────────────────────
+
+export interface PammEarlyResolveStatus {
+  /** How many distinct traders have asked for an early resolve. */
+  requested: number;
+  /** Denominator — unique traders of this market (seed pool excluded). */
+  totalTraders: number;
+  /**
+   * Percentage of traders needed to trigger. Server-configured
+   * (PAMM_EARLY_RESOLVE_REQUEST_PCT) — read it from here, never hardcode 30.
+   */
+  thresholdPct: number;
+  /** Whether the caller already requested. Always false when logged out. */
+  hasRequested: boolean;
+  triggeredAt: string | null;
+  /** `'creator'` or `'traders:3/10'`. */
+  triggeredBy: string | null;
+}
+
+export interface RequestPammEarlyResolveResponse {
+  requested: number;
+  totalTraders: number;
+  thresholdPct: number;
+  /** True when *this* request is the one that crossed the threshold. */
+  triggered: boolean;
+}
+
+/**
+ * Progress of the "resolve this early" petition. Auth is optional — without a
+ * JWT the counts still come back, only `hasRequested` degrades to false.
+ */
+export const getPammEarlyResolveStatus = async (id: string) => {
+  const response = await apiClient.get<PammEarlyResolveStatus>(
+    `/pamm-markets/${id}/early-resolve-status`,
+  );
+  return response.data;
+};
+
+/**
+ * Ask for the market to be resolved before its deadline. Only traders who
+ * actually traded this market may call it, once each (409 on a repeat). Once
+ * `thresholdPct` of traders have asked, the backend closes trading and runs
+ * the AI ensemble — poll the market until it leaves `pending_resolution`.
+ */
+export const requestPammEarlyResolve = async (id: string, note?: string) => {
+  const response = await apiClient.post<RequestPammEarlyResolveResponse>(
+    `/pamm-markets/${id}/request-resolve`,
+    note?.trim() ? { note: note.trim() } : {},
+  );
+  return response.data;
+};
+export interface CollateralBreakdown {
+  totalValue: number;
+  totalPnL: number;
+  sparkline: number[];
+  // True when a settled position's payout couldn't be read from chain at
+  // settlement time; the BE cron self-heals it within ~10-20 min, so treat
+  // totalValue/totalPnL for this collateral as provisional until it clears.
+  hasPendingData: boolean;
+}
+
+/**
+ * The money figures here — `totalValue`, `totalPnL`, `pnlPct`, `sparkline` —
+ * are denominated in ONE collateral, named by `headlineSymbol`. Label them
+ * with that, never a hardcoded 'USDC': they were previously a sum across every
+ * collateral displayed as USDC, which added PXP to USDC even though no PXP→USD
+ * rate exists. Anything that must cover every currency reads `byCollateral`.
+ *
+ * The counts (`openCount`, `wins`, `losses`, `totalTrades`, `winRate`) are
+ * unit-free and do span all collaterals.
+ */
+export interface PammMarketSummary {
+  totalValue: number;
+  totalPnL: number;
+  pnlPct: number;
+  openCount: number;
+  wins: number;
+  losses: number;
+  totalTrades: number;
+  winRate: number;
+  sparkline: number[];
+  /** Mint the headline figures are denominated in; null if none configured. */
+  headlineMint?: string | null;
+  /** Ticker to label the headline figures with. Falls back to 'USDC'. */
+  headlineSymbol?: string | null;
+  // See CollateralBreakdown.hasPendingData — true if any collateral is pending.
+  hasPendingData: boolean;
+  byCollateral?: Record<string, CollateralBreakdown>;
+}
+
+export const redeemTrade = async (
+  tradeId: string,
+): Promise<PammMarketTrade> => {
+  const response = await apiClient.patch<PammMarketTrade>(
+    `/pamm-markets/trades/${tradeId}/redeem`,
+  );
+  return response.data;
+};
+
+export const getMyPammTrades = async (params?: MyPammTradesParams) => {
+  const response = await apiClient.get<ListPammTradesResponse>(
+    '/pamm-markets/my-trades',
+    { params },
+  );
+  return response.data;
+};
+
+export const getMyPammSummary = async () => {
+  const response = await apiClient.get<PammMarketSummary>(
+    '/pamm-markets/my-summary',
+  );
+  return response.data;
+};
+
+/**
+ * Whether the current user (by JWT; optional) may open fiat (non-mintable
+ * collateral, e.g. USDC) positions. Empty/unset whitelist on the BE → allowed
+ * for everyone. Used to gate access to fiat market pages.
+ */
+export const getPammFiatAccess = async (): Promise<{ allowed: boolean }> => {
+  const response = await apiClient.get<{ allowed: boolean }>(
+    '/pamm-markets/fiat-access',
+  );
+  return response.data;
+};
+
+/**
+ * One pool where the caller's wallet currently holds LP tokens/shares.
+ * `lpBalance` is a raw on-chain amount (string, base units) — purely for
+ * display in the list; the withdraw form re-reads the live balance on-chain
+ * before submitting. Only `active` and `resolved` markets are returned —
+ * other statuses (expired, pending_resolution, pending_resolve_review,
+ * cancelled) aren't withdrawable/redeemable yet, so the backend filters
+ * them out of the query entirely.
+ */
+export interface PammLiquidityPosition {
+  poolAddress: string;
+  marketVersion: PammMarketVersion;
+  marketId: string;
+  question: string;
+  imageUrl?: string | null;
+  status: PammMarketStatus;
+  lpBalance: string;
+  lpMint?: string | null;
+  collateralSymbol?: string;
+  collateralDecimals?: number;
+  /** `active` markets only — 70% of `lpBalance` (raw base units) — the
+   * amount the "Max" button should fill in the withdraw form. */
+  maxWithdrawableLp?: string;
+  /** `resolved` markets only — unix ms when the 24h claim delay lifts
+   * (`resolvedAt` + 24h). */
+  redeemableAt?: number;
+}
+
+export interface MyPammLiquidityParams {
+  page?: number;
+  limit?: number;
+}
+
+export const getMyPammLiquidity = async (params?: MyPammLiquidityParams) => {
+  const response = await apiClient.get<
+    InfinityPaginationResponse<PammLiquidityPosition>
+  >('/pamm-markets/my-liquidity', { params });
+  return response.data;
+};
+
+export const pammMarketService = {
+  getMarkets: getPammMarkets,
+  getMarketById: getPammMarketById,
+  getResolution: getPammMarketResolution,
+  getRealtime: getPammMarketRealtime,
+  getTrades: getPammMarketTrades,
+  getMyTrades: getMyPammTrades,
+  getMySummary: getMyPammSummary,
+  getMyLiquidity: getMyPammLiquidity,
+  recordTrade: recordPammMarketTrade,
+  getStream: getPammMarketStream,
+  getViewerToken: getPammMarketViewerToken,
+  getPublisherToken: getPammMarketPublisherToken,
+  stopStream: stopPammMarketStream,
+  getEarlyResolveStatus: getPammEarlyResolveStatus,
+  requestEarlyResolve: requestPammEarlyResolve,
+};

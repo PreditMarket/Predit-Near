@@ -1,0 +1,24 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+# Which dependencies may run install scripts. pnpm ≥ 11 reads this instead of
+# package.json "pnpm.onlyBuiltDependencies" / "ignoredBuiltDependencies", and
+# fails the install on any package left undecided (ERR_PNPM_IGNORED_BUILDS).
+# true = the old onlyBuiltDependencies; false = previously ignored, or scripts
+# we don't need (native speed-ups with JS fallbacks, telemetry, donation notices).
+allowBuilds:
+  '@sentry/cli': true
+  '@stellar/stellar-sdk': true
+  bigint-buffer: true
+  blake-hash: true
+  bufferutil: true
+  protobufjs: true
+  tiny-secp256k1: true
+  usb: true
+  utf-8-validate: true
+  '@reown/appkit': false
+  core-js: false
+  keccak: false
+  sharp: false
+  unrs-resolver: false

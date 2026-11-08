@@ -1,0 +1,273 @@
+/*
+ * Predit theme — the one palette and motion scale every app uses.
+ * Imported by apps/web and apps/admin globals.css (after tailwindcss).
+ *
+ * Use the semantic utilities, never raw Tailwind palette colours or hex:
+ *   action / active / link / focus  → primary        (turquoise)
+ *   gain / yes / buy / success      → success        (green)
+ *   loss / no / sell / error        → danger         (red; `destructive` is the same)
+ *   pending / caution / XP / prize  → warning        (gold)
+ *   brand highlight (AI, gradients) → brand-purple, brand-pink
+ *   podium 1st / 2nd / 3rd           → medal-gold, medal-silver, medal-bronze (rankMedalClass)
+ *   text                            → foreground, muted-foreground, faint
+ *   surfaces                        → background < elevated < card, border, border-strong
+ * Tints come from opacity: `bg-success/10 border-success/30 text-success`.
+ */
+
+:root {
+  /* ─── Palette (dark only) ─── */
+  --brand-bg: #14141C;
+  --brand-bgElev: #1B1B26;
+  --brand-bgCard: #20202B;
+  --brand-border: #2C2C3A;
+  --brand-borderHi: #3D3D4C;
+  --brand-text: #FFFFFF;
+  --brand-textDim: #9EA3B0;
+  --brand-textMute: #5C5C68;
+  --brand-turq: #66EDF4;
+  --brand-blue: #062BFF;
+  --brand-purple: #7852FF;
+  --brand-pink: #FF7DFF;
+  --brand-green: #22D17E;
+  --brand-red: #FF5757;
+  --brand-gold: #FCD05A;
+  --medal-silver: #D5D9E0;
+  --medal-bronze: #E0915A;
+  --brand-primary-soft: color-mix(in srgb, var(--brand-purple) 16%, transparent);
+  --brand-primary-border: color-mix(in srgb, var(--brand-purple) 30%, transparent);
+  --brand-primary-strong: color-mix(in srgb, var(--brand-purple) 82%, white 18%);
+  --brand-success-soft: color-mix(in srgb, var(--brand-green) 14%, transparent);
+  --brand-success-border: color-mix(in srgb, var(--brand-green) 30%, transparent);
+  --brand-danger-soft: color-mix(in srgb, var(--brand-red) 14%, transparent);
+  --brand-danger-border: color-mix(in srgb, var(--brand-red) 30%, transparent);
+
+  /* ─── Semantic tokens ─── */
+  --background: var(--brand-bg);
+  --foreground: var(--brand-text);
+  --card: var(--brand-bgCard);
+  --card-foreground: var(--brand-text);
+  --popover: var(--brand-bgCard);
+  --popover-foreground: var(--brand-text);
+  --primary: var(--brand-turq);
+  --primary-foreground: var(--brand-bg);
+  --secondary: var(--brand-bgElev);
+  --secondary-foreground: var(--brand-text);
+  --muted: var(--brand-bgElev);
+  --muted-foreground: var(--brand-textDim);
+  --faint: var(--brand-textMute);
+  --accent: #262633;
+  --accent-foreground: var(--brand-text);
+  --destructive: var(--brand-red);
+  --destructive-foreground: var(--brand-text);
+  --success: var(--brand-green);
+  --danger: var(--brand-red);
+  --warning: var(--brand-gold);
+  --gain: var(--brand-green);
+  --loss: var(--brand-red);
+  --border: var(--brand-border);
+  --border-strong: var(--brand-borderHi);
+  --input: var(--brand-bgElev);
+  --ring: var(--brand-turq);
+  --radius: 0.5rem;
+
+  --sidebar: var(--brand-bg);
+  --sidebar-foreground: var(--brand-text);
+  --sidebar-primary: var(--brand-turq);
+  --sidebar-primary-foreground: var(--brand-bg);
+  --sidebar-accent: var(--brand-bgElev);
+  --sidebar-accent-foreground: var(--brand-text);
+  --sidebar-border: var(--brand-border);
+  --sidebar-ring: var(--brand-turq);
+
+  color-scheme: dark;
+}
+
+/* ─── Tailwind mapping ─── */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-faint: var(--faint);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+  --color-elevated: var(--brand-bgElev);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-brand-turq: var(--brand-turq);
+  --color-brand-purple: var(--brand-purple);
+  --color-brand-pink: var(--brand-pink);
+  --color-brand-blue: var(--brand-blue);
+  --color-brand-gold: var(--brand-gold);
+  --color-medal-gold: var(--brand-gold);
+  --color-medal-silver: var(--medal-silver);
+  --color-medal-bronze: var(--medal-bronze);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --animate-accordion-down: accordion-down 0.2s var(--ease-smooth);
+  --animate-accordion-up: accordion-up 0.2s var(--ease-smooth) forwards;
+  --animate-page-in: page-in 0.22s var(--ease-smooth);
+  --animate-pump-arrive: pump-arrive 0.5s var(--ease-smooth);
+  --animate-pump-flash: pump-flash 2.4s ease-out;
+}
+
+/* ─── Motion ─── one curve and one duration for every hover, focus and
+   state change, so the whole app moves the same way. `transition-colors`,
+   `transition-all`… pick these up when they set no duration/ease of their own. */
+@theme {
+  --ease-smooth: cubic-bezier(0.22, 1, 0.36, 1);
+  --default-transition-duration: 180ms;
+  --default-transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Opacity only: a transform would re-anchor `position: fixed` children
+   (mobile trade bars, sheets) to the page wrapper while it runs. */
+@keyframes page-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* A token just launched on pump.fun joins a live list: its row opens from
+   nothing (the rows under it slide down rather than jump), drops in, and
+   glows in the brand turquoise for a moment. Reduced motion skips it below. */
+@keyframes pump-arrive {
+  from { grid-template-rows: 0fr; opacity: 0; transform: translateY(-8px); }
+  to   { grid-template-rows: 1fr; opacity: 1; transform: none; }
+}
+@keyframes pump-flash {
+  0%, 25% {
+    background-color: color-mix(in srgb, var(--brand-turq) 16%, transparent);
+    box-shadow: inset 2px 0 0 var(--brand-turq);
+  }
+  100% {
+    background-color: transparent;
+    box-shadow: inset 2px 0 0 transparent;
+  }
+}
+
+/* Create market in the nav: a shine sweeping across and a pulsing glow.
+   Both run on the compositor (transform / opacity), never repainting the
+   button: the glow is a fixed box-shadow on its own element (`cta-glow`,
+   behind the button, which clips its overflow for the shine) whose opacity
+   pulses. Animating box-shadow repainted every frame (plan 21). */
+.create-cta {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.cta-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  will-change: opacity;
+  animation: cta-glow-pulse 2.4s ease-in-out infinite;
+}
+.cta-glow-turq {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand-turq) 18%, transparent),
+    0 0 14px 2px color-mix(in srgb, var(--brand-turq) 45%, transparent);
+}
+.cta-glow-ai {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand-purple) 18%, transparent),
+    0 0 16px 3px color-mix(in srgb, var(--brand-pink) 50%, transparent);
+}
+@keyframes cta-glow-pulse {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
+}
+.create-cta::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(
+    110deg,
+    transparent 30%,
+    rgb(255 255 255 / 0.55) 50%,
+    transparent 70%
+  );
+  transform: translateX(-120%);
+  will-change: transform;
+  animation: create-cta-shine 3.6s var(--ease-smooth) infinite;
+  pointer-events: none;
+}
+@keyframes create-cta-shine {
+  0%, 55% { transform: translateX(-120%); }
+  100%    { transform: translateX(120%); }
+}
+
+@keyframes accordion-down {
+  from { height: 0; }
+  to   { height: var(--radix-accordion-content-height); }
+}
+@keyframes accordion-up {
+  from { height: var(--radix-accordion-content-height); }
+  to   { height: 0; }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-sans);
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* JetBrains Mono's ligatures turn numbers into symbols: `-<$0.01` reads
+     as an arrow, `>=` as one glyph. Mono text is figures, so none here. */
+  .font-mono {
+    font-feature-settings: "liga" 0, "calt" 0;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--brand-turq) 28%, transparent);
+  }
+}
+
+/* Scrollbars in the palette */
+* {
+  scrollbar-color: var(--brand-border) transparent;
+}
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--brand-border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--brand-borderHi); }
+
+/* Respect reduced motion everywhere — animations collapse to their end state. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

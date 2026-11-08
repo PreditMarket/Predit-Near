@@ -1,0 +1,84 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies (any level — monorepo apps/* + packages/*)
+node_modules/
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+coverage
+
+# next.js (any level)
+.next/
+/out/
+apps/*/out/
+
+# production
+build/
+apps/*/build/
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+!.env.example
+!.env.test.example
+
+# playwright (runs from apps/web since the monorepo split)
+/apps/web/playwright/test-results/
+/apps/web/playwright/report/
+/apps/web/playwright-report/
+# same output when Playwright is run from the repo root
+/playwright/test-results/
+/playwright/report/
+
+/apps/web/extensions
+/apps/web/phantom-profile
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+.codegraph
+
+# agent-generated reports (keep out of PRs)
+plans/reports/fullstack-*.md
+
+# planning artifacts — kept local, not part of code PRs
+plans/
+
+# local redis dump
+dump.rdb
+
+extensions/phantom
+phantom-profile
+
+# service worker — built from apps/web/src/app/sw.ts by @serwist/next
+apps/web/public/sw.js
+apps/web/public/sw.js.map
+apps/web/public/swe-worker-*.js
+apps/web/public/swe-worker-*.js.map
+
+plan/
+docs/
+/apps/web/playwright/.staging-profile/
+/apps/web/playwright/.staging-chrome-profile/
+/apps/web/playwright/recordings/
+/apps/web/playwright/staging-report/
+/apps/web/playwright/staging-results/

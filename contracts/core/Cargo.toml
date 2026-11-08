@@ -1,0 +1,8 @@
+[package]
+name = "predit-core"
+version = "0.1.0"
+edition = "2021"
+description = "Chain-independent market math and planning"
+license = "MIT"
+
+[dependencies]

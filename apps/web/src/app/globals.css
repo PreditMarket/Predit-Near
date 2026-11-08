@@ -1,0 +1,658 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+@import "tw-animate-css";
+/* Palette, semantic tokens, Tailwind colour mapping and motion scale. */
+@import "../../../../packages/shared/src/styles/theme.css";
+
+/* Brand fonts — Space Grotesk (display/sans) + JetBrains Mono (mono) — are
+   self-hosted by next/font in app/layout.tsx, which sets --font-space-grotesk
+   and --font-jetbrains-mono on <html>. (An @import url() here came after
+   @import "tailwindcss" and was dropped from the build, so they never loaded.) */
+
+/* Monorepo: Tailwind v4 auto-detects content from this app only, so utility
+   classes used exclusively by shared components (packages/shared) would be
+   purged. Register the shared package as an extra content source. */
+@source "../../../../packages/shared/src";
+
+/* ─── Tailwind v4 custom dark variant ─── */
+@custom-variant dark (&:is(.dark *));
+
+/* Grows a small control's tap area to at least 44×44px without changing how
+   it looks or lays out. The element must not need its own `position`. */
+@utility touch-hit {
+  position: relative;
+  &::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+}
+
+/* ─── App-only tokens (palette + semantic tokens live in theme.css) ─── */
+:root {
+  --font-size: 16px;
+  --font-sans: var(--font-space-grotesk), "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), "SF Mono", "Fira Code", ui-monospace, monospace;
+
+  /* Height of the mobile bottom nav (0 from lg up, where it is hidden).
+     Anything fixed to the bottom of the screen sits above it. */
+  --mobile-nav-h: calc(56px + env(safe-area-inset-bottom));
+
+  /* Full screen height for the app shell and the pages sized off it. */
+  --app-h: 100dvh;
+}
+
+/* Installed, there are no browser bars, so the screen never changes size —
+   but iOS launches a standalone app with a stale 100dvh that is short of the
+   screen and only fixes it on the first scroll/drag gesture: until then a
+   blank strip sat under the bottom nav. 100lvh is static (no bars to track)
+   and right from the first paint. */
+@media (display-mode: standalone) {
+  :root {
+    --app-h: 100lvh;
+  }
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --mobile-nav-h: 0px;
+  }
+}
+
+/**
+ * Base typography
+ */
+@layer base {
+  :where(:not(:has([class*=" text-"]), :not(:has([class^="text-"])))) {
+    h1 {
+      font-size: 2rem;
+      font-weight: 600;
+      line-height: 1.3;
+      letter-spacing: -0.02em;
+    }
+
+    h2 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      line-height: 1.4;
+      letter-spacing: -0.01em;
+    }
+
+    h3 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      line-height: 1.4;
+    }
+
+    h4 {
+      font-size: 1rem;
+      font-weight: 600;
+      line-height: 1.5;
+    }
+
+    p {
+      font-size: 0.9375rem;
+      font-weight: 400;
+      line-height: 1.6;
+    }
+
+    label {
+      font-size: 0.875rem;
+      font-weight: 500;
+      line-height: 1.5;
+    }
+
+    button {
+      font-size: 0.875rem;
+      font-weight: 500;
+      line-height: 1.5;
+    }
+
+    input {
+      font-size: 0.9375rem;
+      font-weight: 400;
+      line-height: 1.5;
+    }
+  }
+}
+
+html {
+  font-size: var(--font-size);
+  scroll-behavior: smooth;
+}
+
+/* Hide scrollbar for horizontal scroll containers */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  scroll-behavior: smooth;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Mobile sidebar slide-in animation */
+@keyframes slide-in {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in 300ms ease-out;
+}
+
+/* Logo pinwheel: 2 revolutions, accelerate → peak → decelerate → rest at the
+   original orientation. Cubic-bezier drives the speed curve. */
+@keyframes logo-swirl {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(720deg); }
+}
+.logo-swirl-parent:hover .logo-swirl-child {
+  animation: logo-swirl 0.9s cubic-bezier(0.45, 0, 0.55, 1);
+}
+
+/* data-cell: mono + tabular-nums + tight tracking */
+.data-cell {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+/* ─── Gambling animations ─── */
+@keyframes pulse-glow {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand-turq) 0%, transparent);
+  }
+
+  50% {
+    box-shadow: 0 0 14px 2px color-mix(in srgb, var(--brand-turq) 15%, transparent);
+  }
+}
+
+@keyframes ticker-scroll {
+  0% {
+    transform: translateX(0);
+  }
+
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes flash-green {
+
+  0%,
+  100% {
+    background-color: transparent;
+  }
+
+  50% {
+    background-color: color-mix(in srgb, var(--brand-green) 10%, transparent);
+  }
+}
+
+@keyframes flash-red {
+
+  0%,
+  100% {
+    background-color: transparent;
+  }
+
+  50% {
+    background-color: color-mix(in srgb, var(--brand-red) 10%, transparent);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2.5s ease-in-out infinite;
+}
+
+.animate-ticker {
+  animation: ticker-scroll 30s linear infinite;
+}
+
+.animate-flash-green {
+  animation: flash-green 1.5s ease-in-out;
+}
+
+.animate-flash-red {
+  animation: flash-red 1.5s ease-in-out;
+}
+
+/* Card gambling hover — neutral grey for dark theme */
+.card-order:hover {
+  border-color: hsl(0 0% 100% / 0.18);
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.04), 0 2px 12px rgba(0, 0, 0, 0.25);
+  transform: translateY(-1px);
+}
+
+/* Live pulse dot */
+@keyframes live-dot {
+
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.5;
+    transform: scale(1.5);
+  }
+}
+
+.animate-live-dot {
+  animation: live-dot 1.5s ease-in-out infinite;
+}
+
+/* Slide in from bottom */
+@keyframes slide-up {
+  0% {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.4s ease-out;
+}
+
+/* ─── FOMO: card shake on new market bump ─── */
+@keyframes card-shake {
+  0% {
+    transform: translateX(0) scale(1);
+  }
+
+  10% {
+    transform: translateX(-3px) scale(1.005);
+  }
+
+  20% {
+    transform: translateX(3px) scale(1.005);
+  }
+
+  30% {
+    transform: translateX(-2px) scale(1.003);
+  }
+
+  40% {
+    transform: translateX(2px) scale(1.003);
+  }
+
+  50% {
+    transform: translateX(-1px) scale(1.001);
+  }
+
+  60% {
+    transform: translateX(1px);
+  }
+
+  100% {
+    transform: translateX(0);
+  }
+}
+
+@keyframes card-glow-in {
+  0% {
+    box-shadow: 0 0 0 color-mix(in srgb, var(--brand-turq) 0%, transparent);
+    border-color: var(--border);
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+
+  30% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  50% {
+    box-shadow: 0 0 24px color-mix(in srgb, var(--brand-turq) 35%, transparent);
+    border-color: var(--primary);
+  }
+
+  100% {
+    box-shadow: 0 0 0 color-mix(in srgb, var(--brand-turq) 0%, transparent);
+    border-color: var(--border);
+  }
+}
+
+.animate-card-bump {
+  animation: card-glow-in 1.2s ease-out, card-shake 0.6s ease-out 0.15s;
+}
+
+/* ─── FOMO: progress bar sparkle/firework ─── */
+.progress-bar-spark {
+  position: relative;
+  overflow: visible !important;
+}
+
+.progress-bar-spark>.bar-fill {
+  position: relative;
+}
+
+.progress-bar-spark>.bar-fill::after {
+  content: '';
+  position: absolute;
+  right: -1px;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  transform: translate(50%, -50%);
+  border-radius: 50%;
+  background: var(--brand-green);
+  box-shadow:
+    0 0 4px 1px color-mix(in srgb, var(--brand-green) 80%, transparent),
+    0 0 10px 2px color-mix(in srgb, var(--brand-green) 40%, transparent),
+    0 -6px 3px -2px color-mix(in srgb, var(--brand-green) 30%, transparent),
+    0 6px 3px -2px color-mix(in srgb, var(--brand-green) 30%, transparent),
+    4px -4px 3px -2px color-mix(in srgb, var(--brand-turq) 30%, transparent),
+    -4px -4px 3px -2px color-mix(in srgb, var(--brand-gold) 30%, transparent);
+  animation: spark-pulse 1.8s ease-in-out infinite;
+  z-index: 2;
+}
+
+/* tiny upward particles */
+.progress-bar-spark>.bar-fill::before {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: -8px;
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--brand-green) 90%, transparent);
+  box-shadow:
+    3px -2px 0 color-mix(in srgb, var(--brand-turq) 70%, transparent),
+    -2px -4px 0 color-mix(in srgb, var(--brand-gold) 60%, transparent),
+    5px -6px 0 color-mix(in srgb, var(--brand-green) 50%, transparent);
+  animation: spark-particles 1.4s ease-out infinite;
+  z-index: 2;
+}
+
+@keyframes spark-pulse {
+
+  0%,
+  100% {
+    transform: translate(50%, -50%) scale(0.8);
+    opacity: 0.6;
+  }
+
+  50% {
+    transform: translate(50%, -50%) scale(1.4);
+    opacity: 1;
+  }
+}
+
+@keyframes spark-particles {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+/* Banner shimmer sweep */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+/* Number count-up shimmer */
+@keyframes shimmer-text {
+  0% {
+    background-position: -100% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer-text {
+  background: linear-gradient(90deg, var(--brand-turq) 0%, color-mix(in srgb, var(--brand-turq) 55%, white) 40%, var(--brand-turq) 80%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer-text 3s ease-in-out infinite;
+}
+
+/* Subtle dot-grid background (OpenAffiliate-style) */
+.dot-grid {
+  background-image: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.06) 1px, transparent 0);
+  background-size: 24px 24px;
+}
+
+.dark .dot-grid {
+  background-image: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.06) 1px, transparent 0);
+}
+
+/* Thin primary-accent divider */
+.oa-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--brand-turq) 25%, transparent) 50%, transparent);
+}
+
+/* TipTap: Tailwind preflight strips ul/ol markers — restore bullets & numbers */
+.tiptap-editor.ProseMirror ul,
+.tiptap-editor ul {
+  list-style-type: disc;
+  list-style-position: outside;
+  padding-left: 1.375rem;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.tiptap-editor.ProseMirror ol,
+.tiptap-editor ol {
+  list-style-type: decimal;
+  list-style-position: outside;
+  padding-left: 1.375rem;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.tiptap-editor li > p {
+  margin-top: 0.15em;
+  margin-bottom: 0.15em;
+}
+
+.tiptap-editor ul ul {
+  list-style-type: circle;
+  margin-top: 0.25em;
+  margin-bottom: 0.25em;
+}
+
+.tiptap-editor ul ul ul {
+  list-style-type: square;
+}
+
+/* Rich market description (sanitized HTML): same preflight issue */
+.market-description-html ul {
+  list-style-type: disc;
+  list-style-position: outside;
+  padding-left: 1.375rem;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.market-description-html ol {
+  list-style-type: decimal;
+  list-style-position: outside;
+  padding-left: 1.375rem;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+.market-description-html li > p {
+  margin-top: 0.15em;
+  margin-bottom: 0.15em;
+}
+
+.market-description-html ul ul {
+  list-style-type: circle;
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+ * Solana wallet selector modal — ensure it stacks above shadcn/Radix
+ * dialogs (default z-50). QuickTrade and other dialogs trigger the
+ * adapter's wallet picker, which otherwise renders inside its default
+ * z-1040 — visible above body but tangled with focus traps when opened
+ * from another dialog. Bumping to four-digit z keeps it on top
+ * unambiguously and prevents click capture by the parent overlay.
+ * ───────────────────────────────────────────────────────────────────── */
+.wallet-adapter-modal {
+  z-index: 9999 !important;
+}
+.wallet-adapter-modal-wrapper {
+  z-index: 10000 !important;
+}
+.wallet-adapter-modal-overlay {
+  z-index: 9998 !important;
+}
+/* Radix Dialog (modal=true) injects pointer-events:none on body when open
+ * to trap interactions inside DialogContent. The wallet picker is portaled
+ * to body too, so it inherits the lock and becomes visible-but-unclickable
+ * when launched from a Dialog (e.g. on-chain QuickTrade). Re-enable here. */
+.wallet-adapter-modal,
+.wallet-adapter-modal *,
+/* Same for Privy's modal (wallet confirmations from inside a Dialog). */
+#privy-dialog,
+#privy-dialog *,
+#privy-dialog-backdrop {
+  pointer-events: auto !important;
+}
+
+.market-description-html ul ul ul {
+  list-style-type: square;
+}
+/* ─── Neon glow pulse — color driven by the --glow-color custom prop,
+ * set per-element via inline style so one keyframe covers every tier
+ * color (gold/platinum/turq/purple/red) without duplicating rules. ─── */
+@keyframes pulse-glow-var {
+  0%, 100% {
+    box-shadow: 0 0 0 0 var(--glow-color, transparent);
+  }
+  50% {
+    box-shadow: 0 0 26px 6px var(--glow-color, transparent);
+  }
+}
+
+.animate-glow-pulse {
+  animation: pulse-glow-var 2.4s ease-in-out infinite;
+}
+
+/* Icon glow that follows currentColor — pair with a text-[color] class
+ * on the same lucide-react icon and it picks up the right neon tint. */
+@keyframes neon-icon-pulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 3px currentColor) drop-shadow(0 0 8px currentColor);
+  }
+  50% {
+    filter: drop-shadow(0 0 8px currentColor) drop-shadow(0 0 20px currentColor);
+  }
+}
+
+.animate-neon-icon {
+  animation: neon-icon-pulse 2.4s ease-in-out infinite;
+}
+
+/* Radix Dialog / Popover / Drawer set `data-scroll-locked` on <body>
+ * via react-remove-scroll while a modal is open. Our app scrolls on
+ * the inner `#scroll-root` container (not body), so the body lock is
+ * a no-op — this mirrors the lock onto our real scroll container. */
+body[data-scroll-locked] #scroll-root {
+  overflow: hidden !important;
+}
+
+/*
+ * Privy modal, in the app's style. Privy injects its palette on `:root` at
+ * runtime; `:root:root` outranks it without !important. Theme + accent are set
+ * in PrivyProviders (`appearance`); these are the tokens it does not expose.
+ */
+:root:root {
+  --privy-color-background: var(--card);
+  --privy-color-background-2: var(--secondary);
+  --privy-color-background-hover: var(--accent);
+  --privy-color-background-clicked: var(--accent);
+  --privy-color-foreground: var(--foreground);
+  --privy-color-foreground-2: var(--muted-foreground);
+  --privy-color-foreground-3: var(--muted-foreground);
+  --privy-color-foreground-4: var(--border);
+  --privy-color-border-default: var(--border);
+  --privy-color-accent: var(--brand-turq);
+  --privy-color-accent-light: color-mix(in srgb, var(--brand-turq) 70%, white);
+  --privy-color-accent-dark: color-mix(in srgb, var(--brand-turq) 80%, black);
+  --privy-color-foreground-accent: var(--brand-bg);
+  --privy-color-error: var(--destructive);
+  --privy-border-radius-xs: 4px;
+  --privy-border-radius-sm: 6px;
+  --privy-border-radius-md: 8px;
+  --privy-border-radius-mdlg: 10px;
+  --privy-border-radius-lg: 12px;
+}
+
+#privy-modal-content {
+  border: 1px solid var(--border);
+}
+
+#privy-modal-content,
+#privy-modal-content * {
+  font-family: var(--font-mono);
+}
+
+/* The mark is a viewBox-only SVG: without a size Privy renders it at 0×0. */
+#privy-modal-content img[src$='logo-MarkWhite.svg'] {
+  width: 36px;
+  height: auto;
+}
+
+/* Connect AI in the nav: a shine sweeping across, as on
+   Create market, and a pulsing glow in the AI purple (`cta-glow cta-glow-ai`
+   in theme.css: opacity only, on its own element). Reduced motion is
+   handled globally in theme.css. */
+.ai-cta {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.ai-cta::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(
+    110deg,
+    transparent 30%,
+    rgb(255 255 255 / 0.55) 50%,
+    transparent 70%
+  );
+  transform: translateX(-120%);
+  will-change: transform;
+  animation: ai-cta-shine 3.6s var(--ease-smooth) infinite;
+  pointer-events: none;
+}
+@keyframes ai-cta-shine {
+  0%, 55% { transform: translateX(-120%); }
+  100%    { transform: translateX(120%); }
+}
