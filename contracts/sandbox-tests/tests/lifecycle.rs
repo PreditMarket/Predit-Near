@@ -167,7 +167,8 @@ impl Env {
                 "market_id": id.to_string(),
                 "report": { "proposed": { "outcome": outcome, "reason": "Confirmed from the source" } },
                 "evidence": { "hash": "abcd", "uri": "https://example.com/snapshot",
-                              "ai": { "model": "glm", "chat_id": "c1", "signature": "0xsigned" } }
+                              "ai": { "model": "glm", "chat_id": "c1", "signed_text": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+                                      "signature": "0xababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababab", "signing_address": "0xb98a789cdc4817275f5155593ba73ef2a957e779" } }
             }))
             .transact()
             .await?

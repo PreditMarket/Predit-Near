@@ -334,7 +334,9 @@ impl Contract {
             require!(
                 ai.model.len() <= MAX_SHORT_TEXT
                     && ai.chat_id.len() <= MAX_SHORT_TEXT
-                    && ai.signature.len() <= MAX_SHORT_TEXT,
+                    && ai.signed_text.len() <= MAX_LONG_TEXT
+                    && ai.signature.len() <= MAX_SHORT_TEXT
+                    && ai.signing_address.len() <= MAX_SHORT_TEXT,
                 "Evidence is too long"
             );
         }

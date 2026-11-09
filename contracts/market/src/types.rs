@@ -135,8 +135,11 @@ pub struct DraftRef {
 pub struct AiReading {
     pub model: String,
     pub chat_id: String,
-    /// Signature from the model's enclave over this exchange.
+    /// What the enclave signed: `request_hash:response_hash`.
+    pub signed_text: String,
     pub signature: String,
+    /// The enclave's address, matched against its attestation report.
+    pub signing_address: String,
 }
 
 #[near(serializers = [borsh, json])]

@@ -120,7 +120,10 @@ fn evidence() -> Evidence {
         ai: Some(AiReading {
             model: "glm".into(),
             chat_id: "chat-2".into(),
-            signature: "0xsigned".into(),
+            // Real lengths: two sha256 hex digests, a 65-byte ECDSA signature.
+            signed_text: format!("{}:{}", "c".repeat(64), "d".repeat(64)),
+            signature: format!("0x{}", "ab".repeat(65)),
+            signing_address: "0xb98a789cdc4817275f5155593ba73ef2a957e779".into(),
         }),
     }
 }
@@ -407,7 +410,10 @@ fn the_operator_proposes_an_event_outcome() {
     receipt(&mut c, id, Side::No);
     let r = c.get_market(id).unwrap().receipt.unwrap();
     assert_eq!(r.outcome, Outcome::No);
-    assert_eq!(r.evidence.ai.unwrap().signature, "0xsigned");
+    let ai = r.evidence.ai.unwrap();
+    assert_eq!(ai.signature.len(), 132);
+    assert_eq!(ai.signing_address.len(), 42);
+    assert_eq!(ai.signed_text.len(), 129);
 
     finalize(&mut c, id);
     let record = c.get_record("x:alice".into());

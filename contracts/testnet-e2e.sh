@@ -111,7 +111,7 @@ tx_fails "$MARKET" finalize "{\"market_id\":\"$PRICE_ID\"}" '50.0 Tgas' '0 NEAR'
 wait_until $(( EXP + 3 ))
 
 echo "== receipts"
-op post_receipt "{\"market_id\":\"$PRICE_ID\",\"report\":{\"proposed\":{\"outcome\":\"yes\",\"reason\":\"e2e proposal\"}},\"evidence\":{\"hash\":\"e2e\",\"uri\":\"https://example.com/source\",\"ai\":{\"model\":\"e2e\",\"chat_id\":\"e2e\",\"signature\":\"e2e\"}}}"
+op post_receipt "{\"market_id\":\"$PRICE_ID\",\"report\":{\"proposed\":{\"outcome\":\"yes\",\"reason\":\"e2e proposal\"}},\"evidence\":{\"hash\":\"e2e\",\"uri\":\"https://example.com/source\",\"ai\":{\"model\":\"e2e\",\"chat_id\":\"e2e\",\"signed_text\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"signature\":\"0xababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababab\",\"signing_address\":\"0xb98a789cdc4817275f5155593ba73ef2a957e779\"}}}"
 op post_receipt "{\"market_id\":\"$EVENT_ID\",\"report\":{\"proposed\":{\"outcome\":\"yes\",\"reason\":\"e2e proposal\"}},\"evidence\":{\"hash\":\"e2e\",\"uri\":\"https://example.com/source\",\"ai\":null}}"
 RECEIPT_AT=$(date +%s)
 check "receipt outcome" "$(view "$MARKET" get_market "{\"market_id\":\"$PRICE_ID\"}" | field receipt.outcome)" yes

@@ -327,7 +327,8 @@ def status_is(name, i, expected, outcome="unset"):
     check(name, ok, f"status {m['status']} outcome {m['outcome']}")
 
 
-AI_READING = {"model": "fullcase-model", "chat_id": "chat-1", "signature": "0xsigned"}
+AI_READING = {"model": "fullcase-model", "chat_id": "chat-1", "signed_text": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+              "signature": "0xababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababab", "signing_address": "0xb98a789cdc4817275f5155593ba73ef2a957e779"}
 
 
 def evidence():
@@ -570,7 +571,7 @@ receipt = market(M["price_yes"])["receipt"]
 check("outcome stored", receipt["outcome"] == "yes")
 check("reason stored", receipt["reason"] == "Result from the listed source")
 check("source hash stored", receipt["evidence"]["hash"] == "source-snapshot-hash")
-check("AI reading stored", receipt["evidence"]["ai"]["signature"] == "0xsigned")
+check("AI reading stored", receipt["evidence"]["ai"] == AI_READING)
 op("receipt, source gone", "post_receipt", {"market_id": str(M["source_gone"]), "report": {"invalid": {"kind": "source_unavailable", "reason": "The source is offline"}}, "evidence": evidence()})
 op("receipt, ambiguous", "post_receipt", {"market_id": str(M["slash_op"]), "report": {"invalid": {"kind": "ambiguous_rules", "reason": "Rules could not be applied"}}, "evidence": evidence()})
 op_reject("no second receipt", "Market is not open", "post_receipt", manual(M["price_yes"], "yes"))
