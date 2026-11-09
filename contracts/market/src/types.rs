@@ -1,6 +1,6 @@
 //! On-chain state and JSON shapes.
 
-use near_sdk::json_types::{I64, U128, U64};
+use near_sdk::json_types::{U128, U64};
 use near_sdk::{near, AccountId, NearToken};
 use predit_core::business::{PoolSnapshot, PositionSnapshot};
 use predit_core::state::Side as CoreSide;
@@ -23,12 +23,12 @@ impl From<Side> for CoreSide {
 }
 
 /// Why a market ended without a winner. Only `AmbiguousRules` costs the
-/// creator their bond: a missed oracle window is nobody's fault.
+/// creator their bond: a source going dark is nobody's fault.
 #[near(serializers = [borsh, json])]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum InvalidKind {
-    OracleMissed,
+    SourceUnavailable,
     AmbiguousRules,
 }
 
@@ -61,7 +61,6 @@ pub struct Config {
     pub min_challenge_window_sec: u32,
     pub max_challenge_window_sec: u32,
     pub stuck_after_sec: u32,
-    pub oracle_window_sec: u32,
     /// In collateral atoms.
     pub min_buy: U64,
     pub max_markets_per_post: u8,
@@ -81,7 +80,6 @@ impl Default for Config {
             min_challenge_window_sec: 60,
             max_challenge_window_sec: 7 * 24 * 60 * 60,
             stuck_after_sec: 7 * 24 * 60 * 60,
-            oracle_window_sec: 5,
             min_buy: U64(1_000_000),
             max_markets_per_post: 5,
             trade_fee_bps: 30,
@@ -105,19 +103,6 @@ pub struct PostRef {
     pub text: String,
 }
 
-/// For price markets, the contract settles from this: `price >= strike` is YES,
-/// or `price < strike` when `below` is set. `strike` is in the feed's native
-/// scale (`expo`).
-#[near(serializers = [borsh, json])]
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct OracleSpec {
-    pub symbol: String,
-    pub feed_id: String,
-    pub strike: I64,
-    pub expo: i32,
-    pub below: bool,
-}
-
 /// Everything that is locked at creation. No method can change it.
 #[near(serializers = [borsh, json])]
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -134,9 +119,6 @@ pub struct Rules {
     /// Empty, or an `https://` image URL.
     pub image_url: String,
     pub expiry_sec: U64,
-    /// `None` for every market that is not a price threshold: the operator
-    /// proposes the outcome, with evidence, and it can be challenged.
-    pub oracle: Option<OracleSpec>,
 }
 
 /// Records which model drafted the wording. It has no say in the outcome.
@@ -147,20 +129,30 @@ pub struct DraftRef {
     pub chat_id: String,
 }
 
+/// The NEAR AI reading a person confirmed before the receipt was posted.
+#[near(serializers = [borsh, json])]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AiReading {
+    pub model: String,
+    pub chat_id: String,
+    /// Signature from the model's enclave over this exchange.
+    pub signature: String,
+}
+
 #[near(serializers = [borsh, json])]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Evidence {
-    /// Hex sha256 of the raw oracle update.
+    /// Hex sha256 of the source content, captured at expiry.
     pub hash: String,
     pub uri: String,
+    pub ai: Option<AiReading>,
 }
 
 #[near(serializers = [json])]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum Report {
-    Price { price: I64, expo: i32, publish_time_sec: U64 },
-    Manual { outcome: Side, reason: String },
+    Proposed { outcome: Side, reason: String },
     Invalid { kind: InvalidKind, reason: String },
 }
 
@@ -168,9 +160,7 @@ pub enum Report {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Receipt {
     pub outcome: Outcome,
-    pub price: Option<I64>,
-    pub publish_time_sec: Option<U64>,
-    pub reason: Option<String>,
+    pub reason: String,
     pub evidence: Evidence,
     pub posted_at_sec: U64,
 }

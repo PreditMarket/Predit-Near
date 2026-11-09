@@ -1,12 +1,11 @@
 //! Social prediction markets on NEAR.
 //!
 //! A market is created from a post: its rules are locked at creation against a
-//! bond, people bet USDC on it, and after expiry the operator posts a receipt.
-//! For a price market the operator supplies the price and the contract derives
-//! the outcome from the locked strike (the price itself is not verified on
-//! chain); for any other market the operator proposes the outcome. Anyone can
-//! challenge a receipt for a bond, and finalizing opens redemption and updates
-//! the post author's forecasting record.
+//! bond and people bet USDC on it. After expiry NEAR AI reads the source named
+//! in the rules, a person confirms that reading, and the operator posts it as a
+//! receipt with evidence. Anyone can challenge a receipt for a bond, an arbiter
+//! decides, and finalizing opens redemption and updates the post author's
+//! forecasting record. The AI never settles a market on its own.
 //!
 //! Market maths live in `predit-core`.
 //! This crate only loads state, runs a `plan_*` and moves tokens.
@@ -323,15 +322,22 @@ impl Contract {
 
     // ---- resolution -------------------------------------------------------
 
-    /// Posts the result. On a price market the operator only supplies the price
-    /// and the contract derives the outcome from the locked strike. On any other
-    /// market the operator proposes the outcome and must show evidence.
+    /// Posts the confirmed result of a market, or declares it invalid. The
+    /// outcome only takes effect once the challenge window has passed.
     pub fn post_receipt(&mut self, market_id: U64, report: Report, evidence: Evidence) {
         require!(env::predecessor_account_id() == self.operator, "Operator only");
         require!(
             evidence.hash.len() <= MAX_SHORT_TEXT && evidence.uri.len() <= MAX_LONG_TEXT,
             "Evidence is too long"
         );
+        if let Some(ai) = &evidence.ai {
+            require!(
+                ai.model.len() <= MAX_SHORT_TEXT
+                    && ai.chat_id.len() <= MAX_SHORT_TEXT
+                    && ai.signature.len() <= MAX_SHORT_TEXT,
+                "Evidence is too long"
+            );
+        }
         require!(!evidence.uri.is_empty(), "Evidence is required");
         let mut market = self.market(market_id.0);
         require!(market.status == Status::Open, "Market is not open");
@@ -339,61 +345,16 @@ impl Contract {
         let expiry = market.rules.expiry_sec.0;
         require!(now >= expiry, "Market has not expired");
 
-        let (outcome, price, publish_time_sec, reason) = match report {
-            Report::Price { price, expo, publish_time_sec } => {
-                let oracle = market
-                    .rules
-                    .oracle
-                    .as_ref()
-                    .unwrap_or_else(|| fail("This market has no price oracle".to_string()));
-                require!(price.0 > 0, "Price must be positive");
-                require!(expo == oracle.expo, "Price scale does not match the rules");
-                require!(
-                    publish_time_sec.0 >= expiry
-                        && publish_time_sec.0 <= expiry + self.config.oracle_window_sec as u64,
-                    "Price is outside the settlement window"
-                );
-                require!(publish_time_sec.0 <= now, "Price is from the future");
-                let yes = if oracle.below {
-                    price.0 < oracle.strike.0
-                } else {
-                    price.0 >= oracle.strike.0
-                };
-                (if yes { Outcome::Yes } else { Outcome::No }, Some(price), Some(publish_time_sec), None)
-            }
-            Report::Manual { outcome, reason } => {
-                require!(
-                    market.rules.oracle.is_none(),
-                    "This market settles from its price oracle"
-                );
-                require!(
-                    !reason.is_empty() && reason.len() <= MAX_LONG_TEXT,
-                    "A reason is required"
-                );
+        let (outcome, reason) = match report {
+            Report::Proposed { outcome, reason } => {
                 let outcome = if outcome == Side::Yes { Outcome::Yes } else { Outcome::No };
-                (outcome, None, None, Some(reason))
+                (outcome, reason)
             }
-            Report::Invalid { kind, reason } => {
-                require!(
-                    !reason.is_empty() && reason.len() <= MAX_LONG_TEXT,
-                    "A reason is required"
-                );
-                require!(
-                    market.rules.oracle.is_none() || kind == InvalidKind::OracleMissed,
-                    "A price market can only be invalid for a missed oracle window"
-                );
-                (Outcome::Invalid(kind), None, None, Some(reason))
-            }
+            Report::Invalid { kind, reason } => (Outcome::Invalid(kind), reason),
         };
+        require!(!reason.is_empty() && reason.len() <= MAX_LONG_TEXT, "A reason is required");
 
-        market.receipt = Some(Receipt {
-            outcome,
-            price,
-            publish_time_sec,
-            reason,
-            evidence,
-            posted_at_sec: U64(now),
-        });
+        market.receipt = Some(Receipt { outcome, reason, evidence, posted_at_sec: U64(now) });
         market.status = Status::ReceiptPosted;
         self.markets.insert(market_id.0, market);
         self.open.remove(&market_id.0);
@@ -1050,7 +1011,7 @@ fn validate_config(c: &Config) {
 }
 
 fn validate_text(post: &PostRef, rules: &Rules, draft: &DraftRef) {
-    let mut short = vec![
+    let short = [
         &post.source,
         &post.post_id,
         &post.author_ref,
@@ -1060,10 +1021,6 @@ fn validate_text(post: &PostRef, rules: &Rules, draft: &DraftRef) {
         &draft.model,
         &draft.chat_id,
     ];
-    if let Some(oracle) = &rules.oracle {
-        short.push(&oracle.symbol);
-        short.push(&oracle.feed_id);
-    }
     let long = [
         &post.text,
         &rules.description,

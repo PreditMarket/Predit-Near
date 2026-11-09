@@ -1,12 +1,10 @@
 use super::*;
-use near_sdk::json_types::I64;
 use near_sdk::test_utils::VMContextBuilder;
 use near_sdk::testing_env;
 
 const T0: u64 = 1_000_000;
 const EXPIRY: u64 = T0 + 3_600;
 const USDC: u64 = 1_000_000;
-const STRIKE: i64 = 25_000_000_000;
 
 fn acc(name: &str) -> AccountId {
     name.parse().unwrap()
@@ -46,28 +44,21 @@ fn contract() -> Contract {
 
 fn rules() -> Rules {
     Rules {
-        question: "SOL >= 250 at expiry?".into(),
+        question: "Will SOL close above 250 on the listed date?".into(),
         description: "From a post predicting SOL above 250.".into(),
         yes_label: "Yes".into(),
         no_label: "No".into(),
-        yes_condition: "Pyth SOL/USD >= 250".into(),
-        no_condition: "Pyth SOL/USD < 250".into(),
-        resolution_source: "Pyth SOL/USD".into(),
-        invalid_conditions: "No price in the settlement window".into(),
+        yes_condition: "The listed source shows SOL at or above 250".into(),
+        no_condition: "The listed source shows SOL below 250".into(),
+        resolution_source: "https://www.coingecko.com/en/coins/solana".into(),
+        invalid_conditions: "The source does not show a price".into(),
         category: "Crypto".into(),
         image_url: "https://example.com/sol.png".into(),
         expiry_sec: U64(EXPIRY),
-        oracle: Some(OracleSpec {
-            symbol: "SOL".into(),
-            feed_id: "ef0d".into(),
-            strike: I64(STRIKE),
-            expo: -8,
-            below: false,
-        }),
     }
 }
 
-/// A market with no oracle: a sports result, an election, an announcement.
+/// A market with named sides: a sports result, an election, an announcement.
 fn event_rules() -> Rules {
     Rules {
         question: "Will the Lakers beat the Celtics?".into(),
@@ -81,7 +72,6 @@ fn event_rules() -> Rules {
         category: "Sports".into(),
         image_url: String::new(),
         expiry_sec: U64(EXPIRY),
-        oracle: None,
     }
 }
 
@@ -90,9 +80,8 @@ fn create_event(c: &mut Contract, post_id: &str) -> U64 {
     c.create_market(post(post_id), Side::Yes, event_rules(), draft(), Some(120))
 }
 
-fn manual(c: &mut Contract, id: U64, side: Side) {
-    call(EXPIRY + 1, "operator.near");
-    c.post_receipt(id, Report::Manual { outcome: side, reason: "Final score 110-102".into() }, evidence());
+fn proposed(side: Side) -> Report {
+    Report::Proposed { outcome: side, reason: "Confirmed from the listed source".into() }
 }
 
 fn post(id: &str) -> PostRef {
@@ -124,17 +113,21 @@ fn buy(c: &mut Contract, who: &str, id: U64, side: Side, amount: u64) {
     let _ = c.ft_on_transfer(acc(who), U128(amount as u128), msg);
 }
 
-fn price_report(price: i64) -> Report {
-    Report::Price { price: I64(price), expo: -8, publish_time_sec: U64(EXPIRY) }
-}
-
 fn evidence() -> Evidence {
-    Evidence { hash: "abcd".into(), uri: "https://hermes.pyth.network/x".into() }
+    Evidence {
+        hash: "abcd".into(),
+        uri: "https://example.com/snapshot".into(),
+        ai: Some(AiReading {
+            model: "glm".into(),
+            chat_id: "chat-2".into(),
+            signature: "0xsigned".into(),
+        }),
+    }
 }
 
-fn receipt(c: &mut Contract, id: U64, price: i64) {
+fn receipt(c: &mut Contract, id: U64, side: Side) {
     call(EXPIRY + 1, "operator.near");
-    c.post_receipt(id, price_report(price), evidence());
+    c.post_receipt(id, proposed(side), evidence());
 }
 
 fn finalize(c: &mut Contract, id: U64) {
@@ -366,7 +359,7 @@ fn receipt_is_operator_only() {
     let mut c = contract();
     let id = create(&mut c);
     call(EXPIRY + 1, "anyone.near");
-    c.post_receipt(id, price_report(STRIKE), evidence());
+    c.post_receipt(id, proposed(Side::Yes), evidence());
 }
 
 #[test]
@@ -375,49 +368,7 @@ fn receipt_waits_for_expiry() {
     let mut c = contract();
     let id = create(&mut c);
     call(EXPIRY - 1, "operator.near");
-    c.post_receipt(id, price_report(STRIKE), evidence());
-}
-
-#[test]
-#[should_panic(expected = "outside the settlement window")]
-fn receipt_rejects_a_price_outside_the_window() {
-    let mut c = contract();
-    let id = create(&mut c);
-    call(EXPIRY + 100, "operator.near");
-    let report = Report::Price { price: I64(STRIKE), expo: -8, publish_time_sec: U64(EXPIRY + 6) };
-    c.post_receipt(id, report, evidence());
-}
-
-#[test]
-#[should_panic(expected = "Price scale does not match")]
-fn receipt_rejects_another_scale() {
-    let mut c = contract();
-    let id = create(&mut c);
-    call(EXPIRY + 1, "operator.near");
-    let report = Report::Price { price: I64(STRIKE), expo: -6, publish_time_sec: U64(EXPIRY) };
-    c.post_receipt(id, report, evidence());
-}
-
-#[test]
-fn the_contract_derives_the_outcome_from_the_strike() {
-    let mut c = contract();
-    let at_strike = create_on(&mut c, "p1");
-    let under = create_on(&mut c, "p2");
-    receipt(&mut c, at_strike, STRIKE);
-    receipt(&mut c, under, STRIKE - 1);
-    assert_eq!(c.get_market(at_strike).unwrap().receipt.unwrap().outcome, Outcome::Yes);
-    assert_eq!(c.get_market(under).unwrap().receipt.unwrap().outcome, Outcome::No);
-}
-
-#[test]
-fn a_below_market_inverts_the_comparison() {
-    let mut c = contract();
-    let mut r = rules();
-    r.oracle.as_mut().unwrap().below = true;
-    at(T0, "creator.near", NearToken::from_near(2));
-    let id = c.create_market(post("p1"), Side::Yes, r, draft(), Some(120));
-    receipt(&mut c, id, STRIKE);
-    assert_eq!(c.get_market(id).unwrap().receipt.unwrap().outcome, Outcome::No);
+    c.post_receipt(id, proposed(Side::Yes), evidence());
 }
 
 #[test]
@@ -429,7 +380,7 @@ fn due_and_finalizable_lists_follow_the_lifecycle() {
     call(EXPIRY, "anyone.near");
     assert_eq!(c.get_due_markets(None, None)[0].id, id);
 
-    receipt(&mut c, id, STRIKE);
+    receipt(&mut c, id, Side::Yes);
     assert!(c.get_due_markets(None, None).is_empty());
     assert!(c.get_finalizable(None, None).is_empty());
     call(EXPIRY + 1 + 120, "anyone.near");
@@ -445,7 +396,6 @@ fn an_event_market_keeps_its_labels_and_content() {
     let m = c.get_market(id).unwrap();
     assert_eq!(m.rules.yes_label, "Lakers");
     assert_eq!(m.rules.category, "Sports");
-    assert_eq!(m.rules.oracle, None);
 }
 
 #[test]
@@ -454,10 +404,10 @@ fn the_operator_proposes_an_event_outcome() {
     let id = create_event(&mut c, "p1");
     buy(&mut c, "yes.near", id, Side::Yes, 100 * USDC);
     buy(&mut c, "no.near", id, Side::No, 100 * USDC);
-    manual(&mut c, id, Side::No);
+    receipt(&mut c, id, Side::No);
     let r = c.get_market(id).unwrap().receipt.unwrap();
     assert_eq!(r.outcome, Outcome::No);
-    assert_eq!(r.price, None);
+    assert_eq!(r.evidence.ai.unwrap().signature, "0xsigned");
 
     finalize(&mut c, id);
     let record = c.get_record("x:alice".into());
@@ -468,23 +418,6 @@ fn the_operator_proposes_an_event_outcome() {
 }
 
 #[test]
-#[should_panic(expected = "This market has no price oracle")]
-fn an_event_market_rejects_a_price() {
-    let mut c = contract();
-    let id = create_event(&mut c, "p1");
-    call(EXPIRY + 1, "operator.near");
-    c.post_receipt(id, price_report(STRIKE), evidence());
-}
-
-#[test]
-#[should_panic(expected = "This market settles from its price oracle")]
-fn a_price_market_rejects_a_declared_outcome() {
-    let mut c = contract();
-    let id = create(&mut c);
-    manual(&mut c, id, Side::Yes);
-}
-
-#[test]
 #[should_panic(expected = "Evidence is required")]
 fn an_event_outcome_needs_evidence() {
     let mut c = contract();
@@ -492,8 +425,8 @@ fn an_event_outcome_needs_evidence() {
     call(EXPIRY + 1, "operator.near");
     c.post_receipt(
         id,
-        Report::Manual { outcome: Side::Yes, reason: "trust me".into() },
-        Evidence { hash: String::new(), uri: String::new() },
+        Report::Proposed { outcome: Side::Yes, reason: "trust me".into() },
+        Evidence { hash: String::new(), uri: String::new(), ai: None },
     );
 }
 
@@ -503,7 +436,7 @@ fn only_the_operator_proposes_an_event_outcome() {
     let mut c = contract();
     let id = create_event(&mut c, "p1");
     call(EXPIRY + 1, "creator.near");
-    c.post_receipt(id, Report::Manual { outcome: Side::Yes, reason: "x".into() }, evidence());
+    c.post_receipt(id, Report::Proposed { outcome: Side::Yes, reason: "x".into() }, evidence());
 }
 
 #[test]
@@ -512,7 +445,7 @@ fn an_event_outcome_waits_for_expiry() {
     let mut c = contract();
     let id = create_event(&mut c, "p1");
     call(EXPIRY - 1, "operator.near");
-    c.post_receipt(id, Report::Manual { outcome: Side::Yes, reason: "x".into() }, evidence());
+    c.post_receipt(id, Report::Proposed { outcome: Side::Yes, reason: "x".into() }, evidence());
 }
 
 fn create_with(r: Rules) {
@@ -560,7 +493,7 @@ fn images_must_be_https() {
 fn finalize_waits_for_the_window() {
     let mut c = contract();
     let id = two_sided(&mut c);
-    receipt(&mut c, id, STRIKE);
+    receipt(&mut c, id, Side::Yes);
     call(EXPIRY + 1 + 119, "anyone.near");
     c.finalize(id);
 }
@@ -570,7 +503,7 @@ fn finalize_waits_for_the_window() {
 fn redeem_waits_for_finalize() {
     let mut c = contract();
     let id = two_sided(&mut c);
-    receipt(&mut c, id, STRIKE);
+    receipt(&mut c, id, Side::Yes);
     yocto(EXPIRY + 2, "yes.near");
     let _ = c.redeem(id);
 }
@@ -579,7 +512,7 @@ fn redeem_waits_for_finalize() {
 fn the_winner_takes_the_losing_stake() {
     let mut c = contract();
     let id = two_sided(&mut c);
-    receipt(&mut c, id, STRIKE);
+    receipt(&mut c, id, Side::Yes);
     finalize(&mut c, id);
     assert_eq!(status(&c, id), Status::Finalized);
 
@@ -599,7 +532,7 @@ fn the_winner_takes_the_losing_stake() {
 fn the_loser_has_nothing_to_redeem() {
     let mut c = contract();
     let id = two_sided(&mut c);
-    receipt(&mut c, id, STRIKE);
+    receipt(&mut c, id, Side::Yes);
     finalize(&mut c, id);
     yocto(EXPIRY + 200, "no.near");
     let _ = c.redeem(id);
@@ -610,7 +543,7 @@ fn the_loser_has_nothing_to_redeem() {
 fn a_winner_cannot_redeem_twice() {
     let mut c = contract();
     let id = two_sided(&mut c);
-    receipt(&mut c, id, STRIKE);
+    receipt(&mut c, id, Side::Yes);
     finalize(&mut c, id);
     yocto(EXPIRY + 200, "yes.near");
     let _ = c.redeem(id);
@@ -622,7 +555,7 @@ fn a_one_sided_market_refunds() {
     let mut c = contract();
     let id = create(&mut c);
     buy(&mut c, "yes.near", id, Side::Yes, 100 * USDC);
-    receipt(&mut c, id, STRIKE);
+    receipt(&mut c, id, Side::Yes);
     finalize(&mut c, id);
 
     yocto(EXPIRY + 200, "yes.near");
@@ -638,11 +571,11 @@ fn an_invalid_market_refunds_both_sides() {
     call(EXPIRY + 1, "operator.near");
     c.post_receipt(
         id,
-        Report::Invalid { kind: InvalidKind::OracleMissed, reason: "no price".into() },
+        Report::Invalid { kind: InvalidKind::SourceUnavailable, reason: "no price".into() },
         evidence(),
     );
     finalize(&mut c, id);
-    assert_eq!(c.get_market(id).unwrap().outcome, Some(Outcome::Invalid(InvalidKind::OracleMissed)));
+    assert_eq!(c.get_market(id).unwrap().outcome, Some(Outcome::Invalid(InvalidKind::SourceUnavailable)));
 
     yocto(EXPIRY + 200, "yes.near");
     let _ = c.refund(id);
@@ -664,7 +597,7 @@ fn challenge(c: &mut Contract, id: U64) {
 fn challenge_needs_a_bond() {
     let mut c = contract();
     let id = two_sided(&mut c);
-    receipt(&mut c, id, STRIKE);
+    receipt(&mut c, id, Side::Yes);
     at(EXPIRY + 2, "challenger.near", NearToken::from_millinear(1));
     c.challenge(id, "x".into());
 }
@@ -674,7 +607,7 @@ fn challenge_needs_a_bond() {
 fn challenge_closes_with_the_window() {
     let mut c = contract();
     let id = two_sided(&mut c);
-    receipt(&mut c, id, STRIKE);
+    receipt(&mut c, id, Side::Yes);
     at(EXPIRY + 1 + 120, "challenger.near", NearToken::from_near(1));
     c.challenge(id, "x".into());
 }
@@ -684,7 +617,7 @@ fn challenge_closes_with_the_window() {
 fn a_challenge_blocks_finalize() {
     let mut c = contract();
     let id = two_sided(&mut c);
-    receipt(&mut c, id, STRIKE);
+    receipt(&mut c, id, Side::Yes);
     challenge(&mut c, id);
     finalize(&mut c, id);
 }
@@ -694,7 +627,7 @@ fn a_challenge_blocks_finalize() {
 fn arbitrate_is_arbiter_only() {
     let mut c = contract();
     let id = two_sided(&mut c);
-    receipt(&mut c, id, STRIKE);
+    receipt(&mut c, id, Side::Yes);
     challenge(&mut c, id);
     call(EXPIRY + 3, "operator.near");
     c.arbitrate(id, Decision::Uphold);
@@ -705,7 +638,7 @@ fn arbitrate_is_arbiter_only() {
 fn overturn_must_change_something() {
     let mut c = contract();
     let id = two_sided(&mut c);
-    receipt(&mut c, id, STRIKE);
+    receipt(&mut c, id, Side::Yes);
     challenge(&mut c, id);
     call(EXPIRY + 3, "arbiter.near");
     c.arbitrate(id, Decision::Overturn(Outcome::Yes));
@@ -715,7 +648,7 @@ fn overturn_must_change_something() {
 fn overturn_flips_the_winner() {
     let mut c = contract();
     let id = two_sided(&mut c);
-    receipt(&mut c, id, STRIKE);
+    receipt(&mut c, id, Side::Yes);
     challenge(&mut c, id);
     call(EXPIRY + 3, "arbiter.near");
     c.arbitrate(id, Decision::Overturn(Outcome::No));
@@ -730,7 +663,7 @@ fn overturn_flips_the_winner() {
 fn uphold_keeps_the_receipt() {
     let mut c = contract();
     let id = two_sided(&mut c);
-    receipt(&mut c, id, STRIKE);
+    receipt(&mut c, id, Side::Yes);
     challenge(&mut c, id);
     call(EXPIRY + 3, "arbiter.near");
     c.arbitrate(id, Decision::Uphold);
@@ -743,7 +676,7 @@ fn uphold_keeps_the_receipt() {
 fn a_correct_call_counts_for_the_author() {
     let mut c = contract();
     let id = two_sided(&mut c);
-    receipt(&mut c, id, STRIKE);
+    receipt(&mut c, id, Side::Yes);
     finalize(&mut c, id);
     let r = c.get_record("x:alice".into());
     assert_eq!((r.correct, r.wrong), (1, 0));
@@ -753,7 +686,7 @@ fn a_correct_call_counts_for_the_author() {
 fn a_wrong_call_counts_against_the_author() {
     let mut c = contract();
     let id = two_sided(&mut c);
-    receipt(&mut c, id, STRIKE - 1);
+    receipt(&mut c, id, Side::No);
     finalize(&mut c, id);
     let r = c.get_record("x:alice".into());
     assert_eq!((r.correct, r.wrong), (0, 1));
@@ -764,7 +697,7 @@ fn a_market_nobody_bet_against_does_not_count() {
     let mut c = contract();
     let id = create(&mut c);
     buy(&mut c, "yes.near", id, Side::Yes, 100 * USDC);
-    receipt(&mut c, id, STRIKE);
+    receipt(&mut c, id, Side::Yes);
     finalize(&mut c, id);
     assert_eq!(c.get_record("x:alice".into()), ForecastRecord::default());
 }
@@ -777,7 +710,7 @@ fn only_the_first_market_on_a_post_counts() {
     for id in [a, b] {
         buy(&mut c, "yes.near", id, Side::Yes, 10 * USDC);
         buy(&mut c, "no.near", id, Side::No, 10 * USDC);
-        receipt(&mut c, id, STRIKE);
+        receipt(&mut c, id, Side::Yes);
         finalize(&mut c, id);
     }
     let r = c.get_record("x:alice".into());
@@ -853,7 +786,7 @@ fn claim_stuck_frees_a_silent_market() {
 fn a_silent_arbiter_leaves_the_receipt_standing() {
     let mut c = contract();
     let id = two_sided(&mut c);
-    receipt(&mut c, id, STRIKE);
+    receipt(&mut c, id, Side::Yes);
     challenge(&mut c, id);
     call(EXPIRY + 2 + 7 * 86_400, "anyone.near");
     c.claim_stuck(id);
@@ -871,7 +804,7 @@ fn a_late_challenge_cannot_void_the_market() {
     let id = c.create_market(post("p1"), Side::Yes, rules(), draft(), Some(7 * 86_400));
     buy(&mut c, "yes.near", id, Side::Yes, 100 * USDC);
     buy(&mut c, "no.near", id, Side::No, 100 * USDC);
-    receipt(&mut c, id, STRIKE);
+    receipt(&mut c, id, Side::Yes);
     at(EXPIRY + 7 * 86_400, "no.near", NearToken::from_near(1));
     c.challenge(id, "x".into());
     call(EXPIRY + 7 * 86_400, "no.near");
@@ -883,7 +816,7 @@ fn a_late_challenge_cannot_void_the_market() {
 fn claim_stuck_leaves_a_receipted_market_alone() {
     let mut c = contract();
     let id = two_sided(&mut c);
-    receipt(&mut c, id, STRIKE);
+    receipt(&mut c, id, Side::Yes);
     call(EXPIRY + 7 * 86_400, "anyone.near");
     c.claim_stuck(id);
 }
@@ -891,16 +824,47 @@ fn claim_stuck_leaves_a_receipted_market_alone() {
 // ---- review fixes ----------------------------------------------------------
 
 #[test]
-#[should_panic(expected = "A price market can only be invalid for a missed oracle window")]
-fn the_operator_cannot_call_a_price_market_ambiguous() {
+#[should_panic(expected = "A reason is required")]
+fn a_proposal_needs_a_reason() {
     let mut c = contract();
     let id = create(&mut c);
     call(EXPIRY + 1, "operator.near");
-    c.post_receipt(
-        id,
-        Report::Invalid { kind: InvalidKind::AmbiguousRules, reason: "x".into() },
-        evidence(),
-    );
+    c.post_receipt(id, Report::Proposed { outcome: Side::Yes, reason: String::new() }, evidence());
+}
+
+#[test]
+fn a_receipt_can_carry_no_ai_reading() {
+    let mut c = contract();
+    let id = create(&mut c);
+    call(EXPIRY + 1, "operator.near");
+    let e = Evidence { ai: None, ..evidence() };
+    c.post_receipt(id, proposed(Side::Yes), e);
+    assert_eq!(c.get_market(id).unwrap().receipt.unwrap().evidence.ai, None);
+}
+
+#[test]
+#[should_panic(expected = "Evidence is too long")]
+fn the_ai_reading_is_size_limited() {
+    let mut c = contract();
+    let id = create(&mut c);
+    call(EXPIRY + 1, "operator.near");
+    let mut e = evidence();
+    e.ai.as_mut().unwrap().signature = "x".repeat(MAX_SHORT_TEXT + 1);
+    c.post_receipt(id, proposed(Side::Yes), e);
+}
+
+#[test]
+fn an_ambiguous_market_forfeits_nothing_but_the_bond() {
+    let mut c = contract();
+    let id = create(&mut c);
+    buy(&mut c, "yes.near", id, Side::Yes, 100 * USDC);
+    buy(&mut c, "no.near", id, Side::No, 100 * USDC);
+    call(EXPIRY + 1, "operator.near");
+    c.post_receipt(id, Report::Invalid { kind: InvalidKind::AmbiguousRules, reason: "x".into() }, evidence());
+    finalize(&mut c, id);
+    yocto(EXPIRY + 200, "yes.near");
+    let _ = c.refund(id);
+    assert_eq!(c.get_accounting().in_flight.0, 99_700_000);
 }
 
 #[test]
@@ -911,26 +875,9 @@ fn invalid_needs_a_reason() {
     call(EXPIRY + 1, "operator.near");
     c.post_receipt(
         id,
-        Report::Invalid { kind: InvalidKind::OracleMissed, reason: String::new() },
+        Report::Invalid { kind: InvalidKind::SourceUnavailable, reason: String::new() },
         evidence(),
     );
-}
-
-#[test]
-#[should_panic(expected = "Evidence is required")]
-fn a_price_receipt_needs_evidence() {
-    let mut c = contract();
-    let id = create(&mut c);
-    call(EXPIRY + 1, "operator.near");
-    c.post_receipt(id, price_report(STRIKE), Evidence { hash: String::new(), uri: String::new() });
-}
-
-#[test]
-#[should_panic(expected = "Price must be positive")]
-fn a_negative_price_is_rejected() {
-    let mut c = contract();
-    let id = create(&mut c);
-    receipt(&mut c, id, i64::MIN);
 }
 
 #[test]
@@ -938,7 +885,7 @@ fn a_negative_price_is_rejected() {
 fn the_arbiter_cannot_challenge() {
     let mut c = contract();
     let id = two_sided(&mut c);
-    receipt(&mut c, id, STRIKE);
+    receipt(&mut c, id, Side::Yes);
     at(EXPIRY + 2, "arbiter.near", NearToken::from_near(1));
     c.challenge(id, "x".into());
 }
@@ -1037,7 +984,7 @@ fn bonds_are_released_when_a_market_ends() {
     let mut c = contract();
     let id = two_sided(&mut c);
     assert_eq!(c.bonds_outstanding, NearToken::from_near(1).as_yoctonear());
-    receipt(&mut c, id, STRIKE);
+    receipt(&mut c, id, Side::Yes);
     challenge(&mut c, id);
     assert_eq!(c.bonds_outstanding, NearToken::from_near(2).as_yoctonear());
     call(EXPIRY + 3, "arbiter.near");
@@ -1080,7 +1027,7 @@ fn set_roles_is_owner_only() {
 fn pause_does_not_block_exits() {
     let mut c = contract();
     let id = two_sided(&mut c);
-    receipt(&mut c, id, STRIKE);
+    receipt(&mut c, id, Side::Yes);
     finalize(&mut c, id);
     call(EXPIRY + 150, "owner.near");
     c.set_paused(true);
@@ -1151,13 +1098,13 @@ fn run_random_operations(seed: u64) {
 
         for (i, id) in markets.iter().enumerate() {
             match i {
-                0 => receipt(&mut c, *id, STRIKE),
-                1 => receipt(&mut c, *id, STRIKE - 1),
+                0 => receipt(&mut c, *id, Side::Yes),
+                1 => receipt(&mut c, *id, Side::No),
                 _ => {
                     call(EXPIRY + 1, "operator.near");
                     c.post_receipt(
                         *id,
-                        Report::Invalid { kind: InvalidKind::OracleMissed, reason: "x".into() },
+                        Report::Invalid { kind: InvalidKind::SourceUnavailable, reason: "x".into() },
                         evidence(),
                     );
                 }

@@ -6,7 +6,6 @@ use near_workspaces::{Account, Contract, Worker};
 use serde_json::{json, Value};
 
 const USDC: u128 = 1_000_000;
-const STRIKE: i64 = 25_000_000_000;
 const WINDOW: u32 = 5;
 const LIFETIME: u64 = 20;
 
@@ -70,7 +69,6 @@ async fn setup() -> anyhow::Result<Env> {
                 "min_challenge_window_sec": 1,
                 "max_challenge_window_sec": 3600,
                 "stuck_after_sec": 3600,
-                "oracle_window_sec": 5,
                 "min_buy": "1000000",
                 "max_markets_per_post": 5,
                 "trade_fee_bps": 30,
@@ -105,14 +103,12 @@ impl Env {
     }
 
     async fn create(&self, post_id: &str) -> anyhow::Result<(u64, u64)> {
-        let oracle = json!({ "symbol": "SOL", "feed_id": "ef0d", "strike": STRIKE.to_string(), "expo": -8, "below": false });
-        self.create_market(post_id, oracle, "Yes", "No").await
+        self.create_market(post_id, "Yes", "No").await
     }
 
     async fn create_market(
         &self,
         post_id: &str,
-        oracle: Value,
         yes_label: &str,
         no_label: &str,
     ) -> anyhow::Result<(u64, u64)> {
@@ -124,18 +120,17 @@ impl Env {
                 "post": { "source": "x", "post_id": post_id, "author_ref": "x:alice", "text": "SOL will exceed $250" },
                 "claim_side": "yes",
                 "rules": {
-                    "question": "SOL >= 250 at expiry?",
+                    "question": "Will SOL close above 250?",
                     "description": "From a post on X",
                     "yes_label": yes_label,
                     "no_label": no_label,
                     "category": "Crypto",
                     "image_url": "",
-                    "yes_condition": "Pyth SOL/USD >= 250",
-                    "no_condition": "Pyth SOL/USD < 250",
-                    "resolution_source": "Pyth SOL/USD",
-                    "invalid_conditions": "No price in the settlement window",
-                    "expiry_sec": expiry.to_string(),
-                    "oracle": oracle
+                    "yes_condition": "Source shows SOL at or above 250",
+                    "no_condition": "Source shows SOL below 250",
+                    "resolution_source": "https://www.coingecko.com/en/coins/solana",
+                    "invalid_conditions": "The source shows no price",
+                    "expiry_sec": expiry.to_string()
                 },
                 "draft": { "model": "glm", "chat_id": "chat-1" },
                 "challenge_window_sec": WINDOW
@@ -164,14 +159,15 @@ impl Env {
         Ok(())
     }
 
-    async fn receipt(&self, id: u64, expiry: u64, price: i64) -> anyhow::Result<()> {
+    async fn receipt(&self, id: u64, expiry: u64, outcome: &str) -> anyhow::Result<()> {
         self.advance_to(expiry + 1).await?;
         self.operator
             .call(self.market.id(), "post_receipt")
             .args_json(json!({
                 "market_id": id.to_string(),
-                "report": { "price": { "price": price.to_string(), "expo": -8, "publish_time_sec": expiry.to_string() } },
-                "evidence": { "hash": "abcd", "uri": "https://hermes.pyth.network/x" }
+                "report": { "proposed": { "outcome": outcome, "reason": "Confirmed from the source" } },
+                "evidence": { "hash": "abcd", "uri": "https://example.com/snapshot",
+                              "ai": { "model": "glm", "chat_id": "c1", "signature": "0xsigned" } }
             }))
             .transact()
             .await?
@@ -262,7 +258,7 @@ async fn full_lifecycle_pays_the_winner_and_updates_the_record() -> anyhow::Resu
     e.assert_solvent(FAUCET).await?;
 
     let creator_before = e.near(&e.creator).await?;
-    e.receipt(id, expiry, STRIKE + 1).await?;
+    e.receipt(id, expiry, "yes").await?;
     e.finalize(id).await?;
 
     let m = e.get_market(id).await?;
@@ -299,7 +295,7 @@ async fn full_lifecycle_pays_the_winner_and_updates_the_record() -> anyhow::Resu
 #[tokio::test]
 async fn an_event_market_settles_from_the_operator_proposal() -> anyhow::Result<()> {
     let e = setup().await?;
-    let (id, expiry) = e.create_market("p1", Value::Null, "Lakers", "Celtics").await?;
+    let (id, expiry) = e.create_market("p1", "Lakers", "Celtics").await?;
     e.buy(&e.alice, id, "yes", 50 * USDC).await?;
     e.buy(&e.bob, id, "no", 50 * USDC).await?;
     e.advance_to(expiry + 1).await?;
@@ -308,8 +304,8 @@ async fn an_event_market_settles_from_the_operator_proposal() -> anyhow::Result<
         .call(e.market.id(), "post_receipt")
         .args_json(json!({
             "market_id": id.to_string(),
-            "report": { "manual": { "outcome": "no", "reason": "Final score 102-110" } },
-            "evidence": { "hash": "abcd", "uri": "https://www.nba.com/scores" }
+            "report": { "proposed": { "outcome": "no", "reason": "Final score 102-110" } },
+            "evidence": { "hash": "abcd", "uri": "https://www.nba.com/scores", "ai": null }
         }))
         .transact()
         .await?
@@ -440,7 +436,7 @@ async fn challenged(e: &Env) -> anyhow::Result<u64> {
     let (id, expiry) = e.create("p1").await?;
     e.buy(&e.alice, id, "yes", 50 * USDC).await?;
     e.buy(&e.bob, id, "no", 50 * USDC).await?;
-    e.receipt(id, expiry, STRIKE).await?;
+    e.receipt(id, expiry, "yes").await?;
     e.bob
         .call(e.market.id(), "challenge")
         .args_json(json!({ "market_id": id.to_string(), "reason_uri": "https://example.com" }))
