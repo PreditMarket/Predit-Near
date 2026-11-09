@@ -2,14 +2,11 @@
 
 import { useEffect, useRef, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { Loader2, Search as SearchIcon, Zap } from 'lucide-react';
+import { Loader2, Search as SearchIcon } from 'lucide-react';
 import MarketListKol, { type MarketListKolStatus } from '@/components/market/market-list-kol';
-import { PortfolioRaffles } from '@/components/portfolio/portfolio-raffles';
-import { WithdrawLiquidityList } from '@/components/portfolio/withdraw-liquidity-list';
 import { ResponsiveTable, SegmentedTabs, type SegmentedTabOption } from '@/components/v2';
 import type { PositionsSort, PositionsTab } from '@/lib/v2/portfolio-positions';
-import { useAuthStore } from '@/store/auth.store';
-import { canCloneMarket, checkIsAdmin } from '@/utils/is-admin';
+import { useNearWallet } from '@/store/near-wallet.store';
 import { PositionCard } from './position-card';
 import { POSITION_COLUMNS } from './position-columns';
 import { SortMenu } from './sort-menu';
@@ -19,14 +16,6 @@ import { MARKET_STATUSES, usePositionsUrl, type PortfolioTab } from './use-posit
 const SORT_OPTIONS: { value: PositionsSort; label: ReactNode }[] = [
   { value: 'recent', label: 'Recent' },
   { value: 'value', label: 'Value' },
-  {
-    value: 'xp',
-    label: (
-      <span className="inline-flex items-center gap-1">
-        <Zap className="w-3 h-3" /> XP
-      </span>
-    ),
-  },
 ];
 
 const STATUS_LABEL: Record<MarketListKolStatus, string> = {
@@ -48,16 +37,11 @@ const isPositionsTab = (tab: PortfolioTab): tab is PositionsTab =>
   tab === 'open' || tab === 'history' || tab === 'resolved' || tab === 'cancelled';
 
 /**
- * Positions and the account's other lists, one tab at a time. Raffles, my
- * markets and withdraw-liquidity mount — and fetch — only when their tab is
- * open.
+ * Positions and the markets this account created, one tab at a time.
  */
 export function PositionsSection() {
   const router = useRouter();
-  const user = useAuthStore((s) => s.user);
-  // Anyone signed in can clone a market, so anyone can own one.
-  const canSeeMyMarkets = canCloneMarket(user);
-  const canSeeWithdraw = checkIsAdmin(user);
+  const canSeeMyMarkets = !!useNearWallet((s) => s.accountId);
   const url = usePositionsUrl();
   const { tab } = url;
   const positionsTab = isPositionsTab(tab) ? tab : null;
@@ -86,14 +70,11 @@ export function PositionsSection() {
   const count = (n: number) => (loading ? null : n);
   const tabs: SegmentedTabOption<PortfolioTab>[] = [
     { value: 'open', label: 'Open', count: count(counts.open) },
-    { value: 'history', label: 'Trades', count: count(counts.history) },
     { value: 'resolved', label: 'Settled', count: count(counts.resolved) },
     ...(counts.cancelled > 0 || tab === 'cancelled'
       ? [{ value: 'cancelled' as const, label: 'Cancelled', count: count(counts.cancelled) }]
       : []),
-    { value: 'raffles', label: 'Raffles' },
     ...(canSeeMyMarkets ? [{ value: 'my-markets' as const, label: 'Markets' }] : []),
-    ...(canSeeWithdraw ? [{ value: 'withdraw' as const, label: 'Withdraw' }] : []),
   ];
   const myMarkets = tab === 'my-markets';
   const hasToolbar = positionsTab !== null || myMarkets;
@@ -138,16 +119,12 @@ export function PositionsSection() {
       </div>
 
       <div className="mt-4">
-        {tab === 'raffles' ? (
-          <PortfolioRaffles />
-        ) : myMarkets ? (
+        {myMarkets ? (
           <MarketListKol
             hideToolbar
             externalSearchTerm={url.marketsSearch}
             externalStatusFilter={url.marketsStatus}
           />
-        ) : tab === 'withdraw' ? (
-          <WithdrawLiquidityList />
         ) : (
           positionsTab && (
             <>

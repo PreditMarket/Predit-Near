@@ -12,6 +12,9 @@
  */
 
 import { SERVER_FETCH_HEADERS } from '@/lib/server-api';
+import { getNearMarket } from '@/lib/near/contract';
+import { statusOf } from '@/lib/near/map';
+import { listNearMarkets } from '@/lib/near/market-list';
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL ?? '').replace(/\/$/, '');
 
@@ -143,31 +146,10 @@ export async function fetchActivePammMarkets(
   limit = 50,
 ): Promise<ActivePammMarket[]> {
   try {
-    const params = new URLSearchParams({
-      page: '1',
-      limit: String(limit),
-      status: 'active',
-    });
-    const res = await fetch(`${API_BASE}/pamm-markets?${params.toString()}`, {
-      headers: SERVER_FETCH_HEADERS,
-      next: { revalidate: 300, tags: ['pamm-market-list'] },
-    });
-    if (!res.ok) return [];
-    const raw = (await res.json()) as {
-      data?: Array<{
-        kind?: string;
-        market?: { id?: string; question?: string; updatedAt?: string };
-      }>;
-    };
-    return (raw.data ?? []).flatMap((item) =>
-      item.kind === 'market' && item.market?.id && item.market.question
-        ? [
-            {
-              id: item.market.id,
-              question: item.market.question,
-              updatedAt: item.market.updatedAt,
-            },
-          ]
+    const { data } = await listNearMarkets({ page: 1, limit, status: 'active' });
+    return data.flatMap((item) =>
+      item.kind === 'market'
+        ? [{ id: item.market.id, question: item.market.question, updatedAt: item.market.updatedAt }]
         : [],
     );
   } catch {
@@ -175,45 +157,31 @@ export async function fetchActivePammMarkets(
   }
 }
 
-/** Solana pubkeys are base58 (no hyphens), 32–44 chars. UUIDs always contain hyphens. */
-export function isSolanaPubkey(id: string): boolean {
-  return !id.includes('-') && id.length >= 32 && id.length <= 44;
-}
+/** Market ids are the contract's sequence numbers. */
+const readNearMarket = async (id: string) =>
+  /^\d+$/.test(id) ? getNearMarket(id).catch(() => null) : null;
 
 export async function fetchPammMarketMeta(id: string): Promise<MarketMeta | null> {
-  const raw = await safeFetch<{
-    id?: string;
-    question?: string;
-    description?: string | null;
-    thumbnail?: { path?: string | null } | null;
-  }>(`${API_BASE}/pamm-markets/${id}`, { revalidate: 300 });
-  if (!raw) return null;
-  const marketId = raw.id ?? id;
+  const market = await readNearMarket(id);
+  if (!market) return null;
   return {
-    title: raw.question ?? 'On-chain Market',
+    title: market.rules.question,
     description:
-      htmlToMetaText(raw.description ?? '') ||
+      htmlToMetaText(market.rules.description) ||
       'Trade on this on-chain prediction market on Predit.',
-    image: `${API_BASE}/pamm-markets/${marketId}/og-image.png`,
+    image: market.rules.image_url || undefined,
   };
 }
 
 export async function fetchPammMarketDetail(id: string): Promise<MarketDetailSnapshot | null> {
-  const raw = await safeFetch<{
-    id?: string;
-    question?: string;
-    description?: string | null;
-    thumbnail?: { path?: string | null } | null;
-    status?: string;
-  }>(`${API_BASE}/pamm-markets/${id}`, { revalidate: 300 });
-  if (!raw || !raw.question) return null;
-  const marketId = raw.id ?? id;
+  const market = await readNearMarket(id);
+  if (!market) return null;
   return {
-    id: marketId,
-    question: raw.question,
-    description: htmlToMetaText(raw.description ?? '', 500),
-    image: raw.thumbnail?.path ?? undefined,
-    status: raw.status,
+    id: market.id,
+    question: market.rules.question,
+    description: htmlToMetaText(market.rules.description, 500),
+    image: market.rules.image_url || undefined,
+    status: statusOf(market),
   };
 }
 

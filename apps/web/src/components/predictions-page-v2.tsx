@@ -1,13 +1,12 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { ColumnBar, ColumnTitle } from '@/components/app-shell/column-bar';
 
 import { getCategories, type Category } from '@/services/categories.service';
-import { RightRailPreditAi } from '@/components/home/right-rail-predit-ai';
 import MarketList from '@/components/market/market-list';
 import type { PammMarketListItem } from '@/services/pamm-market.service';
 
@@ -15,9 +14,9 @@ import type { PammMarketListItem } from '@/services/pamm-market.service';
 const HEADER_BG = 'color-mix(in srgb, var(--background) 85%, transparent)';
 
 /**
- * Predictions page (v2) — 3-column mockup shell w/ collapsible side rails.
- * Item list is the unchanged origin `MarketList`. Both rails collapse; their
- * expand anchors live in the center sticky topbar (mirrors the Home (`/`) pattern).
+ * Predictions page (v2) — category rail and the market list.
+ * Item list is the unchanged origin `MarketList`. The rail collapses; its
+ * expand anchor lives in the center sticky topbar (mirrors the Home (`/`) pattern).
  */
 export default function PredictionsPageV2({
   initialPammItems,
@@ -31,7 +30,6 @@ export default function PredictionsPageV2({
   const searchParams = useSearchParams();
   const activeSlug = searchParams?.get('category') ?? null;
   const [leftCollapsed, setLeftCollapsed] = useState(false);
-  const [rightCollapsed, setRightCollapsed] = useState(false);
 
   const { data: categories = [] } = useQuery({
     queryKey: ['categories-list'],
@@ -53,12 +51,7 @@ export default function PredictionsPageV2({
     window.history.pushState(null, '', q ? `${pathname}?${q}` : pathname);
   };
 
-  const cols = useMemo(() => {
-    if (leftCollapsed && rightCollapsed) return 'grid-cols-1';
-    if (leftCollapsed) return 'grid-cols-1 lg:grid-cols-[1fr_320px]';
-    if (rightCollapsed) return 'grid-cols-1 md:grid-cols-[240px_1fr]';
-    return 'grid-cols-1 md:grid-cols-[240px_1fr] lg:grid-cols-[240px_1fr_320px]';
-  }, [leftCollapsed, rightCollapsed]);
+  const cols = leftCollapsed ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-[240px_1fr]';
 
   return (
     // A fixed-height shell like home, chat and the trade pages: only the
@@ -116,11 +109,9 @@ export default function PredictionsPageV2({
             hideCategoryTabs
             categorySlug={activeSlug}
             gridColsClassName={
-              leftCollapsed && rightCollapsed
+              leftCollapsed
                 ? 'grid-cols-1 md:grid-cols-3 xl:grid-cols-4'
-                : leftCollapsed || rightCollapsed
-                  ? 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3'
-                  : 'grid-cols-1 md:grid-cols-2'
+                : 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3'
             }
             headerLeadingSlot={
               leftCollapsed ? (
@@ -131,21 +122,8 @@ export default function PredictionsPageV2({
                 />
               ) : null
             }
-            headerTrailingSlot={
-              rightCollapsed ? (
-                <RailExpandChip
-                  side="right"
-                  label="Predit AI"
-                  onClick={() => setRightCollapsed(false)}
-                />
-              ) : null
-            }
           />
         </main>
-
-        {!rightCollapsed && (
-          <RightRailPreditAi onCollapse={() => setRightCollapsed(true)} />
-        )}
       </div>
     </div>
   );

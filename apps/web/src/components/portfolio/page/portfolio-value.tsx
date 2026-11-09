@@ -1,109 +1,72 @@
 'use client';
 
-import { useState } from 'react';
-import { Money, SegmentedTabs, StatTile } from '@/components/v2';
-import type { PortfolioSummaryState } from '@/hooks/v2/use-portfolio-summary';
-import {
-  BlankLine,
-  LineRow,
-  PerpsLineRow,
-  PnlCell,
-  type LineStates,
-} from './portfolio-value-lines';
-
-type Group = 'spot' | 'perps';
-
-const GROUPS = [
-  { value: 'spot' as const, label: 'Spot & Predictions' },
-  { value: 'perps' as const, label: 'Perps' },
-];
+import type { ReactNode } from 'react';
+import Link from 'next/link';
+import { StatTile } from '@/components/v2';
+import { useMarketTx } from '@/hooks/pamm/use-market-tx';
+import { useNearFunds } from '@/hooks/pamm/use-near-funds';
+import { USDC_DECIMALS, USDC_SYMBOL } from '@/lib/near/config';
+import { withdrawOnNear } from '@/lib/near/contract';
+import { usePortfolioStore } from '@/store/portfolio.store';
 
 const HEAD_TILE = 'px-3 py-2.5 bg-muted/20';
 
-/**
- * The account's money, in two groups never added together: spot plus
- * prediction markets, or perps (one line per wallet, each a click from its
- * terminal). Both groups show the same four figures and are as tall as the
- * longer one, so toggling never moves the page. PnL is the engine's, so a
- * group's lines sum to its headline.
- */
-export function PortfolioValue({ summary }: Readonly<{ summary: PortfolioSummaryState }>) {
-  const [group, setGroup] = useState<Group>('spot');
-  const { loading, pnlFailed } = summary;
-  const head = group === 'spot' ? summary.spotPredictions : summary.perps;
-  const valueLoading = group === 'spot' ? loading.spot || loading.pnl : loading.perps;
-  const pnl = { loading: loading.pnl, failed: pnlFailed };
+function Amount({ value }: { value: number }) {
+  return (
+    <span className="tabular-nums">
+      {value.toLocaleString('en-US', { maximumFractionDigits: 2 })} {USDC_SYMBOL}
+    </span>
+  );
+}
 
-  const spotLines = 2;
-  const perpsLines = summary.perps.venues.length;
-  const rows = Math.max(spotLines, perpsLines);
-  const shown = group === 'spot' ? spotLines : perpsLines;
-  const lineStates = (valueLoadingFor: boolean): LineStates => ({
-    valueLoading: valueLoadingFor,
-    pnlLoading: loading.pnl,
-    pnlFailed,
-  });
+const ACTION =
+  'font-mono text-[11px] font-bold uppercase tracking-wider text-primary hover:underline disabled:opacity-50';
+
+/** The wallet's tUSDC, the stake in positions, and what the contract holds for this account. */
+export function PortfolioValue() {
+  const { data: funds, isLoading } = useNearFunds();
+  const inPositions = usePortfolioStore((s) => s.totalValue);
+  const positionsLoading = usePortfolioStore((s) => s.summaryLoading);
+  const withdraw = useMarketTx('', 'Withdrawal sent', (_: void) => withdrawOnNear());
+
+  const human = (raw: bigint | undefined) => Number(raw ?? BigInt(0)) / 10 ** USDC_DECIMALS;
+  const claimable = funds?.claimable ?? BigInt(0);
+  const tile = (label: string, value: ReactNode, loading: boolean, sub?: ReactNode) => (
+    <StatTile className={HEAD_TILE} label={label} loading={loading} value={value} sub={sub} />
+  );
 
   return (
     <div
       data-testid="portfolio-value"
-      className="flex flex-col gap-3 px-4 py-3 rounded-lg bg-background/40 backdrop-blur-sm border border-border/50 min-w-0"
+      className="grid grid-cols-1 gap-2 rounded-lg border border-border bg-background/40 px-4 py-3 sm:grid-cols-3"
     >
-      <SegmentedTabs value={group} onChange={setGroup} options={GROUPS} />
-
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <StatTile
-          className={HEAD_TILE}
-          label={group === 'perps' ? 'Equity' : 'Value'}
-          loading={head.valueUsd === null && valueLoading}
-          value={<Money value={head.valueUsd} exact />}
-        />
-        <StatTile
-          className={HEAD_TILE}
-          label="PnL"
-          value={<PnlCell usd={head.realizedUsd + head.unrealizedUsd} {...pnl} />}
-        />
-        <StatTile
-          className={HEAD_TILE}
-          label="Realized"
-          value={<PnlCell usd={head.realizedUsd} {...pnl} />}
-        />
-        <StatTile
-          className={HEAD_TILE}
-          label="Unrealized"
-          value={<PnlCell usd={head.unrealizedUsd} {...pnl} />}
-        />
-      </div>
-
-      {/* One grid for every line, so the columns line up across them. */}
-      <div className="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] items-center gap-x-4 gap-y-2.5 border-t border-border/60 pt-2.5">
-        <span />
-        {[group === 'perps' ? 'Equity' : 'Value', 'Realized', 'Unrealized'].map((h) => (
-          <span
-            key={h}
-            className="text-right font-mono text-[9px] font-medium tracking-[0.18em] uppercase text-muted-foreground"
+      {tile(
+        'Wallet',
+        <Amount value={human(funds?.usdc)} />,
+        isLoading,
+        <Link href="/deposit" className={ACTION}>
+          Deposit
+        </Link>,
+      )}
+      {tile('In positions', <Amount value={inPositions} />, positionsLoading)}
+      {tile(
+        'Ready to withdraw',
+        <Amount value={human(claimable)} />,
+        isLoading,
+        claimable > BigInt(0) ? (
+          <button
+            type="button"
+            className={ACTION}
+            disabled={withdraw.isPending}
+            onClick={() => withdraw.mutate()}
+            data-testid="portfolio-withdraw"
           >
-            {h}
-          </span>
-        ))}
-        {group === 'spot' ? (
-          <>
-            <LineRow name="Spot" line={summary.spotPredictions.spot} {...lineStates(loading.spot)} />
-            <LineRow
-              name="Predictions"
-              line={summary.spotPredictions.predictions}
-              {...lineStates(loading.pnl)}
-            />
-          </>
+            {withdraw.isPending ? 'Confirming…' : 'Withdraw'}
+          </button>
         ) : (
-          summary.perps.venues.map((line) => (
-            <PerpsLineRow key={line.venue} line={line} {...lineStates(loading.perps)} />
-          ))
-        )}
-        {Array.from({ length: rows - shown }, (_, i) => (
-          <BlankLine key={i} />
-        ))}
-      </div>
+          <span>Creator fees and failed payouts</span>
+        ),
+      )}
     </div>
   );
 }

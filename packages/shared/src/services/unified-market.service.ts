@@ -185,10 +185,7 @@ async function normalizeQuickMarket(
  * on-chain grid — both surfaces render quick markets through this.
  */
 export async function fetchActiveQuickMarkets(): Promise<UnifiedMarket[]> {
-  const data = await getActiveQuickMarkets().catch(
-    () => [] as QuickMarketResponseDto[],
-  );
-  return Promise.all(data.map(normalizeQuickMarket));
+  return [];
 }
 
 function normalizePammTrade(

@@ -8,7 +8,7 @@ import {
   cpmmPriceYes,
 } from '@/lib/pamm/cpmm';
 import type { NormalizedPoolStateV3 } from '@/lib/pamm/adapters/types';
-import type { SwapSide } from '@/services/pamm/swap';
+import type { NearSide as SwapSide } from '@/lib/near/types';
 
 /**
  * User's on-chain position — needed for Semantic B sell quote where

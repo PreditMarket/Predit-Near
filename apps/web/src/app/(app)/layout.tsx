@@ -1,6 +1,4 @@
 import { TopNav } from '@/components/top-nav';
-import { AppDialogsHost } from '@/components/app-shell/dialogs-host';
-import { FundsDialogHost } from '@/components/app-shell/funds-dialog-host';
 import { MobileBottomNav } from '@/components/nav/mobile-bottom-nav';
 import { OfflineDataBanner } from '@/components/pwa/offline-data-banner';
 
@@ -24,9 +22,6 @@ export default function AppLayout({
         {children}
       </div>
       <MobileBottomNav />
-      <AppDialogsHost />
-      {/* Every deposit, withdraw and transfer dialog: opened through useFundsDialog. */}
-      <FundsDialogHost />
     </div>
   );
 }

@@ -9,18 +9,13 @@ export type PortfolioTab =
   | 'history'
   | 'resolved'
   | 'cancelled'
-  | 'raffles'
-  | 'my-markets'
-  | 'withdraw';
+  | 'my-markets';
 
 const TABS: PortfolioTab[] = [
   'open',
-  'history',
   'resolved',
   'cancelled',
-  'raffles',
   'my-markets',
-  'withdraw',
 ];
 export const MARKET_STATUSES: MarketListKolStatus[] = [
   'all',

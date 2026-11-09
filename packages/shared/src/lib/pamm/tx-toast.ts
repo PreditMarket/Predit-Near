@@ -5,7 +5,7 @@
 
 import { toast } from "sonner";
 
-import { solscanTxUrl } from "./solscan";
+import { nearExplorerTxUrl } from "@/lib/near/config";
 
 export function toastTxSuccess(
   title: string,
@@ -16,9 +16,9 @@ export function toastTxSuccess(
     description:
       description ?? `Tx: ${signature.slice(0, 8)}…${signature.slice(-8)}`,
     action: {
-      label: "Solscan",
+      label: "Explorer",
       onClick: () =>
-        window.open(solscanTxUrl(signature), "_blank", "noopener,noreferrer"),
+        window.open(nearExplorerTxUrl(signature), "_blank", "noopener,noreferrer"),
     },
     duration: 8_000,
   });

@@ -6,9 +6,9 @@ const SITE = SITE_URL;
 
 /**
  * Sitemap generator — the static pages plus every active market.
- * ISR-revalidates every 10 min.
+ * Read live from the contract on each request.
  */
-export const revalidate = 600;
+export const dynamic = 'force-dynamic';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
@@ -16,9 +16,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticRoutes: MetadataRoute.Sitemap = [
     { url: `${SITE}/`, lastModified: now, changeFrequency: 'daily', priority: 1 },
     { url: `${SITE}/market`, lastModified: now, changeFrequency: 'hourly', priority: 0.9 },
-    { url: `${SITE}/earn`, lastModified: now, changeFrequency: 'daily', priority: 0.6 },
-    { url: `${SITE}/competition`, lastModified: now, changeFrequency: 'daily', priority: 0.6 },
-    { url: `${SITE}/subscription`, lastModified: now, changeFrequency: 'monthly', priority: 0.5 },
     { url: `${SITE}/terms-of-service`, lastModified: now, changeFrequency: 'yearly', priority: 0.3 },
   ];
 

@@ -17,7 +17,8 @@ import {
 } from '@/lib/pamm/trending-section';
 import { HIGHLIGHT_SECTION_KEY } from '@/lib/pamm/highlight-section';
 
-export const revalidate = 300;
+// Prices and status come live from the contract.
+export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = buildMetadata({
   title: 'Prediction Markets — Predit',

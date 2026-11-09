@@ -2,24 +2,20 @@
 
 import { useQuery } from '@tanstack/react-query';
 
-import { fetchConfig, type PammConfig } from '@/lib/pamm/accounts';
-import { deriveConfigPda } from '@/lib/pamm/pdas';
-import { usePammProgram } from './use-pamm-program';
+import { NearAddress } from '@/lib/near/address';
+import { NEAR_MARKET_CONTRACT } from '@/lib/near/config';
+import { nearView } from '@/lib/near/rpc';
 
-/**
- * Fetches the singleton pm-AMM Config account.
- * Returns null when the config has not been initialized yet.
- */
-export function useConfig(): { data: PammConfig | null | undefined; isLoading: boolean } {
-  const program = usePammProgram();
-  const [configPda] = deriveConfigPda();
+type Roles = [owner: string, operator: string, arbiter: string, treasury: string, token: string];
 
+/** The account allowed to post results on the market contract. */
+export function useConfig() {
   return useQuery({
     queryKey: ['pamm', 'config'],
-    queryFn: () => fetchConfig(program!, configPda),
-    enabled: !!program,
-    // The Config account is a session-stable singleton (global fees/authority),
-    // so fetch it once and reuse — no need to re-hit RPC every 30s per market.
+    queryFn: async () => {
+      const [, operator] = await nearView<Roles>(NEAR_MARKET_CONTRACT, 'get_roles', {});
+      return { resolver: new NearAddress(operator) };
+    },
     staleTime: 10 * 60_000,
     gcTime: 10 * 60_000,
   });

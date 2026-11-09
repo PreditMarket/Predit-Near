@@ -20,7 +20,7 @@ import { useSellOutcome } from '@/hooks/pamm/use-sell-outcome';
 import { useUserBalances } from '@/hooks/pamm/use-user-balances';
 import { useV3Position } from '@/hooks/pamm/use-v3-position';
 import type { PoolStateResult } from '@/hooks/pamm/use-pool-state';
-import type { SwapSide } from '@/services/pamm/swap';
+import type { NearSide as SwapSide } from '@/lib/near/types';
 
 import { useV3Quote } from '@/hooks/pamm/use-v3-quote';
 import { useCollateralSymbol } from '@/hooks/pamm/use-collaterals';
@@ -162,14 +162,7 @@ export function SwapPanel({
   // ── Balances / v3 position / quote hooks ─────────────────────────────────
   const { data: balances } = useUserBalances(
     poolAddress,
-    poolState.marketVersion,
-    {
-      collateralMint: poolState.pool.collateralMint,
-      yesMint: poolState.pool.yesMint,
-      noMint: poolState.pool.noMint,
-      lpMint: poolState.pool.lpMint,
-    },
-  );
+    poolState.marketVersion);
   const { data: v3Position } = useV3Position(
     poolState.marketVersion === 'v3_shares' ? poolAddress : null,
     poolState.pool.collateralMint,

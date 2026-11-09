@@ -3,7 +3,6 @@
 import { ImageWithFallback } from '@/components/figma/image-with-fallback';
 import { MarketDescriptionContent } from '@/components/market/market-description-content';
 import { fmtPct, fmtVol } from '@/components/shared/market-card';
-import { EnsembleResultCard } from '@/components/market/ensemble-result-card';
 import type { PoolStateResult } from '@/hooks/pamm/use-pool-state';
 import { useConfig } from '@/hooks/pamm/use-config';
 import { useTradingBan } from '@/hooks/pamm/use-trading-ban';
@@ -21,7 +20,6 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { useState } from 'react';
-import { EarlyResolveRequest } from './resolve/early-resolve-request';
 import { ResolveStatusBanner } from './resolve/resolve-status-banner';
 import { RedeemPanel } from './redeem-panel';
 import { SwapPanel } from './swap-panel';
@@ -368,7 +366,7 @@ function BonusXpAwardsTable({
 // ─── component ───────────────────────────────────────────────────────────────
 
 import { useCollateralMap } from '@/hooks/pamm/use-collaterals';
-import { solscanAddressUrl, solscanTxUrl } from '@/lib/pamm/solscan';
+import { NEAR_MARKET_CONTRACT, nearExplorerAccountUrl, nearExplorerTxUrl } from '@/lib/near/config';
 import { PammMarket, pammMarketService } from '@/services/pamm-market.service';
 import {
   pammMarketAdminService,
@@ -384,11 +382,9 @@ import {
 } from '@tanstack/react-query';
 import { useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
-import { MarketStreamCard } from './market-stream-card';
 import { useHasSession } from '@/hooks/use-has-session';
 import { RoastFeed } from './roast-feed';
 import { PammShareButton } from './share-button';
-import { EarlyResolutionButton } from './report/early-resolution-button';
 import { RequestTrendingButton } from './trending/request-trending-button';
 import { canRequestTrending } from '@/utils/is-admin';
 import { showErrorToast } from '@/components/error/toast-error';
@@ -416,7 +412,6 @@ export function PoolDetailLayout({
   const [sessionKey, setSessionKey] = useState(0);
   const [howOpen, setHowOpen] = useState(false);
   const [now, setNow] = useState<number | null>(null);
-  const [mobileTab, setMobileTab] = useState<'chart' | 'stream'>('chart');
   const [tradeOpen, setTradeOpen] = useState(false);
   // `?side=yes|no` from a Predit AI "Trade on Predit" link (plan 05 F3):
   // the side the trade form opens on. Read after mount, so the cached page
@@ -463,11 +458,6 @@ export function PoolDetailLayout({
 
   const user = useAuthStore((s) => s.user);
 
-  const { data: streamInfo } = useQuery({
-    queryKey: ['pamm', 'market', poolAddress, 'stream'],
-    queryFn: () => pammMarketService.getStream(poolAddress),
-  });
-
   const isCreator = useMemo(() => {
     if (!user || !market) return false;
     return market.creatorId === user.id;
@@ -503,21 +493,6 @@ export function PoolDetailLayout({
     !market.autoResolveDisputed &&
     (!market.autoResolveDisputeUntil ||
       new Date(market.autoResolveDisputeUntil).getTime() > Date.now());
-
-  // Signing in swaps a guest's watch-only token for one that can chat.
-  const hasSession = useHasSession();
-  const { data: streamTokenData } = useQuery({
-    queryKey: ['pamm', 'market', poolAddress, 'token', isCreator, hasSession],
-    queryFn: () =>
-      isCreator
-        ? pammMarketService.getPublisherToken(poolAddress)
-        : pammMarketService.getViewerToken(poolAddress),
-    enabled: !!streamInfo,
-  });
-
-  const livekitUrl =
-    process.env.NEXT_PUBLIC_LIVEKIT_URL ||
-    'wss://predit-rqo2i5rj.livekit.cloud';
 
   const collateralMap = useCollateralMap();
   const collateralToken = collateralMap.get(pool.collateralMint.toBase58());
@@ -562,7 +537,6 @@ export function PoolDetailLayout({
   const isExpiredUnresolved =
     !isResolved && !isCancelled && now !== null && now >= expiryTs;
   const createdTs = (pool.createdTs as unknown as BN).toNumber();
-  const seeded = pool.seeded;
 
   const yesPercent = poolState.priceYes * 100;
   const yesLabel = market.yesLabel?.trim() || 'Yes';
@@ -607,7 +581,7 @@ export function PoolDetailLayout({
     setHoverData(null);
   };
 
-  const explorerUrl = solscanAddressUrl(poolAddress);
+  const explorerUrl = nearExplorerAccountUrl(NEAR_MARKET_CONTRACT);
 
   const collateralDecimals = poolState.pool.collateralDecimals;
   const collateralScale = 10 ** collateralDecimals;
@@ -641,7 +615,7 @@ export function PoolDetailLayout({
           price: isYes ? pctPair(t.priceYes).yes : pctPair(t.priceYes).no,
           txSig: t.txSig,
           txShort: shortAddr(t.txSig, 4, 4),
-          solscanUrl: solscanTxUrl(t.txSig),
+          solscanUrl: nearExplorerTxUrl(t.txSig),
         };
       }) || [];
   const tradesHasNext = tradesPage?.hasNextPage ?? false;
@@ -651,59 +625,23 @@ export function PoolDetailLayout({
     ? shortAddr(pammConfig.resolver.toBase58(), 4, 4)
     : 'Global resolver';
 
-  const showOnMobile = (...tabs: Array<'chart' | 'stream'>) =>
-    tabs.includes(mobileTab) ? '' : 'max-lg:hidden';
-
-  const mobileTabs = [
-    // Trades sit under the chart on Market rather than behind their own
-    // tab, so price and the flow behind it read as one screen.
-    { id: 'chart' as const, label: 'Market' },
-    { id: 'stream' as const, label: 'Stream' },
-  ];
-
   return (
     <>
-      {/* ── Mobile tab bar ── */}
-      <div className="lg:hidden mb-3 bg-background rounded-xl p-1 flex gap-0.5">
-        {mobileTabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setMobileTab(tab.id)}
-            className={`flex-1 min-h-11 py-2 rounded-[10px] font-mono text-[12px] font-bold uppercase tracking-widest transition-all duration-150 ${
-              mobileTab === tab.id
-                ? 'bg-card text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground/60'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
       <div className="grid gap-3.5 lg:grid-cols-[1fr_340px] xl:grid-cols-[1fr_340px_360px] items-start pb-28 lg:pb-0">
         {/* ── Col 1: chart + trades ── */}
         <div className="max-lg:contents lg:flex lg:flex-col lg:gap-3.5">
           {/* Chart card */}
           <div
-            className={`${showOnMobile('chart')} max-lg:order-1 rounded-[10px] border border-border bg-card overflow-hidden`}
+            className={`max-lg:order-1 rounded-[10px] border border-border bg-card overflow-hidden`}
           >
             {/* Eyebrow */}
             <div className="flex flex-wrap items-center gap-2 px-[18px] py-[13px] border-b border-border">
-              <span
-                className={`rounded-[3px] border px-[7px] py-0.5 font-mono text-[8.5px] font-bold uppercase tracking-[0.1em] flex items-center gap-1 ${
-                  seeded
-                    ? 'bg-success/10 text-success border-success/20'
-                    : 'bg-warning/10 text-warning border-warning/20'
-                }`}
-              >
-                {seeded ? (
-                  <>
-                    <span className="text-[7px]">●</span> Live
-                  </>
-                ) : (
-                  'Pending seed'
-                )}
-              </span>
-              {!(seeded && status.label === 'Live') && (
+              {status.label === 'Live' && (
+                <span className="rounded-[3px] border border-success/20 bg-success/10 px-[7px] py-0.5 font-mono text-[8.5px] font-bold uppercase tracking-[0.08em] text-success">
+                  <span className="text-[7px]">●</span> Live
+                </span>
+              )}
+              {status.label !== 'Live' && (
                 <span
                   className={`rounded-[3px] border px-[7px] py-0.5 font-mono text-[8.5px] font-bold uppercase tracking-[0.1em] flex items-center gap-1 ${status.cls}`}
                 >
@@ -738,12 +676,6 @@ export function PoolDetailLayout({
                   <span className="h-3.5 w-px bg-border" />
                 </>
               )}
-              <EarlyResolutionButton
-                marketId={market.id}
-                marketQuestion={market.question}
-                variant="toolbar"
-              />
-              <span className="h-3.5 w-px bg-border" />
               <span className="flex items-center gap-1.5 font-bold text-warning">
                 <TimerReset className="h-3.5 w-3.5" />
                 <span className="font-mono text-[8.5px] font-semibold text-warning/70 uppercase tracking-[0.08em]">
@@ -1155,7 +1087,7 @@ export function PoolDetailLayout({
 
           {/* Description / About + Rules + Pool info */}
           <div
-            className={`${showOnMobile('chart')} max-lg:order-3 rounded-[10px] border border-border bg-card overflow-hidden`}
+            className={`max-lg:order-3 rounded-[10px] border border-border bg-card overflow-hidden`}
           >
             {market.description && (
               <div className="px-[18px] py-4">
@@ -1204,7 +1136,7 @@ export function PoolDetailLayout({
 
           {/* Trades history */}
           <div
-            className={`${showOnMobile('chart')} max-lg:order-2 rounded-[10px] border border-border bg-card overflow-hidden`}
+            className={`max-lg:order-2 rounded-[10px] border border-border bg-card overflow-hidden`}
           >
             <div className="flex items-center gap-2 px-[18px] py-3 border-b border-border">
               <span className="text-[12.5px] font-semibold">
@@ -1271,7 +1203,7 @@ export function PoolDetailLayout({
                       href={t.solscanUrl}
                       target="_blank"
                       rel="noreferrer"
-                      title={`View ${t.txSig} on Solscan`}
+                      title={`View ${t.txSig} on the explorer`}
                       className="flex items-center justify-end gap-1 text-[10.5px] text-primary hover:underline"
                     >
                       {t.txShort}
@@ -1311,7 +1243,6 @@ export function PoolDetailLayout({
             <BonusXpAwardsTable
               marketId={poolAddress}
               isResolved={isResolved}
-              className={showOnMobile('chart')}
             />
           )}
         </div>
@@ -1320,7 +1251,7 @@ export function PoolDetailLayout({
         <div className="max-lg:contents lg:flex lg:flex-col lg:gap-3.5">
           {/* How this resolves */}
           <div
-            className={`${showOnMobile('chart')} max-lg:order-4 rounded-[10px] border border-border bg-card overflow-hidden`}
+            className={`max-lg:order-4 rounded-[10px] border border-border bg-card overflow-hidden`}
           >
             <button
               className="flex w-full cursor-pointer items-center gap-2.5 px-4 py-[13px] text-left transition-colors hover:bg-muted/20"
@@ -1419,30 +1350,6 @@ export function PoolDetailLayout({
                 )}
               </div>
             )}
-
-            {/* Static footer — always visible, not part of the collapse, so
-                someone who just noticed the event already happened can act on
-                it without hunting. Opens the early-resolve petition, which is
-                a different mechanism from the toolbar's admin Report. */}
-            {market.status === 'active' &&
-              !isResolved &&
-              !isCancelled &&
-              !isExpiredUnresolved && (
-                <div className="border-t border-border">
-                  <EarlyResolveRequest
-                    marketId={market.id}
-                    poolAddress={poolAddress}
-                    marketQuestion={market.question}
-                    isCreator={isCreator}
-                    enabled
-                  />
-                </div>
-              )}
-          </div>
-
-          {/* AI ensemble result — per-model votes (below How this resolves) */}
-          <div className={`${showOnMobile('chart')} max-lg:order-5`}>
-            <EnsembleResultCard marketId={poolAddress} kind="pamm" />
           </div>
 
           {/* Trade panel — desktop only */}
@@ -1471,47 +1378,6 @@ export function PoolDetailLayout({
               />
             )}
           </div>
-        </div>
-
-        {/* ── Col 3: stream tile + roast feed + LP ── */}
-        <div
-          className={`${showOnMobile('stream')} lg:col-span-2 xl:col-span-1 relative flex flex-col gap-3.5`}
-        >
-          {streamTokenData?.token ? (
-            <LiveKitRoom
-              key={sessionKey}
-              token={streamTokenData.token}
-              serverUrl={livekitUrl}
-              connect={true}
-              video={false}
-              audio={false}
-            >
-              <div className="flex flex-col gap-3.5 h-full">
-                <MarketStreamCard
-                  marketId={poolAddress}
-                  mode={isCreator ? 'broadcaster' : 'viewer'}
-                  onStop={() => setSessionKey((k: number) => k + 1)}
-                  canAdminStop={isAdminOnly}
-                  onAdminStop={async () => {
-                    await pammMarketService.stopStream(poolAddress);
-                    setSessionKey((k: number) => k + 1);
-                  }}
-                  sidebar={
-                    <RoastFeed yesPercent={yesPercent} yesLabel={yesLabel} />
-                  }
-                />
-              </div>
-            </LiveKitRoom>
-          ) : (
-            <div className="flex flex-col gap-3.5 opacity-40 select-none pointer-events-none lg:flex-row xl:flex-col [&>*]:flex-1">
-              <div className="rounded-[10px] border border-border bg-card overflow-hidden aspect-video flex items-center justify-center">
-                <Loader2 className="h-5 w-5 animate-spin text-primary" />
-              </div>
-              <div className="rounded-[10px] border border-border bg-card h-[400px] flex items-center justify-center">
-                <span className="font-mono text-[11px]">Loading feed...</span>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 

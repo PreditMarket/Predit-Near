@@ -5,7 +5,7 @@ import { useMemo } from 'react';
 import type { BuyQuote } from '@/hooks/pamm/use-buy-quote';
 import type { SellQuote } from '@/hooks/pamm/use-sell-quote';
 import type { V3BuyQuote, V3SellQuote } from '@/hooks/pamm/use-v3-quote';
-import type { SwapSide } from '@/services/pamm/swap';
+import type { NearSide as SwapSide } from '@/lib/near/types';
 
 /** Minimum v3 pool snapshot needed to project the cost-weighted payout at
  * the current pool state. All units are raw atoms (collateral).

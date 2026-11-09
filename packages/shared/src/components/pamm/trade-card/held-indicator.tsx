@@ -1,6 +1,6 @@
 'use client';
 
-import type { SwapSide } from '@/services/pamm/swap';
+import type { NearSide as SwapSide } from '@/lib/near/types';
 import { cents, fmtTokenAmount } from './formatters';
 
 interface HeldIndicatorProps {

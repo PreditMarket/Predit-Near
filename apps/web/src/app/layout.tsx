@@ -9,8 +9,6 @@ import { ErrorBoundary } from '@/components/error/error-boundary';
 import { appleStartupImages } from '@/lib/pwa/splash';
 import { ServiceWorkerRegistrar } from '@/components/pwa/service-worker-registrar';
 import { InstallBanner } from '@/components/pwa/install-banner';
-import { OutboxSync } from '@/components/pwa/outbox-sync';
-import { PushSync } from '@/components/pwa/push-sync';
 
 // Self-hosted at build time: no request to Google, no render-blocking CSS hop.
 // globals.css maps --font-sans / --font-mono onto these variables.
@@ -156,8 +154,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <ErrorBoundary>{children}</ErrorBoundary>
           <ServiceWorkerRegistrar />
           <InstallBanner />
-          <OutboxSync />
-          <PushSync />
         </Providers>
 
         {/* Structured Data */}

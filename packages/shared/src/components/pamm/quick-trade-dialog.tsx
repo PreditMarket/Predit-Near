@@ -6,7 +6,7 @@ import { RedeemPanel } from '@/components/pamm/redeem-panel';
 import { usePoolState } from '@/hooks/pamm/use-pool-state';
 import { useTradingBan } from '@/hooks/pamm/use-trading-ban';
 import type { PammMarket } from '@/services/pamm-market.service';
-import type { SwapSide } from '@/services/pamm/swap';
+import type { NearSide as SwapSide } from '@/lib/near/types';
 import type { AutoSubmit } from '@/hooks/v2/use-auto-submit';
 
 type TradeMode = 'buy' | 'sell';

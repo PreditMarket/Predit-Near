@@ -1,13 +1,19 @@
 'use client';
 
-import { useConnection, useWallet } from '@solana/wallet-adapter-react';
-import { PublicKey } from '@solana/web3.js';
 import { useQuery } from '@tanstack/react-query';
 
-import { getV3UserBalances } from '@/lib/pamm/adapters/v3';
-import type { V3PositionBalances } from '@/lib/pamm/adapters/v3';
+import type { NearAddress } from '@/lib/near/address';
+import { getNearPosition, getNearUsdcBalance } from '@/lib/near/contract';
+import { useNearWallet } from '@/store/near-wallet.store';
 
-import { usePammProgram } from './use-pamm-program';
+export interface V3PositionBalances {
+  collateral: bigint;
+  yes: bigint;
+  no: bigint;
+  lpShares: bigint;
+  yesCostAcc: bigint;
+  noCostAcc: bigint;
+}
 
 const EMPTY: V3PositionBalances = {
   collateral: BigInt(0),
@@ -18,35 +24,33 @@ const EMPTY: V3PositionBalances = {
   noCostAcc: BigInt(0),
 };
 
-/**
- * v3 position including cost basis. `useUserBalances` drops `yesCostAcc` /
- * `noCostAcc` because v1/v2 have no equivalent, but the v3 payout is computed
- * from cost basis rather than share count — so anything showing a claim
- * estimate needs this instead.
- */
+/** The account's position with its cost basis, which is what payouts follow. */
 export function useV3Position(
   poolAddress: string | null | undefined,
-  collateralMint: PublicKey | null | undefined,
+  _collateralMint: NearAddress | null | undefined,
   enabled = true,
 ) {
-  const { connection } = useConnection();
-  const { publicKey } = useWallet();
-  const program = usePammProgram();
+  const accountId = useNearWallet((s) => s.accountId);
 
   return useQuery({
-    queryKey: ['pamm', 'v3Position', publicKey?.toBase58(), poolAddress],
+    queryKey: ['pamm', 'v3Position', accountId, poolAddress],
     queryFn: async (): Promise<V3PositionBalances> => {
-      if (!publicKey || !poolAddress || !program) return EMPTY;
-      return getV3UserBalances({
-        program,
-        connection,
-        poolAddress: new PublicKey(poolAddress),
-        userPublicKey: publicKey,
-        knownMints: collateralMint ? { collateralMint } : undefined,
-      });
+      if (!accountId || !poolAddress) return EMPTY;
+      const [collateral, p] = await Promise.all([
+        getNearUsdcBalance(accountId),
+        getNearPosition(poolAddress, accountId),
+      ]);
+      return {
+        collateral,
+        yes: BigInt(p.yes_shares),
+        no: BigInt(p.no_shares),
+        lpShares: BigInt(0),
+        yesCostAcc: BigInt(p.yes_cost),
+        noCostAcc: BigInt(p.no_cost),
+      };
     },
-    enabled: enabled && !!publicKey && !!poolAddress && !!program,
-    staleTime: 10_000,
-    refetchInterval: 15_000,
+    enabled: enabled && !!accountId && !!poolAddress,
+    staleTime: 3_000,
+    refetchInterval: 10_000,
   });
 }

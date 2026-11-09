@@ -1,4 +1,8 @@
-import apiClient from '@/lib/axios';
+import { getNearMarket, getNearPaused, getNearUserMarkets } from '@/lib/near/contract';
+import { USDC_DECIMALS, USDC_SYMBOL } from '@/lib/near/config';
+import { listNearMarkets } from '@/lib/near/market-list';
+import { positionRows, toPammMarket } from '@/lib/near/map';
+import { useNearWallet } from '@/store/near-wallet.store';
 import type { InfinityPaginationResponse, MarketRules } from './market.service';
 import type { Category } from './categories.service';
 import type { PammMarketVersion, PammPositionModel } from './pamm/market-be';
@@ -412,29 +416,27 @@ export function normalizePammListItem(
   return { kind: 'market', market: item as PammMarket };
 }
 
-export const getPammMarkets = async (
-  params?: ListPammMarketsParams,
-): Promise<ListPammMarketsResponse> => {
-  const response = await apiClient.get<
-    Omit<ListPammMarketsResponse, 'data'> & {
-      data: (PammMarket | PammMarketListItem)[];
-    }
-  >('/pamm-markets', { params });
-  return {
-    ...response.data,
-    data: (response.data.data ?? []).map(normalizePammListItem),
-  };
+/** Every side of every position the connected account holds, newest market first. */
+const myNearPositionRows = async (): Promise<PammMarketTrade[]> => {
+  const accountId = useNearWallet.getState().accountId;
+  if (!accountId) return [];
+  const held = await getNearUserMarkets(accountId);
+  return held.flatMap(([market, position]) => positionRows(market, position)).reverse();
 };
+
+export const getPammMarkets = (params?: ListPammMarketsParams): Promise<ListPammMarketsResponse> =>
+  listNearMarkets(params);
+
 
 /** The /markets Highlight section, picked by the BE in one request. */
-export const getPammHighlight = async (): Promise<HighlightSection | null> =>
-  (await apiClient.get<HighlightSectionResponse>('/pamm-markets/highlight')).data
-    .section ?? null;
+export const getPammHighlight = async (): Promise<HighlightSection | null> => null;
 
-export const getPammMarketById = async (id: string) => {
-  const response = await apiClient.get<PammMarket>(`/pamm-markets/${id}`);
-  return response.data;
+export const getPammMarketById = async (id: string): Promise<PammMarket> => {
+  const market = await getNearMarket(id);
+  if (!market) throw new Error('Market not found');
+  return toPammMarket(market);
 };
+
 
 /**
  * Fetch just the global circuit-breaker flag. Cheaper than the market list;
@@ -444,76 +446,30 @@ export const getPammMarketById = async (id: string) => {
 export const getPammGlobalPause = async (): Promise<{
   isPaused: boolean;
   refreshedAt: number;
-}> => {
-  const response = await apiClient.get<{
-    isPaused: boolean;
-    refreshedAt: number;
-  }>('/pamm-markets/global-pause');
-  return response.data;
-};
+}> => ({ isPaused: await getNearPaused(), refreshedAt: Date.now() });
+
 
 export const getPammMarketResolution = async (
-  id: string,
-): Promise<PublicResolution | null> => {
-  const response = await apiClient.get<PublicResolution | null>(
-    `/pamm-markets/${id}/resolution`,
-  );
-  return response.data;
+  _id: string,
+): Promise<PublicResolution | null> => null;
+
+
+export const getPammMarketRealtime = async (id: string): Promise<PammMarketRealtime> => {
+  const [market, isPaused] = await Promise.all([getNearMarket(id), getNearPaused()]);
+  return { latestPriceYes: (market?.price_yes_bps ?? 5000) / 10_000, latestTrades: [], isPaused };
 };
 
-export const getPammMarketRealtime = async (id: string) => {
-  const response = await apiClient.get<PammMarketRealtime>(
-    `/pamm-markets/${id}/realtime`,
-  );
-  return response.data;
-};
 
 export const getPammMarketTrades = async (
-  id: string,
-  params?: ListPammTradesParams,
-) => {
-  const response = await apiClient.get<ListPammTradesResponse>(
-    `/pamm-markets/${id}/trades`,
-    { params },
-  );
-  return response.data;
-};
+  _id: string,
+  _params?: ListPammTradesParams,
+): Promise<ListPammTradesResponse> => ({ data: [], hasNextPage: false, total: 0 });
 
-export const recordPammMarketTrade = async (
-  id: string,
-  payload: RecordPammTradeDto,
-) => {
-  const response = await apiClient.post<PammMarketTrade>(
-    `/pamm-markets/${id}/trades`,
-    payload,
-  );
-  return response.data;
-};
 
-export const getPammMarketStream = async (id: string) => {
-  const response = await apiClient.get<PammMarketStream>(
-    `/pamm-markets/${id}/stream`,
-  );
-  return response.data;
-};
 
-export const getPammMarketViewerToken = async (id: string) => {
-  const response = await apiClient.get<PammViewerTokenResponse>(
-    `/pamm-markets/${id}/stream/viewer-token`,
-  );
-  return response.data;
-};
 
-export const getPammMarketPublisherToken = async (id: string) => {
-  const response = await apiClient.get<PammViewerTokenResponse>(
-    `/pamm-markets/${id}/stream/publisher-token`,
-  );
-  return response.data;
-};
 
-export const stopPammMarketStream = async (id: string) => {
-  await apiClient.post(`/pamm-markets/${id}/stream/stop`);
-};
+
 
 // ─── Early resolution (trader-driven) ────────────────────────────────────────
 
@@ -546,12 +502,6 @@ export interface RequestPammEarlyResolveResponse {
  * Progress of the "resolve this early" petition. Auth is optional — without a
  * JWT the counts still come back, only `hasRequested` degrades to false.
  */
-export const getPammEarlyResolveStatus = async (id: string) => {
-  const response = await apiClient.get<PammEarlyResolveStatus>(
-    `/pamm-markets/${id}/early-resolve-status`,
-  );
-  return response.data;
-};
 
 /**
  * Ask for the market to be resolved before its deadline. Only traders who
@@ -559,13 +509,6 @@ export const getPammEarlyResolveStatus = async (id: string) => {
  * `thresholdPct` of traders have asked, the backend closes trading and runs
  * the AI ensemble — poll the market until it leaves `pending_resolution`.
  */
-export const requestPammEarlyResolve = async (id: string, note?: string) => {
-  const response = await apiClient.post<RequestPammEarlyResolveResponse>(
-    `/pamm-markets/${id}/request-resolve`,
-    note?.trim() ? { note: note.trim() } : {},
-  );
-  return response.data;
-};
 export interface CollateralBreakdown {
   totalValue: number;
   totalPnL: number;
@@ -605,41 +548,55 @@ export interface PammMarketSummary {
   byCollateral?: Record<string, CollateralBreakdown>;
 }
 
-export const redeemTrade = async (
-  tradeId: string,
-): Promise<PammMarketTrade> => {
-  const response = await apiClient.patch<PammMarketTrade>(
-    `/pamm-markets/trades/${tradeId}/redeem`,
-  );
-  return response.data;
+
+export const getMyPammTrades = async (
+  params?: MyPammTradesParams,
+): Promise<ListPammTradesResponse> => {
+  const rows = await myNearPositionRows();
+  const page = params?.page ?? 1;
+  const limit = params?.limit ?? 20;
+  const start = (page - 1) * limit;
+  return {
+    data: rows.slice(start, start + limit),
+    hasNextPage: start + limit < rows.length,
+    total: rows.length,
+  };
 };
 
-export const getMyPammTrades = async (params?: MyPammTradesParams) => {
-  const response = await apiClient.get<ListPammTradesResponse>(
-    '/pamm-markets/my-trades',
-    { params },
-  );
-  return response.data;
+
+export const getMyPammSummary = async (): Promise<PammMarketSummary> => {
+  const rows = await myNearPositionRows();
+  const stake = (r: PammMarketTrade) => Number(r.amountIn) / 10 ** USDC_DECIMALS;
+  const value = (r: PammMarketTrade) =>
+    r.status === 'lost' ? 0 : r.claimAmount != null ? Number(r.claimAmount) / 10 ** USDC_DECIMALS : stake(r);
+  const totalValue = rows.reduce((sum, r) => sum + value(r), 0);
+  const wins = rows.filter((r) => r.status === 'won').length;
+  const losses = rows.filter((r) => r.status === 'lost').length;
+  const settled = wins + losses;
+  const cost = rows.reduce((sum, r) => sum + stake(r), 0);
+  return {
+    totalValue,
+    totalPnL: totalValue - cost,
+    pnlPct: cost > 0 ? ((totalValue - cost) / cost) * 100 : 0,
+    openCount: rows.filter((r) => r.status === 'open').length,
+    wins,
+    losses,
+    totalTrades: rows.length,
+    winRate: settled > 0 ? (wins / settled) * 100 : 0,
+    sparkline: [],
+    headlineSymbol: USDC_SYMBOL,
+    hasPendingData: false,
+  };
 };
 
-export const getMyPammSummary = async () => {
-  const response = await apiClient.get<PammMarketSummary>(
-    '/pamm-markets/my-summary',
-  );
-  return response.data;
-};
 
 /**
  * Whether the current user (by JWT; optional) may open fiat (non-mintable
  * collateral, e.g. USDC) positions. Empty/unset whitelist on the BE → allowed
  * for everyone. Used to gate access to fiat market pages.
  */
-export const getPammFiatAccess = async (): Promise<{ allowed: boolean }> => {
-  const response = await apiClient.get<{ allowed: boolean }>(
-    '/pamm-markets/fiat-access',
-  );
-  return response.data;
-};
+export const getPammFiatAccess = async (): Promise<{ allowed: boolean }> => ({ allowed: true });
+
 
 /**
  * One pool where the caller's wallet currently holds LP tokens/shares.
@@ -674,12 +631,6 @@ export interface MyPammLiquidityParams {
   limit?: number;
 }
 
-export const getMyPammLiquidity = async (params?: MyPammLiquidityParams) => {
-  const response = await apiClient.get<
-    InfinityPaginationResponse<PammLiquidityPosition>
-  >('/pamm-markets/my-liquidity', { params });
-  return response.data;
-};
 
 export const pammMarketService = {
   getMarkets: getPammMarkets,
@@ -689,12 +640,4 @@ export const pammMarketService = {
   getTrades: getPammMarketTrades,
   getMyTrades: getMyPammTrades,
   getMySummary: getMyPammSummary,
-  getMyLiquidity: getMyPammLiquidity,
-  recordTrade: recordPammMarketTrade,
-  getStream: getPammMarketStream,
-  getViewerToken: getPammMarketViewerToken,
-  getPublisherToken: getPammMarketPublisherToken,
-  stopStream: stopPammMarketStream,
-  getEarlyResolveStatus: getPammEarlyResolveStatus,
-  requestEarlyResolve: requestPammEarlyResolve,
 };

@@ -47,14 +47,7 @@ export function RedeemPanel({
   const refund = useV3Refund(poolAddress);
   const { data: balances } = useUserBalances(
     poolAddress,
-    poolState.marketVersion,
-    {
-      collateralMint: poolState.pool.collateralMint,
-      yesMint: poolState.pool.yesMint,
-      noMint: poolState.pool.noMint,
-      lpMint: poolState.pool.lpMint,
-    },
-  );
+    poolState.marketVersion);
   const [amountStr, setAmountStr] = useState('');
   const [nowTs, setNowTs] = useState(() => Math.floor(Date.now() / 1000));
 

@@ -2,29 +2,17 @@
 
 import { useEffect } from 'react';
 import { notFound, useParams } from 'next/navigation';
-import { PublicKey } from '@solana/web3.js';
-import { useWallet } from '@solana/wallet-adapter-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PoolDetailLayout } from '@/components/pamm/pool-detail-layout';
 import { usePoolState } from '@/hooks/pamm/use-pool-state';
 import { useQuery } from '@tanstack/react-query';
 import { pammMarketService } from '@/services/pamm-market.service';
-import MarketDetails from '@/components/market/market-details';
-import { usePammBetaIds } from '@/hooks/use-pamm-access';
-import { useTrackedPammAccess } from '@/hooks/use-tracked-pamm-access';
-import { useCollaterals, useCollateralMap } from '@/hooks/pamm/use-collaterals';
-import { usePammFiatAccess } from '@/hooks/pamm/use-fiat-access';
-import useAuthStore from '@/store/auth.store';
-import { useHasSession } from '@/hooks/use-has-session';
-import { trackMarketView } from '@/lib/analytics';
-import { posthog, isPostHogReady } from '@/lib/posthog-init';
 import { markMarketViewed } from '@/lib/last-market-view';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 
-function isValidPubkey(s: string): boolean {
-  try { new PublicKey(s); return true; } catch { return false; }
-}
+/** Market ids are the contract's sequence numbers. */
+const isMarketId = (id: string) => /^\d+$/.test(id);
 
 function PammDetailContent({ poolAddress }: { poolAddress: string }) {
   const { data: market, isLoading: isMarketLoading, isError: isMarketError } = useQuery({
@@ -51,51 +39,11 @@ function PammDetailContent({ poolAddress }: { poolAddress: string }) {
   const { data: poolState, isLoading: isPoolLoading, isError: isPoolError } =
     usePoolState(poolAddress, market?.marketVersion ?? null);
 
-  // Fiat (non-mintable collateral, e.g. USDC) markets are gated: the listing
-  // hides them from non-whitelisted users, so a direct URL must be blocked too.
-  const collateralMap = useCollateralMap();
-  const { isLoading: isCollateralsLoading } = useCollaterals();
-  const { data: fiatAccess, isLoading: isFiatAccessLoading } =
-    usePammFiatAccess();
-
-  const isLoggedIn = useHasSession();
-  const { publicKey } = useWallet();
-
-  // PostHog: tie every event in this session to this market via group
-  // analytics. Lets dashboards pivot by market_id with one switch.
   useEffect(() => {
-    if (!market || !isPostHogReady()) return;
-    try {
-      posthog.group('pamm_market', poolAddress, {
-        market_name: market.question,
-        creator_id: market.creatorId,
-        collateral: market.collateralMint ?? undefined,
-      });
-    } catch { /* ignore */ }
-  }, [poolAddress, market?.id]);
+    if (market) markMarketViewed(poolAddress);
+  }, [poolAddress, market]);
 
-  // Fire market_view once per market id change. Re-firing on
-  // auth/wallet flips would inflate view counts artificially.
-  useEffect(() => {
-    if (!market) return;
-    trackMarketView({
-      market_id: poolAddress,
-      market_type: 'pamm',
-      is_logged_in: isLoggedIn,
-      has_wallet: !!publicKey,
-    });
-    markMarketViewed(poolAddress);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [poolAddress, market?.id]);
-
-  // Wait for the collateral catalog + fiat-access check too, so a gated fiat
-  // market never briefly flashes its trading UI before the block resolves.
-  if (
-    isMarketLoading ||
-    isPoolLoading ||
-    isCollateralsLoading ||
-    isFiatAccessLoading
-  ) {
+  if (isMarketLoading || isPoolLoading) {
     return (
       <div className="space-y-3.5">
         <Skeleton className="h-[480px] w-full rounded-[10px]" />
@@ -116,48 +64,14 @@ function PammDetailContent({ poolAddress }: { poolAddress: string }) {
     );
   }
 
-  // A fiat market (non-mintable collateral) is off-limits to users outside the
-  // fiat trade whitelist — mirror the list's exclusion on direct URL access.
-  const isFiatMarket =
-    collateralMap.get(market.collateralMint ?? '')?.mintable === false;
-  if (isFiatMarket && fiatAccess && !fiatAccess.allowed) {
-    return (
-      <div className="rounded-[10px] border border-border bg-card p-16 text-center">
-        <p className="text-[14px] font-semibold text-foreground">
-          This market isn’t available for your account
-        </p>
-        <p className="mx-auto mt-2 max-w-md font-mono text-[12px] text-muted-foreground">
-          USDC markets are limited to approved accounts. If you think this is a
-          mistake, contact the team to request access.
-        </p>
-        <Link
-          href="/markets"
-          className="mt-6 inline-flex items-center gap-1.5 rounded-[6px] border border-border bg-card px-3 py-1.5 font-mono text-[11.5px] text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          Back to markets
-        </Link>
-      </div>
-    );
-  }
-
   return <PoolDetailLayout poolState={poolState} poolAddress={poolAddress} market={market} />;
 }
 
 export function MarketDetailRouter() {
   const { id } = useParams<{ id: string }>();
-  // Use the tracked variant on the route gate so every PAMM access
-  // decision feeds the rollout-visibility funnel in PostHog.
-  const pammAccess = useTrackedPammAccess({
-    source: 'market-detail-router',
-    marketId: isValidPubkey(id) ? id : undefined,
-  });
-  const { isLoading: pammLoading } = usePammBetaIds();
-  const isAuthHydrated = useAuthStore((s) => s.isHydrated);
 
-  if (isValidPubkey(id) && !pammLoading && isAuthHydrated && !pammAccess) notFound();
+  if (!isMarketId(id)) notFound();
 
-  if (isValidPubkey(id)) {
     return (
       <div className="mx-auto max-w-[1440px] px-3 sm:px-6 pb-16 pt-5">
         <div className="mb-5">
@@ -172,7 +86,4 @@ export function MarketDetailRouter() {
         <PammDetailContent poolAddress={id} />
       </div>
     );
-  }
-
-  return <MarketDetails />;
 }
