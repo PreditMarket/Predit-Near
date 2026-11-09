@@ -47,19 +47,52 @@ fn contract() -> Contract {
 fn rules() -> Rules {
     Rules {
         question: "SOL >= 250 at expiry?".into(),
+        description: "From a post predicting SOL above 250.".into(),
+        yes_label: "Yes".into(),
+        no_label: "No".into(),
         yes_condition: "Pyth SOL/USD >= 250".into(),
         no_condition: "Pyth SOL/USD < 250".into(),
         resolution_source: "Pyth SOL/USD".into(),
         invalid_conditions: "No price in the settlement window".into(),
+        category: "Crypto".into(),
+        image_url: "https://example.com/sol.png".into(),
         expiry_sec: U64(EXPIRY),
-        oracle: OracleSpec {
+        oracle: Some(OracleSpec {
             symbol: "SOL".into(),
             feed_id: "ef0d".into(),
             strike: I64(STRIKE),
             expo: -8,
             below: false,
-        },
+        }),
     }
+}
+
+/// A market with no oracle: a sports result, an election, an announcement.
+fn event_rules() -> Rules {
+    Rules {
+        question: "Will the Lakers beat the Celtics?".into(),
+        description: "From a post calling the game for the Lakers.".into(),
+        yes_label: "Lakers".into(),
+        no_label: "Celtics".into(),
+        yes_condition: "Lakers win, including overtime".into(),
+        no_condition: "Celtics win, including overtime".into(),
+        resolution_source: "https://www.nba.com/scores".into(),
+        invalid_conditions: "The game is cancelled".into(),
+        category: "Sports".into(),
+        image_url: String::new(),
+        expiry_sec: U64(EXPIRY),
+        oracle: None,
+    }
+}
+
+fn create_event(c: &mut Contract, post_id: &str) -> U64 {
+    at(T0, "creator.near", NearToken::from_near(2));
+    c.create_market(post(post_id), Side::Yes, event_rules(), draft(), Some(120))
+}
+
+fn manual(c: &mut Contract, id: U64, side: Side) {
+    call(EXPIRY + 1, "operator.near");
+    c.post_receipt(id, Report::Manual { outcome: side, reason: "Final score 110-102".into() }, evidence());
 }
 
 fn post(id: &str) -> PostRef {
@@ -380,7 +413,7 @@ fn the_contract_derives_the_outcome_from_the_strike() {
 fn a_below_market_inverts_the_comparison() {
     let mut c = contract();
     let mut r = rules();
-    r.oracle.below = true;
+    r.oracle.as_mut().unwrap().below = true;
     at(T0, "creator.near", NearToken::from_near(2));
     let id = c.create_market(post("p1"), Side::Yes, r, draft(), Some(120));
     receipt(&mut c, id, STRIKE);
@@ -401,6 +434,123 @@ fn due_and_finalizable_lists_follow_the_lifecycle() {
     assert!(c.get_finalizable(None).is_empty());
     call(EXPIRY + 1 + 120, "anyone.near");
     assert_eq!(c.get_finalizable(None), vec![id]);
+}
+
+// ---- event markets ---------------------------------------------------------
+
+#[test]
+fn an_event_market_keeps_its_labels_and_content() {
+    let mut c = contract();
+    let id = create_event(&mut c, "p1");
+    let m = c.get_market(id).unwrap();
+    assert_eq!(m.rules.yes_label, "Lakers");
+    assert_eq!(m.rules.category, "Sports");
+    assert_eq!(m.rules.oracle, None);
+}
+
+#[test]
+fn the_operator_proposes_an_event_outcome() {
+    let mut c = contract();
+    let id = create_event(&mut c, "p1");
+    buy(&mut c, "yes.near", id, Side::Yes, 100 * USDC);
+    buy(&mut c, "no.near", id, Side::No, 100 * USDC);
+    manual(&mut c, id, Side::No);
+    let r = c.get_market(id).unwrap().receipt.unwrap();
+    assert_eq!(r.outcome, Outcome::No);
+    assert_eq!(r.price, None);
+
+    finalize(&mut c, id);
+    let record = c.get_record("x:alice".into());
+    assert_eq!((record.correct, record.wrong), (0, 1));
+    yocto(EXPIRY + 200, "no.near");
+    let _ = c.redeem(id);
+    assert!(c.get_accounting().in_flight.0 > 0);
+}
+
+#[test]
+#[should_panic(expected = "This market has no price oracle")]
+fn an_event_market_rejects_a_price() {
+    let mut c = contract();
+    let id = create_event(&mut c, "p1");
+    call(EXPIRY + 1, "operator.near");
+    c.post_receipt(id, price_report(STRIKE), evidence());
+}
+
+#[test]
+#[should_panic(expected = "This market settles from its price oracle")]
+fn a_price_market_rejects_a_declared_outcome() {
+    let mut c = contract();
+    let id = create(&mut c);
+    manual(&mut c, id, Side::Yes);
+}
+
+#[test]
+#[should_panic(expected = "Evidence is required")]
+fn an_event_outcome_needs_evidence() {
+    let mut c = contract();
+    let id = create_event(&mut c, "p1");
+    call(EXPIRY + 1, "operator.near");
+    c.post_receipt(
+        id,
+        Report::Manual { outcome: Side::Yes, reason: "trust me".into() },
+        Evidence { hash: String::new(), uri: String::new() },
+    );
+}
+
+#[test]
+#[should_panic(expected = "Operator only")]
+fn only_the_operator_proposes_an_event_outcome() {
+    let mut c = contract();
+    let id = create_event(&mut c, "p1");
+    call(EXPIRY + 1, "creator.near");
+    c.post_receipt(id, Report::Manual { outcome: Side::Yes, reason: "x".into() }, evidence());
+}
+
+#[test]
+#[should_panic(expected = "Market has not expired")]
+fn an_event_outcome_waits_for_expiry() {
+    let mut c = contract();
+    let id = create_event(&mut c, "p1");
+    call(EXPIRY - 1, "operator.near");
+    c.post_receipt(id, Report::Manual { outcome: Side::Yes, reason: "x".into() }, evidence());
+}
+
+fn create_with(r: Rules) {
+    let mut c = contract();
+    at(T0, "creator.near", NearToken::from_near(2));
+    c.create_market(post("p1"), Side::Yes, r, draft(), None);
+}
+
+#[test]
+#[should_panic(expected = "Two different outcome labels")]
+fn labels_must_differ() {
+    let mut r = event_rules();
+    r.no_label = r.yes_label.clone();
+    create_with(r);
+}
+
+#[test]
+#[should_panic(expected = "Label is too long")]
+fn labels_are_capped() {
+    let mut r = event_rules();
+    r.yes_label = "x".repeat(MAX_LABEL + 1);
+    create_with(r);
+}
+
+#[test]
+#[should_panic(expected = "A resolution source is required")]
+fn an_event_needs_a_resolution_source() {
+    let mut r = event_rules();
+    r.resolution_source = String::new();
+    create_with(r);
+}
+
+#[test]
+#[should_panic(expected = "Image must be an https URL")]
+fn images_must_be_https() {
+    let mut r = event_rules();
+    r.image_url = "javascript:alert(1)".into();
+    create_with(r);
 }
 
 // ---- finalize and payouts --------------------------------------------------

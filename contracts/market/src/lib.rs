@@ -1,9 +1,11 @@
 //! Social prediction markets on NEAR.
 //!
 //! A market is created from a post: its rules are locked at creation against a
-//! bond, people bet USDC on it, an operator posts a price receipt after expiry,
-//! anyone can challenge it for a bond, and finalizing opens redemption and
-//! updates the post author's forecasting record.
+//! bond, people bet USDC on it, and after expiry the operator posts a receipt.
+//! For a price market the contract derives the outcome from the locked strike;
+//! for any other market the operator proposes it with evidence. Anyone can
+//! challenge a receipt for a bond, and finalizing opens redemption and updates
+//! the post author's forecasting record.
 //!
 //! Market maths live in `predit-core`.
 //! This crate only loads state, runs a `plan_*` and moves tokens.
@@ -40,6 +42,7 @@ const GAS_ON_PAYOUT: Gas = Gas::from_tgas(15);
 const MIN_PAYOUT_GAS: Gas = Gas::from_tgas(60);
 const ONE_YOCTO: NearToken = NearToken::from_yoctonear(1);
 
+const MAX_LABEL: usize = 40;
 const MAX_SHORT_TEXT: usize = 200;
 const MAX_LONG_TEXT: usize = 600;
 
@@ -306,8 +309,9 @@ impl Contract {
 
     // ---- resolution -------------------------------------------------------
 
-    /// Posts the settlement price. The contract derives the outcome from the
-    /// locked strike, so the operator cannot simply declare a winner.
+    /// Posts the result. On a price market the operator only supplies the price
+    /// and the contract derives the outcome from the locked strike. On any other
+    /// market the operator proposes the outcome and must show evidence.
     pub fn post_receipt(&mut self, market_id: U64, report: Report, evidence: Evidence) {
         require!(env::predecessor_account_id() == self.operator, "Operator only");
         require!(
@@ -322,20 +326,37 @@ impl Contract {
 
         let (outcome, price, publish_time_sec, reason) = match report {
             Report::Price { price, expo, publish_time_sec } => {
-                require!(expo == market.rules.oracle.expo, "Price scale does not match the rules");
+                let oracle = market
+                    .rules
+                    .oracle
+                    .as_ref()
+                    .unwrap_or_else(|| fail("This market has no price oracle".to_string()));
+                require!(expo == oracle.expo, "Price scale does not match the rules");
                 require!(
                     publish_time_sec.0 >= expiry
                         && publish_time_sec.0 <= expiry + self.config.oracle_window_sec as u64,
                     "Price is outside the settlement window"
                 );
                 require!(publish_time_sec.0 <= now, "Price is from the future");
-                let oracle = &market.rules.oracle;
                 let yes = if oracle.below {
                     price.0 < oracle.strike.0
                 } else {
                     price.0 >= oracle.strike.0
                 };
                 (if yes { Outcome::Yes } else { Outcome::No }, Some(price), Some(publish_time_sec), None)
+            }
+            Report::Manual { outcome, reason } => {
+                require!(
+                    market.rules.oracle.is_none(),
+                    "This market settles from its price oracle"
+                );
+                require!(
+                    !reason.is_empty() && reason.len() <= MAX_LONG_TEXT,
+                    "A reason is required"
+                );
+                require!(!evidence.uri.is_empty(), "Evidence is required");
+                let outcome = if outcome == Side::Yes { Outcome::Yes } else { Outcome::No };
+                (outcome, None, None, Some(reason))
             }
             Report::Invalid { kind, reason } => {
                 require!(reason.len() <= MAX_LONG_TEXT, "Reason is too long");
@@ -920,23 +941,43 @@ fn receipt_of(market: &Market) -> &Receipt {
 }
 
 fn validate_text(post: &PostRef, rules: &Rules, draft: &DraftRef) {
-    let short = [
+    let mut short = vec![
         &post.source,
         &post.post_id,
         &post.author_ref,
         &rules.question,
         &rules.resolution_source,
-        &rules.oracle.symbol,
-        &rules.oracle.feed_id,
+        &rules.image_url,
         &draft.model,
         &draft.chat_id,
     ];
-    let long = [&post.text, &rules.yes_condition, &rules.no_condition, &rules.invalid_conditions];
+    if let Some(oracle) = &rules.oracle {
+        short.push(&oracle.symbol);
+        short.push(&oracle.feed_id);
+    }
+    let long = [
+        &post.text,
+        &rules.description,
+        &rules.yes_condition,
+        &rules.no_condition,
+        &rules.invalid_conditions,
+    ];
+    let labels = [&rules.yes_label, &rules.no_label, &rules.category];
     require!(short.iter().all(|s| s.len() <= MAX_SHORT_TEXT), "Text is too long");
     require!(long.iter().all(|s| s.len() <= MAX_LONG_TEXT), "Text is too long");
+    require!(labels.iter().all(|s| s.len() <= MAX_LABEL), "Label is too long");
     require!(
         !post.post_id.is_empty() && !post.author_ref.is_empty() && !rules.question.is_empty(),
         "Missing post or question"
+    );
+    require!(
+        !rules.yes_label.is_empty() && !rules.no_label.is_empty() && rules.yes_label != rules.no_label,
+        "Two different outcome labels are required"
+    );
+    require!(!rules.resolution_source.is_empty(), "A resolution source is required");
+    require!(
+        rules.image_url.is_empty() || rules.image_url.starts_with("https://"),
+        "Image must be an https URL"
     );
 }
 

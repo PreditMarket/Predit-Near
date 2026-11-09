@@ -105,8 +105,9 @@ pub struct PostRef {
     pub text: String,
 }
 
-/// Settles the market: `price >= strike` is YES, or `price < strike` when
-/// `below` is set. `strike` is in the feed's native scale (`expo`).
+/// For price markets, the contract settles from this: `price >= strike` is YES,
+/// or `price < strike` when `below` is set. `strike` is in the feed's native
+/// scale (`expo`).
 #[near(serializers = [borsh, json])]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OracleSpec {
@@ -122,12 +123,20 @@ pub struct OracleSpec {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Rules {
     pub question: String,
+    pub description: String,
+    pub yes_label: String,
+    pub no_label: String,
     pub yes_condition: String,
     pub no_condition: String,
     pub resolution_source: String,
     pub invalid_conditions: String,
+    pub category: String,
+    /// Empty, or an `https://` image URL.
+    pub image_url: String,
     pub expiry_sec: U64,
-    pub oracle: OracleSpec,
+    /// `None` for every market that is not a price threshold: the operator
+    /// proposes the outcome, with evidence, and it can be challenged.
+    pub oracle: Option<OracleSpec>,
 }
 
 /// Records which model drafted the wording. It has no say in the outcome.
@@ -151,6 +160,7 @@ pub struct Evidence {
 #[serde(rename_all = "snake_case")]
 pub enum Report {
     Price { price: I64, expo: i32, publish_time_sec: U64 },
+    Manual { outcome: Side, reason: String },
     Invalid { kind: InvalidKind, reason: String },
 }
 

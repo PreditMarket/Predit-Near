@@ -105,6 +105,17 @@ impl Env {
     }
 
     async fn create(&self, post_id: &str) -> anyhow::Result<(u64, u64)> {
+        let oracle = json!({ "symbol": "SOL", "feed_id": "ef0d", "strike": STRIKE.to_string(), "expo": -8, "below": false });
+        self.create_market(post_id, oracle, "Yes", "No").await
+    }
+
+    async fn create_market(
+        &self,
+        post_id: &str,
+        oracle: Value,
+        yes_label: &str,
+        no_label: &str,
+    ) -> anyhow::Result<(u64, u64)> {
         let expiry = self.now().await? + LIFETIME;
         let id: String = self
             .creator
@@ -114,12 +125,17 @@ impl Env {
                 "claim_side": "yes",
                 "rules": {
                     "question": "SOL >= 250 at expiry?",
+                    "description": "From a post on X",
+                    "yes_label": yes_label,
+                    "no_label": no_label,
+                    "category": "Crypto",
+                    "image_url": "",
                     "yes_condition": "Pyth SOL/USD >= 250",
                     "no_condition": "Pyth SOL/USD < 250",
                     "resolution_source": "Pyth SOL/USD",
                     "invalid_conditions": "No price in the settlement window",
                     "expiry_sec": expiry.to_string(),
-                    "oracle": { "symbol": "SOL", "feed_id": "ef0d", "strike": STRIKE.to_string(), "expo": -8, "below": false }
+                    "oracle": oracle
                 },
                 "draft": { "model": "glm", "chat_id": "chat-1" },
                 "challenge_window_sec": WINDOW
@@ -276,6 +292,35 @@ async fn full_lifecycle_pays_the_winner_and_updates_the_record() -> anyhow::Resu
     let before = e.balance(e.treasury.id()).await?;
     assert!(pay(&e.treasury, &e.market, "withdraw", None).await?);
     assert_eq!(e.balance(e.treasury.id()).await?, before + fee);
+    e.assert_solvent(FAUCET).await?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn an_event_market_settles_from_the_operator_proposal() -> anyhow::Result<()> {
+    let e = setup().await?;
+    let (id, expiry) = e.create_market("p1", Value::Null, "Lakers", "Celtics").await?;
+    e.buy(&e.alice, id, "yes", 50 * USDC).await?;
+    e.buy(&e.bob, id, "no", 50 * USDC).await?;
+    e.advance_to(expiry + 1).await?;
+
+    e.operator
+        .call(e.market.id(), "post_receipt")
+        .args_json(json!({
+            "market_id": id.to_string(),
+            "report": { "manual": { "outcome": "no", "reason": "Final score 102-110" } },
+            "evidence": { "hash": "abcd", "uri": "https://www.nba.com/scores" }
+        }))
+        .transact()
+        .await?
+        .into_result()?;
+    e.finalize(id).await?;
+
+    let m = e.get_market(id).await?;
+    assert_eq!(m["outcome"], "no");
+    assert_eq!(m["rules"]["yes_label"], "Lakers");
+    assert!(pay(&e.bob, &e.market, "redeem", Some(id)).await?);
+    assert!(!pay(&e.alice, &e.market, "redeem", Some(id)).await?);
     e.assert_solvent(FAUCET).await?;
     Ok(())
 }
