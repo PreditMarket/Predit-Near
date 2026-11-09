@@ -72,7 +72,7 @@ EXP=$(( $(date +%s) + 75 ))
 args() { python3 -I - "$@" <<'PY'
 import json, sys
 post, expiry, author, kind, window = sys.argv[1:6]
-labels = ("Yes", "No", "Crypto") if kind == "price" else ("Lakers", "Celtics", "Sports")
+labels = ("Yes", "No", "Crypto") if kind == "crypto" else ("Lakers", "Celtics", "Sports")
 print(json.dumps({
     "post": {"source": "x", "post_id": post, "author_ref": author, "text": "testnet e2e"},
     "claim_side": "yes",
@@ -89,7 +89,7 @@ buy() { # who id side amount
 }
 
 echo "== create"
-tx "$MARKET" create_market "$(args "e2e-p-$TS" "$EXP" "$AUTHOR" price "$WINDOW")" '100.0 Tgas' '2 NEAR' "$OWNER"; PRICE_ID=$(market_id)
+tx "$MARKET" create_market "$(args "e2e-p-$TS" "$EXP" "$AUTHOR" crypto "$WINDOW")" '100.0 Tgas' '2 NEAR' "$OWNER"; PRICE_ID=$(market_id)
 tx "$MARKET" create_market "$(args "e2e-e-$TS" "$EXP" "$AUTHOR" event "$WINDOW")" '100.0 Tgas' '2 NEAR' "$OWNER"; EVENT_ID=$(market_id)
 [ -n "$PRICE_ID" ] && [ -n "$EVENT_ID" ] || die "no market id"
 ok "price market $PRICE_ID, event market $EVENT_ID"
@@ -111,8 +111,8 @@ tx_fails "$MARKET" finalize "{\"market_id\":\"$PRICE_ID\"}" '50.0 Tgas' '0 NEAR'
 wait_until $(( EXP + 3 ))
 
 echo "== receipts"
-op post_receipt "{\"market_id\":\"$PRICE_ID\",\"report\":{\"proposed\":{\"outcome\":\"yes\",\"reason\":\"e2e proposal\"}},\"evidence\":{\"hash\":\"e2e\",\"uri\":\"https://example.com/source\",\"ai\":{\"model\":\"e2e\",\"chat_id\":\"e2e\",\"signed_text\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"signature\":\"0xababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababab\",\"signing_address\":\"0xb98a789cdc4817275f5155593ba73ef2a957e779\"}}}"
-op post_receipt "{\"market_id\":\"$EVENT_ID\",\"report\":{\"proposed\":{\"outcome\":\"yes\",\"reason\":\"e2e proposal\"}},\"evidence\":{\"hash\":\"e2e\",\"uri\":\"https://example.com/source\",\"ai\":null}}"
+op post_receipt "{\"market_id\":\"$PRICE_ID\",\"report\":{\"proposed\":{\"outcome\":\"yes\",\"reason\":\"e2e proposal\"}},\"evidence\":{\"hash\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"uri\":\"https://example.com/source\",\"ai\":{\"model\":\"e2e\",\"chat_id\":\"e2e\",\"signed_text\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"signature\":\"0xababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababab\",\"signing_address\":\"0xb98a789cdc4817275f5155593ba73ef2a957e779\"}}}"
+op post_receipt "{\"market_id\":\"$EVENT_ID\",\"report\":{\"proposed\":{\"outcome\":\"yes\",\"reason\":\"e2e proposal\"}},\"evidence\":{\"hash\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"uri\":\"https://example.com/source\",\"ai\":{\"model\":\"glm\",\"chat_id\":\"c1\",\"signed_text\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"signature\":\"0xababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababab\",\"signing_address\":\"0xb98a789cdc4817275f5155593ba73ef2a957e779\"}}}"
 RECEIPT_AT=$(date +%s)
 check "receipt outcome" "$(view "$MARKET" get_market "{\"market_id\":\"$PRICE_ID\"}" | field receipt.outcome)" yes
 

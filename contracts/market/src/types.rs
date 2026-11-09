@@ -23,7 +23,7 @@ impl From<Side> for CoreSide {
 }
 
 /// Why a market ended without a winner. Only `AmbiguousRules` costs the
-/// creator their bond: a source going dark is nobody's fault.
+/// creator their bond.
 #[near(serializers = [borsh, json])]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -77,7 +77,9 @@ impl Default for Config {
             creation_bond: NearToken::from_near(1),
             challenge_bond: NearToken::from_near(1),
             default_challenge_window_sec: 60 * 60,
-            min_challenge_window_sec: 60,
+            // The challenge is the main defence against a wrong receipt, so the
+            // default floor leaves people time to use it. Demos configure less.
+            min_challenge_window_sec: 60 * 60,
             max_challenge_window_sec: 7 * 24 * 60 * 60,
             stuck_after_sec: 7 * 24 * 60 * 60,
             min_buy: U64(1_000_000),

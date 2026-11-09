@@ -38,7 +38,7 @@ fn contract() -> Contract {
         acc("arbiter.near"),
         acc("treasury.near"),
         acc("usdc.near"),
-        None,
+        Some(Config { min_challenge_window_sec: 60, ..Config::default() }),
     )
 }
 
@@ -115,7 +115,7 @@ fn buy(c: &mut Contract, who: &str, id: U64, side: Side, amount: u64) {
 
 fn evidence() -> Evidence {
     Evidence {
-        hash: "abcd".into(),
+        hash: "a".repeat(64),
         uri: "https://example.com/snapshot".into(),
         ai: Some(AiReading {
             model: "glm".into(),
@@ -839,13 +839,105 @@ fn a_proposal_needs_a_reason() {
 }
 
 #[test]
-fn a_receipt_can_carry_no_ai_reading() {
+#[should_panic(expected = "A NEAR AI reading is required")]
+fn a_proposal_needs_an_ai_reading() {
     let mut c = contract();
     let id = create(&mut c);
     call(EXPIRY + 1, "operator.near");
     let e = Evidence { ai: None, ..evidence() };
     c.post_receipt(id, proposed(Side::Yes), e);
+}
+
+#[test]
+fn an_invalid_report_needs_no_ai_reading() {
+    let mut c = contract();
+    let id = create(&mut c);
+    call(EXPIRY + 1, "operator.near");
+    let e = Evidence { ai: None, ..evidence() };
+    let report = Report::Invalid { kind: InvalidKind::SourceUnavailable, reason: "offline".into() };
+    c.post_receipt(id, report, e);
     assert_eq!(c.get_market(id).unwrap().receipt.unwrap().evidence.ai, None);
+}
+
+#[test]
+#[should_panic(expected = "A reason is required")]
+fn a_blank_reason_is_rejected() {
+    let mut c = contract();
+    let id = create(&mut c);
+    call(EXPIRY + 1, "operator.near");
+    c.post_receipt(id, Report::Proposed { outcome: Side::Yes, reason: "   ".into() }, evidence());
+}
+
+#[test]
+#[should_panic(expected = "Evidence hash must be a sha256 hex digest")]
+fn the_evidence_hash_must_be_a_digest() {
+    let mut c = contract();
+    let id = create(&mut c);
+    call(EXPIRY + 1, "operator.near");
+    let e = Evidence { hash: "junk".into(), ..evidence() };
+    c.post_receipt(id, proposed(Side::Yes), e);
+}
+
+#[test]
+#[should_panic(expected = "The AI reading is incomplete")]
+fn the_ai_reading_must_be_complete() {
+    let mut c = contract();
+    let id = create(&mut c);
+    call(EXPIRY + 1, "operator.near");
+    let mut e = evidence();
+    e.ai.as_mut().unwrap().signature = String::new();
+    c.post_receipt(id, proposed(Side::Yes), e);
+}
+
+#[test]
+#[should_panic(expected = "Conditions cannot be blank")]
+fn blank_conditions_are_rejected() {
+    let mut r = event_rules();
+    r.yes_condition = "  ".into();
+    create_with(r);
+}
+
+#[test]
+#[should_panic(expected = "The resolution source must be an https URL")]
+fn the_source_must_be_https() {
+    let mut r = event_rules();
+    r.resolution_source = "ftp://example.com".into();
+    create_with(r);
+}
+
+#[test]
+#[should_panic(expected = "Operator and arbiter must differ")]
+fn operator_and_arbiter_must_differ() {
+    let mut c = contract();
+    call(T0, "owner.near");
+    c.set_roles(None, Some(acc("operator.near")), None);
+}
+
+#[test]
+fn the_default_challenge_window_floor_is_an_hour() {
+    assert_eq!(Config::default().min_challenge_window_sec, 3_600);
+}
+
+/// A contract nearly out of spare NEAR refuses bets, but not a challenge.
+#[test]
+fn a_challenge_still_works_when_bets_have_filled_the_contract() {
+    let mut c = contract();
+    let id = two_sided(&mut c);
+    receipt(&mut c, id, Side::Yes);
+    let mut ctx = VMContextBuilder::new();
+    ctx.current_account_id(acc("market.near"))
+        .predecessor_account_id(acc("no.near"))
+        .signer_account_id(acc("no.near"))
+        .block_timestamp((EXPIRY + 2) * 1_000_000_000)
+        .prepaid_gas(Gas::from_tgas(300))
+        // 0.5 NEAR of storage, comfortably above what this test rewrites.
+        .storage_usage(50_000)
+        .attached_deposit(NearToken::from_near(1))
+        // Storage + both bonds + the 0.1 floor, far short of the 1 NEAR bets must leave.
+        .account_balance(NearToken::from_millinear(2_700));
+    testing_env!(ctx.build());
+    c.challenge(id, "x".into());
+    assert_eq!(c.get_market(id).unwrap().status, Status::Challenged);
 }
 
 #[test]

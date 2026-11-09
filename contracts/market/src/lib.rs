@@ -43,6 +43,8 @@ const MIN_PAYOUT_GAS: Gas = Gas::from_tgas(60);
 const ONE_YOCTO: NearToken = NearToken::from_yoctonear(1);
 /// Kept free at all times so that a failed payout can always be recorded.
 const NEAR_RESERVE: NearToken = NearToken::from_near(1);
+/// Kept free even by receipts and challenges, so a failed payout is recorded.
+const PAYOUT_FLOOR: NearToken = NearToken::from_millinear(100);
 /// Expiry cannot be further out than this.
 const MAX_EXPIRY_HORIZON_SEC: u64 = 10 * 365 * 24 * 60 * 60;
 const MAX_FEE_BPS: u16 = 5_000;
@@ -131,6 +133,7 @@ impl Contract {
     ) -> Self {
         let config = config.unwrap_or_default();
         validate_config(&config);
+        require!(operator != arbiter, "Operator and arbiter must differ");
         Self {
             owner,
             operator,
@@ -332,6 +335,14 @@ impl Contract {
         );
         if let Some(ai) = &evidence.ai {
             require!(
+                !ai.model.is_empty()
+                    && !ai.chat_id.is_empty()
+                    && !ai.signed_text.is_empty()
+                    && !ai.signature.is_empty()
+                    && !ai.signing_address.is_empty(),
+                "The AI reading is incomplete"
+            );
+            require!(
                 ai.model.len() <= MAX_SHORT_TEXT
                     && ai.chat_id.len() <= MAX_SHORT_TEXT
                     && ai.signed_text.len() <= MAX_LONG_TEXT
@@ -340,7 +351,8 @@ impl Contract {
                 "Evidence is too long"
             );
         }
-        require!(!evidence.uri.is_empty(), "Evidence is required");
+        require!(!evidence.uri.trim().is_empty(), "Evidence is required");
+        require!(is_sha256_hex(&evidence.hash), "Evidence hash must be a sha256 hex digest");
         let mut market = self.market(market_id.0);
         require!(market.status == Status::Open, "Market is not open");
         let now = now_sec();
@@ -349,19 +361,20 @@ impl Contract {
 
         let (outcome, reason) = match report {
             Report::Proposed { outcome, reason } => {
+                require!(evidence.ai.is_some(), "A NEAR AI reading is required");
                 let outcome = if outcome == Side::Yes { Outcome::Yes } else { Outcome::No };
                 (outcome, reason)
             }
             Report::Invalid { kind, reason } => (Outcome::Invalid(kind), reason),
         };
-        require!(!reason.is_empty() && reason.len() <= MAX_LONG_TEXT, "A reason is required");
+        require!(!reason.trim().is_empty() && reason.len() <= MAX_LONG_TEXT, "A reason is required");
 
         market.receipt = Some(Receipt { outcome, reason, evidence, posted_at_sec: U64(now) });
         market.status = Status::ReceiptPosted;
         self.markets.insert(market_id.0, market);
         self.open.remove(&market_id.0);
         self.awaiting_finalize.insert(market_id.0);
-        self.assert_near_reserve(NearToken::from_yoctonear(0));
+        self.assert_near_cover(NearToken::from_yoctonear(0), PAYOUT_FLOOR);
         Event::ReceiptPosted { market_id, outcome }.emit();
     }
 
@@ -397,7 +410,7 @@ impl Contract {
         market.status = Status::Challenged;
         self.markets.insert(market_id.0, market);
         self.bonds_outstanding += bond.as_yoctonear();
-        self.assert_near_reserve(excess);
+        self.assert_near_cover(excess, PAYOUT_FLOOR);
         Event::Challenged { market_id, challenger }.emit();
     }
 
@@ -572,6 +585,7 @@ impl Contract {
         if let Some(a) = treasury {
             self.treasury = a;
         }
+        require!(self.operator != self.arbiter, "Operator and arbiter must differ");
     }
 
     // ---- views ------------------------------------------------------------
@@ -791,7 +805,7 @@ impl Contract {
         }
         .emit();
         self.markets.insert(market_id.0, market);
-        self.assert_near_reserve(NearToken::from_yoctonear(0));
+        self.assert_near_cover(NearToken::from_yoctonear(0), NEAR_RESERVE);
     }
 
     /// Ends a market: settles the pool, then the bonds, then the record.
@@ -921,10 +935,12 @@ impl Contract {
         env::storage_byte_cost().saturating_mul(env::storage_usage() as u128)
     }
 
-    /// Bets and receipts grow storage that nobody pays for directly. They stop
-    /// before touching NEAR held for bonds or the reserve for failed payouts.
+    /// Bets, receipts and challenges grow storage nobody pays for directly.
+    /// They stop before touching NEAR held for bonds, and `keep` stays free for
+    /// recording failed payouts. Bets keep the larger amount, so filling the
+    /// contract with positions can never block a receipt or a challenge.
     /// `leaving` is NEAR in the balance that is about to be refunded.
-    fn assert_near_reserve(&mut self, leaving: NearToken) {
+    fn assert_near_cover(&mut self, leaving: NearToken, keep: NearToken) {
         self.markets.flush();
         self.positions.flush();
         self.by_user.flush();
@@ -934,7 +950,7 @@ impl Contract {
         let needed = self
             .storage_near()
             .saturating_add(NearToken::from_yoctonear(self.bonds_outstanding))
-            .saturating_add(NEAR_RESERVE)
+            .saturating_add(keep)
             .saturating_add(leaving);
         require!(self.account_near() >= needed, "The contract needs more NEAR for storage");
     }
@@ -1042,11 +1058,25 @@ fn validate_text(post: &PostRef, rules: &Rules, draft: &DraftRef) {
         !rules.yes_label.is_empty() && !rules.no_label.is_empty() && rules.yes_label != rules.no_label,
         "Two different outcome labels are required"
     );
-    require!(!rules.resolution_source.is_empty(), "A resolution source is required");
+    require!(!rules.resolution_source.trim().is_empty(), "A resolution source is required");
+    require!(
+        rules.resolution_source.starts_with("https://"),
+        "The resolution source must be an https URL"
+    );
+    require!(
+        !rules.yes_condition.trim().is_empty()
+            && !rules.no_condition.trim().is_empty()
+            && !rules.invalid_conditions.trim().is_empty(),
+        "Conditions cannot be blank"
+    );
     require!(
         rules.image_url.is_empty() || rules.image_url.starts_with("https://"),
         "Image must be an https URL"
     );
+}
+
+fn is_sha256_hex(s: &str) -> bool {
+    s.len() == 64 && s.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
 fn require_payout_gas() {

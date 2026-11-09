@@ -16,6 +16,7 @@ use near_sdk::{env, near, require, AccountId, BorshStorageKey, NearToken, PanicO
 
 const FAUCET_AMOUNT: Balance = 100_000_000; // 100 tUSDC
 const FAUCET_COOLDOWN_MS: u64 = 60 * 60 * 1000;
+const MAX_SIMULATED_DEPOSIT: Balance = 10_000_000_000; // 10,000 tUSDC
 
 #[derive(BorshStorageKey)]
 #[near]
@@ -63,6 +64,7 @@ impl Contract {
             env::predecessor_account_id() == env::current_account_id(),
             "Token account only"
         );
+        require!(amount.0 <= MAX_SIMULATED_DEPOSIT, "Amount is too large");
         if !self.token.accounts.contains_key(&account_id) {
             self.token.internal_register_account(&account_id);
         }

@@ -327,12 +327,13 @@ def status_is(name, i, expected, outcome="unset"):
     check(name, ok, f"status {m['status']} outcome {m['outcome']}")
 
 
+SNAPSHOT_HASH = "a" * 64
 AI_READING = {"model": "fullcase-model", "chat_id": "chat-1", "signed_text": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
               "signature": "0xababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababab", "signing_address": "0xb98a789cdc4817275f5155593ba73ef2a957e779"}
 
 
 def evidence():
-    return {"hash": "source-snapshot-hash", "uri": "https://example.com/source", "ai": AI_READING}
+    return {"hash": SNAPSHOT_HASH, "uri": "https://example.com/source", "ai": AI_READING}
 
 
 def manual(i, side):
@@ -356,6 +357,10 @@ reject("same labels on both sides", "Two different outcome labels", MARKET, "cre
        create_args(f"bad-{RUN}", "x:bad", {**bad, "yes_label": "Same", "no_label": "Same"}), OWNER, deposit="0.3 NEAR")
 reject("image must be https", "Image must be an https URL", MARKET, "create_market",
        create_args(f"bad-{RUN}", "x:bad", {**bad, "image_url": "http://x"}), OWNER, deposit="0.3 NEAR")
+reject("blank conditions", "Conditions cannot be blank", MARKET, "create_market",
+       create_args(f"bad-{RUN}", "x:bad", {**bad, "yes_condition": "  "}), OWNER, deposit="0.3 NEAR")
+reject("source must be https", "must be an https URL", MARKET, "create_market",
+       create_args(f"bad-{RUN}", "x:bad", {**bad, "resolution_source": "ftp://x"}), OWNER, deposit="0.3 NEAR")
 reject("resolution source required", "A resolution source is required", MARKET, "create_market",
        create_args(f"bad-{RUN}", "x:bad", {**bad, "resolution_source": ""}), OWNER, deposit="0.3 NEAR")
 reject("oversized question", "Text is too long", MARKET, "create_market",
@@ -370,13 +375,13 @@ reject("bond not attached", "Attach at least", MARKET, "create_market",
        create_args(f"bad-{RUN}", "x:bad", bad), OWNER, deposit="0.01 NEAR")
 
 section("markets for the checks that do not depend on expiry")
-M["far_price"] = create("price market, distant expiry", f"far-{RUN}", f"{A}-far", rules("crypto", FAR))
+M["far"] = create("price market, distant expiry", f"far-{RUN}", f"{A}-far", rules("crypto", FAR))
 M["sell"] = create("market for sells", f"sell-{RUN}", f"{A}-sell", rules("event", FAR))
 M["failed_payout"] = create("failed payout", f"fp-{RUN}", f"{A}-fp", rules("event", FAR))
 M["cancel_creator"] = create("creator cancels before trades", f"cc-{RUN}", f"{A}-cc", rules("event", FAR))
 M["cancel_owner"] = create("owner cancels after trades", f"co-{RUN}", f"{A}-co", rules("event", FAR))
 M["reserve"] = create("NEAR reserve check", f"rs-{RUN}", f"{A}-rs", rules("event", FAR, labels=("Lakers", "Celtics")))
-check("rules hash is stored", len(market(M["far_price"])["rules_hash"]) == 64)
+check("rules hash is stored", len(market(M["far"])["rules_hash"]) == 64)
 check("custom labels are stored", market(M["reserve"])["rules"]["yes_label"] == "Lakers")
 
 section("five markets per post, cancelling frees a slot")
@@ -390,7 +395,7 @@ for n, i in enumerate(cap):
     must(f"clean up cap market {n}", MARKET, "cancel_market", {"market_id": str(i)}, OWNER)
 
 section("buy: rejections, money comes back")
-m = M["far_price"]
+m = M["far"]
 bet_refused("below the minimum buy", ALICE, m, "yes", USDC_UNIT - 1)
 bet_refused("slippage limit", ALICE, m, "yes", 2 * USDC_UNIT, min_shares=str(2**63))
 before_fake = int(view(FAKE, "ft_balance_of", {"account_id": ALICE}))
@@ -455,7 +460,7 @@ must("owner cancels the failed-payout market", MARKET, "cancel_market", {"market
 pay("alice refunds there", "refund", m, ALICE, expected=net_in(2 * USDC_UNIT))
 
 section("permissions")
-m = M["far_price"]
+m = M["far"]
 event = M["reserve"]
 reject("set_roles is owner only", "Owner only", MARKET, "set_roles", {"operator": ALICE}, ALICE)
 reject("set_paused is owner only", "Owner only", MARKET, "set_paused", {"paused": True}, ALICE)
@@ -494,9 +499,9 @@ pay("alice refunds in full", "refund", m, ALICE, expected=net_in(3 * USDC_UNIT))
 pay("bob refunds in full", "refund", m, BOB, expected=net_in(5 * USDC_UNIT))
 pay_rejected("no second refund", "NothingToRefund", "refund", m, BOB)
 reject("cannot cancel twice", "Market is not open", MARKET, "cancel_market", {"market_id": str(m)}, OWNER)
-must("owner cancels the distant price market", MARKET, "cancel_market", {"market_id": str(M["far_price"])}, OWNER)
-pay("alice refunds the distant market", "refund", M["far_price"], ALICE, expected=net_in(20 * USDC_UNIT))
-pay("bob refunds the distant market", "refund", M["far_price"], BOB, expected=net_in(10 * USDC_UNIT))
+must("owner cancels the distant price market", MARKET, "cancel_market", {"market_id": str(M["far"])}, OWNER)
+pay("alice refunds the distant market", "refund", M["far"], ALICE, expected=net_in(20 * USDC_UNIT))
+pay("bob refunds the distant market", "refund", M["far"], BOB, expected=net_in(10 * USDC_UNIT))
 m = M["sell"]
 must("owner cancels the sell market", MARKET, "cancel_market", {"market_id": str(m)}, OWNER)
 p = position(m, ALICE)
@@ -505,10 +510,10 @@ pay("other side refunds", "refund", m, BOB, expected=net_in(4 * USDC_UNIT))
 
 section("markets that settle")
 EXP = int(time.time()) + 540
-M["price_yes"] = create("market resolving YES", f"p1-{RUN}", f"{A}-a", rules("crypto", EXP))
+M["market_yes"] = create("market resolving YES", f"p1-{RUN}", f"{A}-a", rules("crypto", EXP))
 M["same_post"] = create("second market on the same post", f"p1-{RUN}", f"{A}-a", rules("crypto", EXP))
-M["price_no"] = create("market resolving NO", f"p2-{RUN}", f"{A}-b", rules("crypto", EXP))
-M["below"] = create("third market on another author", f"p3-{RUN}", f"{A}-c", rules("crypto", EXP))
+M["market_no"] = create("market resolving NO", f"p2-{RUN}", f"{A}-b", rules("crypto", EXP))
+M["market_third"] = create("third market on another author", f"p3-{RUN}", f"{A}-c", rules("crypto", EXP))
 M["source_gone"] = create("market whose source goes away", f"p8-{RUN}", f"{A}-h", rules("crypto", EXP))
 M["one_sided"] = create("market with one side only", f"p9-{RUN}", f"{A}-i", rules("crypto", EXP))
 M["uphold"] = create("event market, challenge lost", f"p4-{RUN}", f"{A}-d", rules("event", EXP))
@@ -519,14 +524,14 @@ M["silent_op"] = create("operator goes silent", f"p10-{RUN}", f"{A}-j", rules("e
 M["silent_arb"] = create("arbiter goes silent", f"p11-{RUN}", f"{A}-k", rules("event", EXP))
 
 section("bets on the settling markets")
-bet("price YES, alice", ALICE, M["price_yes"], "yes", 20 * USDC_UNIT)
-bet("price YES, bob", BOB, M["price_yes"], "no", 10 * USDC_UNIT)
+bet("price YES, alice", ALICE, M["market_yes"], "yes", 20 * USDC_UNIT)
+bet("price YES, bob", BOB, M["market_yes"], "no", 10 * USDC_UNIT)
 bet("same post, alice", ALICE, M["same_post"], "yes", 2 * USDC_UNIT)
 bet("same post, bob", BOB, M["same_post"], "no", 2 * USDC_UNIT)
-bet("price NO, alice", ALICE, M["price_no"], "yes", 3 * USDC_UNIT)
-bet("price NO, bob", BOB, M["price_no"], "no", 6 * USDC_UNIT)
-bet("inverted, alice", ALICE, M["below"], "yes", 4 * USDC_UNIT)
-bet("inverted, bob", BOB, M["below"], "no", 2 * USDC_UNIT)
+bet("price NO, alice", ALICE, M["market_no"], "yes", 3 * USDC_UNIT)
+bet("price NO, bob", BOB, M["market_no"], "no", 6 * USDC_UNIT)
+bet("inverted, alice", ALICE, M["market_third"], "yes", 4 * USDC_UNIT)
+bet("inverted, bob", BOB, M["market_third"], "no", 2 * USDC_UNIT)
 for key in ("uphold", "overturn", "slash_ch", "slash_op", "source_gone", "silent_arb"):
     bet(f"{key}, alice", ALICE, M[key], "yes", 2 * USDC_UNIT)
     bet(f"{key}, bob", BOB, M[key], "no", 2 * USDC_UNIT)
@@ -540,41 +545,45 @@ if time.time() > EXP - 15:
 
 section("freeze window")
 wait_until(EXP - 3)
-bet_refused("buy inside the freeze window", ALICE, M["price_yes"], "yes", 2 * USDC_UNIT)
+bet_refused("buy inside the freeze window", ALICE, M["market_yes"], "yes", 2 * USDC_UNIT)
 
 section("receipts: rejected inputs")
 wait_until(EXP + 1)
-m = M["price_yes"]
+m = M["market_yes"]
 op_reject("missing evidence", "Evidence is required", "post_receipt",
           {"market_id": str(m), "report": {"proposed": {"outcome": "yes", "reason": "x"}}, "evidence": {"hash": "", "uri": "", "ai": None}})
 op_reject("proposal needs a reason", "A reason is required", "post_receipt",
           {"market_id": str(m), "report": {"proposed": {"outcome": "yes", "reason": ""}}, "evidence": evidence()})
 op_reject("invalid needs a reason", "A reason is required", "post_receipt",
           {"market_id": str(M["source_gone"]), "report": {"invalid": {"kind": "source_unavailable", "reason": ""}}, "evidence": evidence()})
+op_reject("evidence hash must be a digest", "must be a sha256 hex digest", "post_receipt",
+          {"market_id": str(m), "report": {"proposed": {"outcome": "yes", "reason": "x"}}, "evidence": {**evidence(), "hash": "junk"}})
+op_reject("a proposal needs a NEAR AI reading", "A NEAR AI reading is required", "post_receipt",
+          {"market_id": str(m), "report": {"proposed": {"outcome": "yes", "reason": "x"}}, "evidence": {**evidence(), "ai": None}})
 op_reject("oversized AI signature", "Evidence is too long", "post_receipt",
           {"market_id": str(m), "report": {"proposed": {"outcome": "yes", "reason": "x"}},
            "evidence": {**evidence(), "ai": {**AI_READING, "signature": "x" * 201}}})
 
 section("views for the agent")
 due = view(MARKET, "get_due_markets", {"limit": 100})
-check("due markets are listed", any(d["id"] == str(M["price_yes"]) for d in due))
+check("due markets are listed", any(d["id"] == str(M["market_yes"]) for d in due))
 check("open count is reported", view(MARKET, "get_open_count") >= len(due))
 
 section("receipts")
-expected_yes, expected_no, expected_below = True, False, True
-op("receipt, YES", "post_receipt", manual(M["price_yes"], "yes"))
+expected_yes, expected_no, expected_third = True, False, True
+op("receipt, YES", "post_receipt", manual(M["market_yes"], "yes"))
 op("receipt, same post", "post_receipt", manual(M["same_post"], "yes"))
-op("receipt, NO", "post_receipt", manual(M["price_no"], "no"))
-op("receipt, third call", "post_receipt", manual(M["below"], "yes"))
+op("receipt, NO", "post_receipt", manual(M["market_no"], "no"))
+op("receipt, third call", "post_receipt", manual(M["market_third"], "yes"))
 op("receipt, one side", "post_receipt", manual(M["one_sided"], "yes"))
-receipt = market(M["price_yes"])["receipt"]
+receipt = market(M["market_yes"])["receipt"]
 check("outcome stored", receipt["outcome"] == "yes")
 check("reason stored", receipt["reason"] == "Result from the listed source")
-check("source hash stored", receipt["evidence"]["hash"] == "source-snapshot-hash")
+check("source hash stored", receipt["evidence"]["hash"] == SNAPSHOT_HASH)
 check("AI reading stored", receipt["evidence"]["ai"] == AI_READING)
 op("receipt, source gone", "post_receipt", {"market_id": str(M["source_gone"]), "report": {"invalid": {"kind": "source_unavailable", "reason": "The source is offline"}}, "evidence": evidence()})
 op("receipt, ambiguous", "post_receipt", {"market_id": str(M["slash_op"]), "report": {"invalid": {"kind": "ambiguous_rules", "reason": "Rules could not be applied"}}, "evidence": evidence()})
-op_reject("no second receipt", "Market is not open", "post_receipt", manual(M["price_yes"], "yes"))
+op_reject("no second receipt", "Market is not open", "post_receipt", manual(M["market_yes"], "yes"))
 op("receipt, uphold case", "post_receipt", manual(M["uphold"], "yes"))
 op("receipt, overturn case", "post_receipt", manual(M["overturn"], "yes"))
 op("receipt, invalid-overturn case", "post_receipt", manual(M["slash_ch"], "yes"))
@@ -617,27 +626,27 @@ wait_until(LAST_RECEIPT + WINDOW + 3)
 reject("challenge after the window", "Challenge window is over", MARKET, "challenge", {"market_id": str(M["one_sided"]), "reason_uri": "x"}, BOB, deposit="0.1 NEAR")
 check("finalizable list has the receipts", len(view(MARKET, "get_finalizable", {"limit": 100})) >= 5)
 before_treasury = near_balance(TREASURY)
-for key in ("price_yes", "same_post", "price_no", "below", "one_sided", "source_gone"):
+for key in ("market_yes", "same_post", "market_no", "market_third", "one_sided", "source_gone"):
     op(f"finalize {key} with the limited key", "finalize", {"market_id": str(M[key])})
 must("anyone can finalize", MARKET, "finalize", {"market_id": str(M["slash_op"])}, BOB)
 time.sleep(6)
 check("ambiguous rules forfeit the creation bond", near_balance(TREASURY) - before_treasury == BOND, str(near_balance(TREASURY) - before_treasury))
-reject("no second finalize", "Nothing to finalize", MARKET, "finalize", {"market_id": str(M["price_yes"])}, BOB)
-status_is("YES finalized", M["price_yes"], "finalized", "yes" if expected_yes else "no")
-status_is("NO finalized", M["price_no"], "finalized", "yes" if expected_no else "no")
+reject("no second finalize", "Nothing to finalize", MARKET, "finalize", {"market_id": str(M["market_yes"])}, BOB)
+status_is("YES finalized", M["market_yes"], "finalized", "yes" if expected_yes else "no")
+status_is("NO finalized", M["market_no"], "finalized", "yes" if expected_no else "no")
 status_is("source-gone finalized", M["source_gone"], "finalized", {"invalid": "source_unavailable"})
 
 section("payouts")
 pot = net_in(20 * USDC_UNIT) + net_in(10 * USDC_UNIT)
-pay("winner redeems the pot", "redeem", M["price_yes"], ALICE, expected=redeem_net(pot))
-pay_rejected("no second redeem", "NothingToRedeem", "redeem", M["price_yes"], ALICE)
-pay_rejected("loser cannot redeem", "NothingToRedeem", "redeem", M["price_yes"], BOB)
-pay_rejected("no refund on a settled market", "NotCancelled", "refund", M["price_yes"], BOB)
+pay("winner redeems the pot", "redeem", M["market_yes"], ALICE, expected=redeem_net(pot))
+pay_rejected("no second redeem", "NothingToRedeem", "redeem", M["market_yes"], ALICE)
+pay_rejected("loser cannot redeem", "NothingToRedeem", "redeem", M["market_yes"], BOB)
+pay_rejected("no refund on a settled market", "NotCancelled", "refund", M["market_yes"], BOB)
 pay("same post winner", "redeem", M["same_post"], ALICE, expected=redeem_net(2 * net_in(2 * USDC_UNIT)))
 pot = net_in(3 * USDC_UNIT) + net_in(6 * USDC_UNIT)
-pay("NO winner redeems", "redeem", M["price_no"], BOB, expected=redeem_net(pot))
+pay("NO winner redeems", "redeem", M["market_no"], BOB, expected=redeem_net(pot))
 pot = net_in(4 * USDC_UNIT) + net_in(2 * USDC_UNIT)
-pay("inverted winner redeems", "redeem", M["below"], ALICE, expected=redeem_net(pot))
+pay("inverted winner redeems", "redeem", M["market_third"], ALICE, expected=redeem_net(pot))
 pot = 2 * net_in(2 * USDC_UNIT)
 pay("upheld winner redeems", "redeem", M["uphold"], ALICE, expected=redeem_net(pot))
 pay("overturned winner redeems", "redeem", M["overturn"], BOB, expected=redeem_net(pot))

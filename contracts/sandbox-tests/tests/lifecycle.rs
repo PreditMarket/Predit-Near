@@ -166,7 +166,7 @@ impl Env {
             .args_json(json!({
                 "market_id": id.to_string(),
                 "report": { "proposed": { "outcome": outcome, "reason": "Confirmed from the source" } },
-                "evidence": { "hash": "abcd", "uri": "https://example.com/snapshot",
+                "evidence": { "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "uri": "https://example.com/snapshot",
                               "ai": { "model": "glm", "chat_id": "c1", "signed_text": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
                                       "signature": "0xababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababab", "signing_address": "0xb98a789cdc4817275f5155593ba73ef2a957e779" } }
             }))
@@ -306,7 +306,7 @@ async fn an_event_market_settles_from_the_operator_proposal() -> anyhow::Result<
         .args_json(json!({
             "market_id": id.to_string(),
             "report": { "proposed": { "outcome": "no", "reason": "Final score 102-110" } },
-            "evidence": { "hash": "abcd", "uri": "https://www.nba.com/scores", "ai": null }
+            "evidence": { "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "uri": "https://www.nba.com/scores", "ai": { "model": "glm", "chat_id": "c1", "signed_text": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "signature": "0xababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababab", "signing_address": "0xb98a789cdc4817275f5155593ba73ef2a957e779" } }
         }))
         .transact()
         .await?

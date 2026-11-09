@@ -3,6 +3,8 @@
 # Usage: ./build.sh && ./deploy-testnet.sh <account-prefix>
 #   FUNDER=<account>  pay for new accounts from this one instead of the faucet,
 #                     which rate-limits quickly. FUND_AMOUNT defaults to 1.5 NEAR.
+#   CONFIG_FILE=<json> market Config to deploy with, e.g. demo-config.json.
+#                     Default: the contract's own (1 hour minimum challenge window).
 # Keys are saved in ~/.near-credentials, never in this repository.
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -10,6 +12,8 @@ cd "$(dirname "$0")"
 PREFIX="${1:?usage: deploy-testnet.sh <account-prefix>}"
 NET="network-config testnet"
 SIGN="sign-with-legacy-keychain send"
+CONFIG=null
+[ -n "${CONFIG_FILE:-}" ] && CONFIG=$(tr -d '\n' < "$CONFIG_FILE")
 MARKET="$PREFIX-market.testnet"
 USDC="$PREFIX-usdc.testnet"
 OWNER="$PREFIX-owner.testnet"
@@ -34,7 +38,7 @@ near contract deploy "$USDC" use-file target/near/predit_mock_usdc/predit_mock_u
 
 near contract deploy "$MARKET" use-file target/near/predit_market/predit_market.wasm \
   with-init-call new json-args \
-  "{\"owner\":\"$OWNER\",\"operator\":\"$OPERATOR\",\"arbiter\":\"$ARBITER\",\"treasury\":\"$TREASURY\",\"collateral\":\"$USDC\"}" \
+  "{\"owner\":\"$OWNER\",\"operator\":\"$OPERATOR\",\"arbiter\":\"$ARBITER\",\"treasury\":\"$TREASURY\",\"collateral\":\"$USDC\",\"config\":$CONFIG}" \
   prepaid-gas '100.0 Tgas' attached-deposit '0 NEAR' $NET $SIGN
 
 # The market needs a USDC balance to receive bets, and the treasury to collect fees.
