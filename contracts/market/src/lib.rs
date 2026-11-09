@@ -1004,6 +1004,18 @@ fn view_of(m: &Market) -> MarketView {
         total_no: U128(m.pool.total_no_cost_acc),
         volume: U128(m.volume as u128),
         trades: m.trades,
+        yes_shares: U128(m.pool.yes_shares),
+        no_shares: U128(m.pool.no_shares),
+        virtual_liquidity_l: U128(m.pool.virtual_liquidity_l as u128),
+        trade_fee_bps: m.pool.trade_fee_bps,
+        redeem_fee_bps: m.pool.redeem_fee_bps,
+        creator_share_bps: m.pool.creator_share_bps,
+        trade_freeze_sec: m.pool.trade_freeze_seconds,
+        refunds_only: m.pool.mode == ResolveModeV3::AutoCanceled as u8,
+        resolved_pool_collateral: U128(m.pool.resolved_pool_collateral as u128),
+        resolved_x_win: U128(m.pool.resolved_x_win),
+        resolved_ts: U64(m.pool.resolved_ts.max(0) as u64),
+        resolved_redeem_fee_bps: m.pool.resolved_redeem_fee_bps,
     }
 }
 

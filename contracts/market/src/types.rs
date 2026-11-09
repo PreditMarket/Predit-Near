@@ -346,6 +346,20 @@ pub struct MarketView {
     pub total_no: U128,
     pub volume: U128,
     pub trades: u32,
+    pub yes_shares: U128,
+    pub no_shares: U128,
+    pub virtual_liquidity_l: U128,
+    pub trade_fee_bps: u16,
+    pub redeem_fee_bps: u16,
+    pub creator_share_bps: u16,
+    pub trade_freeze_sec: u32,
+    /// Everyone gets their stake back: cancelled, invalid or one-sided.
+    pub refunds_only: bool,
+    /// Snapshot at settlement, the inputs to the payout.
+    pub resolved_pool_collateral: U128,
+    pub resolved_x_win: U128,
+    pub resolved_ts: U64,
+    pub resolved_redeem_fee_bps: u16,
 }
 
 #[near(serializers = [json])]

@@ -521,6 +521,11 @@ fn the_winner_takes_the_losing_stake() {
     receipt(&mut c, id, Side::Yes);
     finalize(&mut c, id);
     assert_eq!(status(&c, id), Status::Finalized);
+    let m = c.get_market(id).unwrap();
+    assert!(!m.refunds_only);
+    assert_eq!(m.resolved_pool_collateral.0, 199_400_000);
+    assert_eq!(m.resolved_x_win.0, 99_700_000);
+    assert!(m.yes_shares.0 > 0 && m.no_shares.0 > 0);
 
     yocto(EXPIRY + 200, "yes.near");
     let _ = c.redeem(id);
@@ -563,6 +568,7 @@ fn a_one_sided_market_refunds() {
     buy(&mut c, "yes.near", id, Side::Yes, 100 * USDC);
     receipt(&mut c, id, Side::Yes);
     finalize(&mut c, id);
+    assert!(c.get_market(id).unwrap().refunds_only);
 
     yocto(EXPIRY + 200, "yes.near");
     let _ = c.refund(id);
