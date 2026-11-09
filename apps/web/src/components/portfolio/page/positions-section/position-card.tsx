@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { MarketCell, PayoutCell, PriceCell, TradedCell, XpCell } from './position-cells';
+import { MarketCell, PayoutCell, PriceCell, TradedCell } from './position-cells';
 import type { PositionView } from './use-position-view';
 
 function Figure({ label, children }: { label: string; children: ReactNode }) {
@@ -27,9 +27,6 @@ export function PositionCard({ view }: { view: PositionView }) {
         </Figure>
         <Figure label="To win">
           <PayoutCell view={view} />
-        </Figure>
-        <Figure label="XP value">
-          <XpCell view={view} />
         </Figure>
       </div>
     </div>

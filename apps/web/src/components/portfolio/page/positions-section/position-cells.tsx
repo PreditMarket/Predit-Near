@@ -157,14 +157,3 @@ export function PayoutCell({ view }: { view: PositionView }) {
       return <Dash />;
   }
 }
-
-export function XpCell({ view }: { view: PositionView }) {
-  if (view.xp === null) return <Dash />;
-  return (
-    <span className="flex items-center gap-1 font-mono font-black text-warning text-[12px]">
-      <Zap className="w-3 h-3" />
-      {view.xp}
-      <span className="text-[9px] text-muted-foreground font-semibold">XP</span>
-    </span>
-  );
-}

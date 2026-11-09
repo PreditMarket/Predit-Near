@@ -1,5 +1,5 @@
 import type { ResponsiveTableColumn } from '@/components/v2';
-import { MarketCell, PayoutCell, PriceCell, TradedCell, XpCell } from './position-cells';
+import { MarketCell, PayoutCell, PriceCell, TradedCell } from './position-cells';
 import type { PositionView } from './use-position-view';
 
 /** A position as a desktop row: the columns `ResponsiveTable` lays out. */
@@ -30,12 +30,5 @@ export const POSITION_COLUMNS: ResponsiveTableColumn<PositionView>[] = [
     align: 'right',
     width: '110px',
     cell: (view) => <PayoutCell view={view} />,
-  },
-  {
-    key: 'xp',
-    header: 'XP value',
-    align: 'right',
-    width: '110px',
-    cell: (view) => <XpCell view={view} />,
   },
 ];
