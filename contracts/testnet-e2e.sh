@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs a full market lifecycle against a deployed testnet contract:
-#   a price market that finalizes, and an event market whose receipt is
-#   challenged and overturned. Prices here are test values, not Pyth data.
+#   a market that finalizes, and a market whose receipt is challenged and
+#   overturned.
 # Takes about 3 minutes. Stops at the first check that fails.
 #
 # Usage: ./testnet-e2e.sh <account-prefix>
@@ -16,7 +16,7 @@ MARKET="$P-market.testnet"; USDC="$P-usdc.testnet"; OWNER="$P-owner.testnet"
 OPERATOR="$P-operator.testnet"; ARBITER="$P-arbiter.testnet"; TREASURY="$P-treasury.testnet"
 ALICE="$P-alice.testnet"; BOB="$P-bob.testnet"
 NET="network-config testnet"; SIGN="sign-with-legacy-keychain send"
-WINDOW=60; STRIKE=25000000000; TS=$(date +%s); AUTHOR="x:e2e-$TS"
+WINDOW=60; TS=$(date +%s); AUTHOR="x:e2e-$TS"
 
 die() { echo "FAIL: $*"; exit 1; }
 ok() { echo "  ok: $*"; }
@@ -71,19 +71,14 @@ ok "alice $A0, bob $B0"
 EXP=$(( $(date +%s) + 75 ))
 args() { python3 -I - "$@" <<'PY'
 import json, sys
-post, expiry, author, kind, strike, window = sys.argv[1:7]
-oracle = None
-labels = ("Yes", "No", "Crypto")
-if kind == "price":
-    oracle = {"symbol": "SOL", "feed_id": "ef0d8b6f", "strike": strike, "expo": -8, "below": False}
-else:
-    labels = ("Lakers", "Celtics", "Sports")
+post, expiry, author, kind, window = sys.argv[1:6]
+labels = ("Yes", "No", "Crypto") if kind == "price" else ("Lakers", "Celtics", "Sports")
 print(json.dumps({
     "post": {"source": "x", "post_id": post, "author_ref": author, "text": "testnet e2e"},
     "claim_side": "yes",
     "rules": {"question": f"e2e {kind} {post}", "description": "testnet e2e", "yes_label": labels[0], "no_label": labels[1],
               "yes_condition": "YES condition", "no_condition": "NO condition", "resolution_source": "https://example.com/source",
-              "invalid_conditions": "none", "category": labels[2], "image_url": "", "expiry_sec": expiry, "oracle": oracle},
+              "invalid_conditions": "none", "category": labels[2], "image_url": "", "expiry_sec": expiry},
     "draft": {"model": "e2e", "chat_id": "e2e"},
     "challenge_window_sec": int(window)}))
 PY
@@ -94,8 +89,8 @@ buy() { # who id side amount
 }
 
 echo "== create"
-tx "$MARKET" create_market "$(args "e2e-p-$TS" "$EXP" "$AUTHOR" price "$STRIKE" "$WINDOW")" '100.0 Tgas' '2 NEAR' "$OWNER"; PRICE_ID=$(market_id)
-tx "$MARKET" create_market "$(args "e2e-e-$TS" "$EXP" "$AUTHOR" event "$STRIKE" "$WINDOW")" '100.0 Tgas' '2 NEAR' "$OWNER"; EVENT_ID=$(market_id)
+tx "$MARKET" create_market "$(args "e2e-p-$TS" "$EXP" "$AUTHOR" price "$WINDOW")" '100.0 Tgas' '2 NEAR' "$OWNER"; PRICE_ID=$(market_id)
+tx "$MARKET" create_market "$(args "e2e-e-$TS" "$EXP" "$AUTHOR" event "$WINDOW")" '100.0 Tgas' '2 NEAR' "$OWNER"; EVENT_ID=$(market_id)
 [ -n "$PRICE_ID" ] && [ -n "$EVENT_ID" ] || die "no market id"
 ok "price market $PRICE_ID, event market $EVENT_ID"
 
@@ -116,10 +111,10 @@ tx_fails "$MARKET" finalize "{\"market_id\":\"$PRICE_ID\"}" '50.0 Tgas' '0 NEAR'
 wait_until $(( EXP + 3 ))
 
 echo "== receipts"
-op post_receipt "{\"market_id\":\"$PRICE_ID\",\"report\":{\"price\":{\"price\":\"26000000000\",\"expo\":-8,\"publish_time_sec\":\"$EXP\"}},\"evidence\":{\"hash\":\"e2e\",\"uri\":\"testnet-e2e-test-price\"}}"
-op post_receipt "{\"market_id\":\"$EVENT_ID\",\"report\":{\"manual\":{\"outcome\":\"yes\",\"reason\":\"e2e proposal\"}},\"evidence\":{\"hash\":\"e2e\",\"uri\":\"https://example.com/source\"}}"
+op post_receipt "{\"market_id\":\"$PRICE_ID\",\"report\":{\"proposed\":{\"outcome\":\"yes\",\"reason\":\"e2e proposal\"}},\"evidence\":{\"hash\":\"e2e\",\"uri\":\"https://example.com/source\",\"ai\":{\"model\":\"e2e\",\"chat_id\":\"e2e\",\"signature\":\"e2e\"}}}"
+op post_receipt "{\"market_id\":\"$EVENT_ID\",\"report\":{\"proposed\":{\"outcome\":\"yes\",\"reason\":\"e2e proposal\"}},\"evidence\":{\"hash\":\"e2e\",\"uri\":\"https://example.com/source\",\"ai\":null}}"
 RECEIPT_AT=$(date +%s)
-check "derived outcome" "$(view "$MARKET" get_market "{\"market_id\":\"$PRICE_ID\"}" | field receipt.outcome)" yes
+check "receipt outcome" "$(view "$MARKET" get_market "{\"market_id\":\"$PRICE_ID\"}" | field receipt.outcome)" yes
 
 echo "== challenge and overturn the event market"
 tx "$MARKET" challenge "{\"market_id\":\"$EVENT_ID\",\"reason_uri\":\"https://example.com/why\"}" '50.0 Tgas' '1 NEAR' "$BOB"

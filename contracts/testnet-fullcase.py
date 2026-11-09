@@ -1,22 +1,20 @@
 #!/usr/bin/env python3
-"""Full case test on NEAR testnet, with mock USDC and real Pyth SOL/USD prices.
+"""Full case test on NEAR testnet, with mock USDC.
 
 Every success path and every rejection the contract promises, against a fresh
-deployment with short timers. Prices are read from Pyth's public SOL/USD
-PriceUpdateV2 account on Solana mainnet, which needs no API key.
+deployment with short timers. A rejection only passes if it fails for the
+stated reason.
 
 Usage: FUNDERS=a.testnet,b.testnet,c.testnet python3 -I testnet-fullcase.py <prefix>
-Build first with ./build.sh. Takes about 35 minutes and needs about 25 NEAR on first run (accounts are reused).
-Exits non-zero if any check failed.
+Build first with ./build.sh. Takes about 30 minutes and needs about 22 NEAR on
+the first run (accounts are reused). Exits non-zero if any check failed.
 """
 
 import base64
-import hashlib
 import json
 import math
 import os
 import re
-import struct
 import subprocess
 import sys
 import time
@@ -25,15 +23,10 @@ import urllib.request
 PREFIX = sys.argv[1]
 FUNDERS = os.environ["FUNDERS"].split(",")
 RPCS = ["https://test.rpc.fastnear.com", "https://rpc.testnet.near.org"]
-SOLANA_RPC = "https://api.mainnet-beta.solana.com"
-PYTH_SOL_ACCOUNT = "7UVimffxr9ow1uXYxsr4LHAcV58mLzhmwaeKvJ1pjLiE"
-PYTH_SOL_FEED = "ef0d8b6fda2ceba41da15d4095d1da392a0d2f8ed0c6c7bc0f4cfac8c280b56d"
-PYTH_RECEIVER_PREFIX = "rec5EKMG"
 
 USDC_UNIT = 1_000_000
 NEAR_UNIT = 10**24
 BOND = NEAR_UNIT // 10
-ORACLE_WINDOW = 30
 STUCK_AFTER = 180
 WINDOW = 60
 FREEZE = 5
@@ -174,42 +167,13 @@ def redeem_net(gross):
     return gross - math.ceil(gross * 100 / 10_000)
 
 
-def read_pyth():
-    body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "getAccountInfo",
-                       "params": [PYTH_SOL_ACCOUNT, {"encoding": "base64", "commitment": "confirmed"}]}).encode()
-    req = urllib.request.Request(SOLANA_RPC, data=body, headers={"content-type": "application/json"})
-    result = json.load(urllib.request.urlopen(req, timeout=20))["result"]
-    raw = base64.b64decode(result["value"]["data"][0])
-    i = 8 + 32
-    level = raw[i]
-    i += 2 if level == 0 else 1
-    feed = raw[i:i + 32].hex()
-    price, conf, expo, publish = struct.unpack_from("<qQiq", raw, i + 32)
-    return {"owner": result["value"]["owner"], "feed": feed, "price": price, "conf": conf, "expo": expo,
-            "publish": publish, "level": level, "slot": result["context"]["slot"],
-            "hash": hashlib.sha256(raw).hexdigest()}
-
-
-def pyth_after(expiry):
-    deadline = expiry + ORACLE_WINDOW + 15
-    while time.time() < deadline:
-        try:
-            p = read_pyth()
-            if p["publish"] >= expiry:
-                return p
-        except Exception as e:
-            log(f"  pyth read failed: {e}")
-        time.sleep(1)
-    raise RuntimeError("no Pyth update after expiry")
-
-
 # ---- deployment --------------------------------------------------------------
 
 def setup():
     global OPERATOR_KEY
     section("deploy a fresh contract with short timers")
     plan = [(MARKET, "7", 0), (USDC, "2.5", 0), (FAKE, "2.5", 1), (OWNER, "5", 1), (CAROL, "1", 1),
-            (OPERATOR, "1.5", 2), (ARBITER, "1", 2), (TREASURY, "1", 2), (ALICE, "2", 2), (BOB, "2", 2)]
+            (OPERATOR, "1", 2), (ARBITER, "0.5", 2), (TREASURY, "0.5", 2), (ALICE, "1", 2), (BOB, "1", 2)]
     for account, amount, funder in plan:
         if rpc_exists(account):
             log(f"  exists {account}")
@@ -222,7 +186,7 @@ def setup():
     config = {
         "creation_bond": str(BOND), "challenge_bond": str(BOND),
         "default_challenge_window_sec": WINDOW, "min_challenge_window_sec": 20, "max_challenge_window_sec": 3600,
-        "stuck_after_sec": STUCK_AFTER, "oracle_window_sec": ORACLE_WINDOW, "min_buy": str(USDC_UNIT),
+        "stuck_after_sec": STUCK_AFTER, "min_buy": str(USDC_UNIT),
         "max_markets_per_post": 5, "trade_fee_bps": 30, "redeem_fee_bps": 100, "creator_share_bps": 1000,
         "trade_freeze_sec": FREEZE, "virtual_liquidity_l": "500000000",
     }
@@ -298,14 +262,11 @@ def cleanup():
 
 # ---- market helpers ----------------------------------------------------------
 
-def rules(kind, expiry, strike=None, below=False, labels=("Yes", "No")):
-    oracle = None
-    if kind == "price":
-        oracle = {"symbol": "SOL", "feed_id": PYTH_SOL_FEED, "strike": str(strike), "expo": PRICE_EXPO, "below": below}
+def rules(kind, expiry, labels=("Yes", "No")):
     return {"question": f"Full case {kind} market", "description": "Testnet full case", "yes_label": labels[0],
             "no_label": labels[1], "yes_condition": "YES condition", "no_condition": "NO condition",
             "resolution_source": "https://example.com/source", "invalid_conditions": "None", "category": "Test",
-            "image_url": "", "expiry_sec": str(expiry), "oracle": oracle}
+            "image_url": "", "expiry_sec": str(expiry)}
 
 
 def create_args(post_id, author, r, claim="yes", window=WINDOW):
@@ -366,12 +327,15 @@ def status_is(name, i, expected, outcome="unset"):
     check(name, ok, f"status {m['status']} outcome {m['outcome']}")
 
 
+AI_READING = {"model": "fullcase-model", "chat_id": "chat-1", "signature": "0xsigned"}
+
+
 def evidence():
-    return {"hash": "manual-evidence", "uri": "https://example.com/source"}
+    return {"hash": "source-snapshot-hash", "uri": "https://example.com/source", "ai": AI_READING}
 
 
 def manual(i, side):
-    return {"market_id": str(i), "report": {"manual": {"outcome": side, "reason": "Result from the listed source"}},
+    return {"market_id": str(i), "report": {"proposed": {"outcome": side, "reason": "Result from the listed source"}},
             "evidence": evidence()}
 
 
@@ -379,16 +343,6 @@ def manual(i, side):
 
 setup()
 cleanup()
-
-live = read_pyth()
-PRICE_EXPO = live["expo"]
-section("real Pyth feed")
-check("feed id is SOL/USD", live["feed"] == PYTH_SOL_FEED)
-check("account is owned by the Pyth receiver", live["owner"].startswith(PYTH_RECEIVER_PREFIX), live["owner"])
-check("update is fully verified", live["level"] == 1, str(live["level"]))
-log(f"  live SOL/USD {live['price'] * 10 ** live['expo']:.4f}, publish {live['publish']}")
-LOW = int(live["price"] * 0.8)
-HIGH = int(live["price"] * 1.2)
 
 RUN = str(int(time.time()))
 A = f"x:fc-{RUN}"
@@ -415,7 +369,7 @@ reject("bond not attached", "Attach at least", MARKET, "create_market",
        create_args(f"bad-{RUN}", "x:bad", bad), OWNER, deposit="0.01 NEAR")
 
 section("markets for the checks that do not depend on expiry")
-M["far_price"] = create("price market, distant expiry", f"far-{RUN}", f"{A}-far", rules("price", FAR, LOW))
+M["far_price"] = create("price market, distant expiry", f"far-{RUN}", f"{A}-far", rules("crypto", FAR))
 M["sell"] = create("market for sells", f"sell-{RUN}", f"{A}-sell", rules("event", FAR))
 M["failed_payout"] = create("failed payout", f"fp-{RUN}", f"{A}-fp", rules("event", FAR))
 M["cancel_creator"] = create("creator cancels before trades", f"cc-{RUN}", f"{A}-cc", rules("event", FAR))
@@ -423,7 +377,6 @@ M["cancel_owner"] = create("owner cancels after trades", f"co-{RUN}", f"{A}-co",
 M["reserve"] = create("NEAR reserve check", f"rs-{RUN}", f"{A}-rs", rules("event", FAR, labels=("Lakers", "Celtics")))
 check("rules hash is stored", len(market(M["far_price"])["rules_hash"]) == 64)
 check("custom labels are stored", market(M["reserve"])["rules"]["yes_label"] == "Lakers")
-check("oracle terms are stored", market(M["far_price"])["rules"]["oracle"]["feed_id"] == PYTH_SOL_FEED)
 
 section("five markets per post, cancelling frees a slot")
 cap = [create(f"post cap {n}", f"cap-{RUN}", f"{A}-cap", rules("event", FAR)) for n in range(1, 6)]
@@ -551,12 +504,12 @@ pay("other side refunds", "refund", m, BOB, expected=net_in(4 * USDC_UNIT))
 
 section("markets that settle")
 EXP = int(time.time()) + 540
-M["price_yes"] = create("price market, YES from real Pyth", f"p1-{RUN}", f"{A}-a", rules("price", EXP, LOW))
-M["same_post"] = create("second market on the same post", f"p1-{RUN}", f"{A}-a", rules("price", EXP, LOW))
-M["price_no"] = create("price market, NO from real Pyth", f"p2-{RUN}", f"{A}-b", rules("price", EXP, HIGH))
-M["below"] = create("inverted price market", f"p3-{RUN}", f"{A}-c", rules("price", EXP, HIGH, below=True))
-M["oracle_missed"] = create("price market, oracle missed", f"p8-{RUN}", f"{A}-h", rules("price", EXP, LOW))
-M["one_sided"] = create("market with one side only", f"p9-{RUN}", f"{A}-i", rules("price", EXP, LOW))
+M["price_yes"] = create("market resolving YES", f"p1-{RUN}", f"{A}-a", rules("crypto", EXP))
+M["same_post"] = create("second market on the same post", f"p1-{RUN}", f"{A}-a", rules("crypto", EXP))
+M["price_no"] = create("market resolving NO", f"p2-{RUN}", f"{A}-b", rules("crypto", EXP))
+M["below"] = create("third market on another author", f"p3-{RUN}", f"{A}-c", rules("crypto", EXP))
+M["source_gone"] = create("market whose source goes away", f"p8-{RUN}", f"{A}-h", rules("crypto", EXP))
+M["one_sided"] = create("market with one side only", f"p9-{RUN}", f"{A}-i", rules("crypto", EXP))
 M["uphold"] = create("event market, challenge lost", f"p4-{RUN}", f"{A}-d", rules("event", EXP))
 M["overturn"] = create("event market, challenge won", f"p5-{RUN}", f"{A}-e", rules("event", EXP))
 M["slash_ch"] = create("event market, overturned to invalid", f"p6-{RUN}", f"{A}-f", rules("event", EXP))
@@ -573,7 +526,7 @@ bet("price NO, alice", ALICE, M["price_no"], "yes", 3 * USDC_UNIT)
 bet("price NO, bob", BOB, M["price_no"], "no", 6 * USDC_UNIT)
 bet("inverted, alice", ALICE, M["below"], "yes", 4 * USDC_UNIT)
 bet("inverted, bob", BOB, M["below"], "no", 2 * USDC_UNIT)
-for key in ("uphold", "overturn", "slash_ch", "slash_op", "oracle_missed", "silent_arb"):
+for key in ("uphold", "overturn", "slash_ch", "slash_op", "source_gone", "silent_arb"):
     bet(f"{key}, alice", ALICE, M[key], "yes", 2 * USDC_UNIT)
     bet(f"{key}, bob", BOB, M[key], "no", 2 * USDC_UNIT)
 bet("one side only", ALICE, M["one_sided"], "yes", 3 * USDC_UNIT)
@@ -588,63 +541,39 @@ section("freeze window")
 wait_until(EXP - 3)
 bet_refused("buy inside the freeze window", ALICE, M["price_yes"], "yes", 2 * USDC_UNIT)
 
-section("real Pyth price at expiry")
-wait_until(EXP)
-price = pyth_after(EXP)
-log(f"  SOL/USD {price['price'] * 10 ** price['expo']:.4f} published {price['publish']} (expiry {EXP}), slot {price['slot']}")
-check("price published inside the settlement window", EXP <= price["publish"] <= EXP + ORACLE_WINDOW)
-check("feed still SOL/USD and verified", price["feed"] == PYTH_SOL_FEED and price["level"] == 1)
-REPORT = {"price": {"price": str(price["price"]), "expo": price["expo"], "publish_time_sec": str(price["publish"])}}
-EVIDENCE = {"hash": price["hash"], "uri": f"solana:{PYTH_SOL_ACCOUNT}@{price['slot']}"}
-
-
-def price_receipt(i):
-    return {"market_id": str(i), "report": REPORT, "evidence": EVIDENCE}
-
-
 section("receipts: rejected inputs")
+wait_until(EXP + 1)
 m = M["price_yes"]
-op_reject("wrong price scale", "Price scale does not match", "post_receipt",
-          {"market_id": str(m), "report": {"price": {"price": str(price["price"]), "expo": price["expo"] - 1, "publish_time_sec": str(price["publish"])}}, "evidence": EVIDENCE})
-op_reject("price outside the window", "outside the settlement window", "post_receipt",
-          {"market_id": str(m), "report": {"price": {"price": str(price["price"]), "expo": price["expo"], "publish_time_sec": str(EXP - 1)}}, "evidence": EVIDENCE})
-op_reject("price after the window", "outside the settlement window", "post_receipt",
-          {"market_id": str(m), "report": {"price": {"price": str(price["price"]), "expo": price["expo"], "publish_time_sec": str(EXP + ORACLE_WINDOW + 1)}}, "evidence": EVIDENCE})
-op_reject("negative price", "Price must be positive", "post_receipt",
-          {"market_id": str(m), "report": {"price": {"price": "-1", "expo": price["expo"], "publish_time_sec": str(price["publish"])}}, "evidence": EVIDENCE})
 op_reject("missing evidence", "Evidence is required", "post_receipt",
-          {"market_id": str(m), "report": REPORT, "evidence": {"hash": "", "uri": ""}})
-op_reject("declared outcome on a price market", "settles from its price oracle", "post_receipt", manual(m, "yes"))
-op_reject("price report on an event market", "has no price oracle", "post_receipt", price_receipt(M["uphold"]))
-op_reject("price market cannot be ambiguous", "only be invalid for a missed oracle window", "post_receipt",
-          {"market_id": str(m), "report": {"invalid": {"kind": "ambiguous_rules", "reason": "x"}}, "evidence": EVIDENCE})
+          {"market_id": str(m), "report": {"proposed": {"outcome": "yes", "reason": "x"}}, "evidence": {"hash": "", "uri": "", "ai": None}})
+op_reject("proposal needs a reason", "A reason is required", "post_receipt",
+          {"market_id": str(m), "report": {"proposed": {"outcome": "yes", "reason": ""}}, "evidence": evidence()})
 op_reject("invalid needs a reason", "A reason is required", "post_receipt",
-          {"market_id": str(M["oracle_missed"]), "report": {"invalid": {"kind": "oracle_missed", "reason": ""}}, "evidence": EVIDENCE})
-op_reject("event outcome needs a reason", "A reason is required", "post_receipt",
-          {"market_id": str(M["uphold"]), "report": {"manual": {"outcome": "yes", "reason": ""}}, "evidence": evidence()})
+          {"market_id": str(M["source_gone"]), "report": {"invalid": {"kind": "source_unavailable", "reason": ""}}, "evidence": evidence()})
+op_reject("oversized AI signature", "Evidence is too long", "post_receipt",
+          {"market_id": str(m), "report": {"proposed": {"outcome": "yes", "reason": "x"}},
+           "evidence": {**evidence(), "ai": {**AI_READING, "signature": "x" * 201}}})
 
 section("views for the agent")
 due = view(MARKET, "get_due_markets", {"limit": 100})
 check("due markets are listed", any(d["id"] == str(M["price_yes"]) for d in due))
 check("open count is reported", view(MARKET, "get_open_count") >= len(due))
 
-section("receipts from the real price")
-expected_yes = price["price"] >= LOW
-expected_no = price["price"] >= HIGH
-expected_below = price["price"] < HIGH
-op("receipt, price YES", "post_receipt", price_receipt(M["price_yes"]))
-op("receipt, same post", "post_receipt", price_receipt(M["same_post"]))
-op("receipt, price NO", "post_receipt", price_receipt(M["price_no"]))
-op("receipt, inverted", "post_receipt", price_receipt(M["below"]))
-op("receipt, one side", "post_receipt", price_receipt(M["one_sided"]))
-check("contract derived YES", market(M["price_yes"])["receipt"]["outcome"] == ("yes" if expected_yes else "no"))
-check("contract derived NO", market(M["price_no"])["receipt"]["outcome"] == ("yes" if expected_no else "no"))
-check("contract derived the inverted result", market(M["below"])["receipt"]["outcome"] == ("yes" if expected_below else "no"))
-check("real price stored on the receipt", market(M["price_yes"])["receipt"]["price"] == str(price["price"]))
-check("evidence stored on the receipt", market(M["price_yes"])["receipt"]["evidence"]["hash"] == price["hash"])
-op("receipt, oracle missed", "post_receipt", {"market_id": str(M["oracle_missed"]), "report": {"invalid": {"kind": "oracle_missed", "reason": "No update in the window"}}, "evidence": EVIDENCE})
-op("receipt, ambiguous event", "post_receipt", {"market_id": str(M["slash_op"]), "report": {"invalid": {"kind": "ambiguous_rules", "reason": "Rules could not be applied"}}, "evidence": evidence()})
-op_reject("no second receipt", "Market is not open", "post_receipt", price_receipt(M["price_yes"]))
+section("receipts")
+expected_yes, expected_no, expected_below = True, False, True
+op("receipt, YES", "post_receipt", manual(M["price_yes"], "yes"))
+op("receipt, same post", "post_receipt", manual(M["same_post"], "yes"))
+op("receipt, NO", "post_receipt", manual(M["price_no"], "no"))
+op("receipt, third call", "post_receipt", manual(M["below"], "yes"))
+op("receipt, one side", "post_receipt", manual(M["one_sided"], "yes"))
+receipt = market(M["price_yes"])["receipt"]
+check("outcome stored", receipt["outcome"] == "yes")
+check("reason stored", receipt["reason"] == "Result from the listed source")
+check("source hash stored", receipt["evidence"]["hash"] == "source-snapshot-hash")
+check("AI reading stored", receipt["evidence"]["ai"]["signature"] == "0xsigned")
+op("receipt, source gone", "post_receipt", {"market_id": str(M["source_gone"]), "report": {"invalid": {"kind": "source_unavailable", "reason": "The source is offline"}}, "evidence": evidence()})
+op("receipt, ambiguous", "post_receipt", {"market_id": str(M["slash_op"]), "report": {"invalid": {"kind": "ambiguous_rules", "reason": "Rules could not be applied"}}, "evidence": evidence()})
+op_reject("no second receipt", "Market is not open", "post_receipt", manual(M["price_yes"], "yes"))
 op("receipt, uphold case", "post_receipt", manual(M["uphold"], "yes"))
 op("receipt, overturn case", "post_receipt", manual(M["overturn"], "yes"))
 op("receipt, invalid-overturn case", "post_receipt", manual(M["slash_ch"], "yes"))
@@ -687,7 +616,7 @@ wait_until(LAST_RECEIPT + WINDOW + 3)
 reject("challenge after the window", "Challenge window is over", MARKET, "challenge", {"market_id": str(M["one_sided"]), "reason_uri": "x"}, BOB, deposit="0.1 NEAR")
 check("finalizable list has the receipts", len(view(MARKET, "get_finalizable", {"limit": 100})) >= 5)
 before_treasury = near_balance(TREASURY)
-for key in ("price_yes", "same_post", "price_no", "below", "one_sided", "oracle_missed"):
+for key in ("price_yes", "same_post", "price_no", "below", "one_sided", "source_gone"):
     op(f"finalize {key} with the limited key", "finalize", {"market_id": str(M[key])})
 must("anyone can finalize", MARKET, "finalize", {"market_id": str(M["slash_op"])}, BOB)
 time.sleep(6)
@@ -695,7 +624,7 @@ check("ambiguous rules forfeit the creation bond", near_balance(TREASURY) - befo
 reject("no second finalize", "Nothing to finalize", MARKET, "finalize", {"market_id": str(M["price_yes"])}, BOB)
 status_is("YES finalized", M["price_yes"], "finalized", "yes" if expected_yes else "no")
 status_is("NO finalized", M["price_no"], "finalized", "yes" if expected_no else "no")
-status_is("oracle missed finalized", M["oracle_missed"], "finalized", {"invalid": "oracle_missed"})
+status_is("source-gone finalized", M["source_gone"], "finalized", {"invalid": "source_unavailable"})
 
 section("payouts")
 pot = net_in(20 * USDC_UNIT) + net_in(10 * USDC_UNIT)
@@ -712,9 +641,9 @@ pot = 2 * net_in(2 * USDC_UNIT)
 pay("upheld winner redeems", "redeem", M["uphold"], ALICE, expected=redeem_net(pot))
 pay("overturned winner redeems", "redeem", M["overturn"], BOB, expected=redeem_net(pot))
 pay_rejected("overturned loser cannot redeem", "NothingToRedeem", "redeem", M["overturn"], ALICE)
-for key, who in (("oracle_missed", ALICE), ("oracle_missed", BOB), ("slash_op", ALICE), ("slash_op", BOB), ("slash_ch", ALICE), ("slash_ch", BOB)):
+for key, who in (("source_gone", ALICE), ("source_gone", BOB), ("slash_op", ALICE), ("slash_op", BOB), ("slash_ch", ALICE), ("slash_ch", BOB)):
     pay(f"{key}: {who.split('-')[-1]} refunds", "refund", M[key], who, expected=net_in(2 * USDC_UNIT))
-pay_rejected("no redeem on an invalid market", "NotResolved", "redeem", M["oracle_missed"], ALICE)
+pay_rejected("no redeem on an invalid market", "NotResolved", "redeem", M["source_gone"], ALICE)
 pay("one-sided market refunds", "refund", M["one_sided"], ALICE, expected=net_in(3 * USDC_UNIT))
 
 section("forecasting record")
