@@ -172,7 +172,7 @@ def redeem_net(gross):
 def setup():
     global OPERATOR_KEY
     section("deploy a fresh contract with short timers")
-    plan = [(MARKET, "7", 0), (USDC, "2.5", 0), (FAKE, "2.5", 1), (OWNER, "5", 1), (CAROL, "1", 1),
+    plan = [(MARKET, "6.5", 0), (USDC, "2.5", 0), (FAKE, "2.5", 1), (OWNER, "4.5", 1), (CAROL, "1", 1),
             (OPERATOR, "1", 2), (ARBITER, "0.5", 2), (TREASURY, "0.5", 2), (ALICE, "1", 2), (BOB, "1", 2)]
     for account, amount, funder in plan:
         if rpc_exists(account):
@@ -206,7 +206,8 @@ def setup():
     must("market registered on USDC", USDC, "storage_deposit", {"account_id": MARKET}, OWNER, deposit="0.01 NEAR")
     must("market registered on the fake token", FAKE, "storage_deposit", {"account_id": MARKET}, OWNER, deposit="0.01 NEAR")
     for who in (OWNER, TREASURY, ALICE, BOB, CAROL):
-        if view(USDC, "storage_balance_of", {"account_id": who}) is None:
+        # Also tops up accounts an earlier run left short (the faucet has a cooldown).
+        if view(USDC, "storage_balance_of", {"account_id": who}) is None or usdc(who) < 50 * USDC_UNIT:
             must(f"faucet {who.split('-')[-1]}", USDC, "faucet", {}, who, gas="50.0 Tgas")
     if view(FAKE, "storage_balance_of", {"account_id": ALICE}) is None:
         must("faucet on the fake token", FAKE, "faucet", {}, ALICE, gas="50.0 Tgas")

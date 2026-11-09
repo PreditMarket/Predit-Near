@@ -35,7 +35,7 @@ Requires Rust (the version is pinned in `rust-toolchain.toml`) and [`cargo-near`
 | Do | See |
 |---|---|
 | `./build.sh` | `target/near/predit_market/predit_market.wasm` and the mock token wasm |
-| `cargo test` | 171 tests pass: market maths, contract logic and a full lifecycle on a local NEAR node |
+| `cargo test` | 180 tests pass: market maths, contract logic and a full lifecycle on a local NEAR node |
 | `near contract call-function as-read-only predit-markets-market.testnet get_config json-args '{}' network-config testnet now` | The deployed contract's configuration |
 | `near contract call-function as-read-only predit-markets-market.testnet get_markets json-args '{}' network-config testnet now` | Markets on the deployed contract, including receipts and evidence |
 
@@ -44,7 +44,7 @@ To deploy your own copy and run the suites (needs [`near`](https://github.com/ne
 ```bash
 FUNDER=<account> FUND_AMOUNT='6 NEAR' ./deploy-testnet.sh <prefix>
 FUNDER=<account> ./testnet-e2e.sh <prefix>                     # about 3 minutes
-FUNDERS=<a>,<b>,<c> python3 -I testnet-fullcase.py <prefix>    # about 37 minutes
+FUNDERS=<a>,<b>,<c> python3 -I testnet-fullcase.py <prefix>    # about 36 minutes, keep the machine awake
 ```
 
 ## Deployed on testnet
