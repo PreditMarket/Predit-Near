@@ -425,15 +425,15 @@ fn due_and_finalizable_lists_follow_the_lifecycle() {
     let mut c = contract();
     let id = create(&mut c);
     call(T0 + 1, "anyone.near");
-    assert!(c.get_due_markets(None).is_empty());
+    assert!(c.get_due_markets(None, None).is_empty());
     call(EXPIRY, "anyone.near");
-    assert_eq!(c.get_due_markets(None)[0].id, id);
+    assert_eq!(c.get_due_markets(None, None)[0].id, id);
 
     receipt(&mut c, id, STRIKE);
-    assert!(c.get_due_markets(None).is_empty());
-    assert!(c.get_finalizable(None).is_empty());
+    assert!(c.get_due_markets(None, None).is_empty());
+    assert!(c.get_finalizable(None, None).is_empty());
     call(EXPIRY + 1 + 120, "anyone.near");
-    assert_eq!(c.get_finalizable(None), vec![id]);
+    assert_eq!(c.get_finalizable(None, None), vec![id]);
 }
 
 // ---- event markets ---------------------------------------------------------
@@ -787,7 +787,9 @@ fn only_the_first_market_on_a_post_counts() {
 #[test]
 fn an_invalid_market_does_not_count() {
     let mut c = contract();
-    let id = two_sided(&mut c);
+    let id = create_event(&mut c, "p1");
+    buy(&mut c, "yes.near", id, Side::Yes, 100 * USDC);
+    buy(&mut c, "no.near", id, Side::No, 100 * USDC);
     call(EXPIRY + 1, "operator.near");
     c.post_receipt(
         id,
@@ -848,14 +850,32 @@ fn claim_stuck_frees_a_silent_market() {
 }
 
 #[test]
-fn claim_stuck_frees_a_silent_arbiter() {
+fn a_silent_arbiter_leaves_the_receipt_standing() {
     let mut c = contract();
     let id = two_sided(&mut c);
     receipt(&mut c, id, STRIKE);
     challenge(&mut c, id);
-    call(EXPIRY + 7 * 86_400, "anyone.near");
+    call(EXPIRY + 2 + 7 * 86_400, "anyone.near");
     c.claim_stuck(id);
-    assert_eq!(status(&c, id), Status::Cancelled);
+    let m = c.get_market(id).unwrap();
+    assert_eq!(m.status, Status::Finalized);
+    assert_eq!(m.outcome, Some(Outcome::Yes));
+}
+
+/// A loser must not be able to void a settled market by challenging late.
+#[test]
+#[should_panic(expected = "Too early")]
+fn a_late_challenge_cannot_void_the_market() {
+    let mut c = contract();
+    at(T0, "creator.near", NearToken::from_near(2));
+    let id = c.create_market(post("p1"), Side::Yes, rules(), draft(), Some(7 * 86_400));
+    buy(&mut c, "yes.near", id, Side::Yes, 100 * USDC);
+    buy(&mut c, "no.near", id, Side::No, 100 * USDC);
+    receipt(&mut c, id, STRIKE);
+    at(EXPIRY + 7 * 86_400, "no.near", NearToken::from_near(1));
+    c.challenge(id, "x".into());
+    call(EXPIRY + 7 * 86_400, "no.near");
+    c.claim_stuck(id);
 }
 
 #[test]
@@ -866,6 +886,163 @@ fn claim_stuck_leaves_a_receipted_market_alone() {
     receipt(&mut c, id, STRIKE);
     call(EXPIRY + 7 * 86_400, "anyone.near");
     c.claim_stuck(id);
+}
+
+// ---- review fixes ----------------------------------------------------------
+
+#[test]
+#[should_panic(expected = "A price market can only be invalid for a missed oracle window")]
+fn the_operator_cannot_call_a_price_market_ambiguous() {
+    let mut c = contract();
+    let id = create(&mut c);
+    call(EXPIRY + 1, "operator.near");
+    c.post_receipt(
+        id,
+        Report::Invalid { kind: InvalidKind::AmbiguousRules, reason: "x".into() },
+        evidence(),
+    );
+}
+
+#[test]
+#[should_panic(expected = "A reason is required")]
+fn invalid_needs_a_reason() {
+    let mut c = contract();
+    let id = create(&mut c);
+    call(EXPIRY + 1, "operator.near");
+    c.post_receipt(
+        id,
+        Report::Invalid { kind: InvalidKind::OracleMissed, reason: String::new() },
+        evidence(),
+    );
+}
+
+#[test]
+#[should_panic(expected = "Evidence is required")]
+fn a_price_receipt_needs_evidence() {
+    let mut c = contract();
+    let id = create(&mut c);
+    call(EXPIRY + 1, "operator.near");
+    c.post_receipt(id, price_report(STRIKE), Evidence { hash: String::new(), uri: String::new() });
+}
+
+#[test]
+#[should_panic(expected = "Price must be positive")]
+fn a_negative_price_is_rejected() {
+    let mut c = contract();
+    let id = create(&mut c);
+    receipt(&mut c, id, i64::MIN);
+}
+
+#[test]
+#[should_panic(expected = "cannot challenge")]
+fn the_arbiter_cannot_challenge() {
+    let mut c = contract();
+    let id = two_sided(&mut c);
+    receipt(&mut c, id, STRIKE);
+    at(EXPIRY + 2, "arbiter.near", NearToken::from_near(1));
+    c.challenge(id, "x".into());
+}
+
+#[test]
+fn cancelling_frees_the_post_slot() {
+    let mut c = contract();
+    for _ in 0..5 {
+        let id = create_on(&mut c, "p1");
+        call(T0 + 1, "creator.near");
+        c.cancel_market(id);
+    }
+    create_on(&mut c, "p1");
+    assert_eq!(c.get_markets_for_posts(vec!["p1".into()])[0].1.len(), 1);
+}
+
+#[test]
+fn selling_out_and_buying_again_lists_the_market_once() {
+    let mut c = contract();
+    let id = two_sided(&mut c);
+    let shares = c.get_position(id, acc("yes.near")).yes_shares;
+    yocto(T0 + 20, "yes.near");
+    let _ = c.sell(id, Side::Yes, shares, U128(0));
+    buy(&mut c, "yes.near", id, Side::Yes, 10 * USDC);
+    assert_eq!(c.get_user_markets(acc("yes.near"), None, None).len(), 1);
+}
+
+#[test]
+#[should_panic(expected = "Expiry is too far out")]
+fn expiry_has_an_upper_bound() {
+    let mut r = rules();
+    r.expiry_sec = U64(u64::MAX);
+    create_with(r);
+}
+
+#[test]
+#[should_panic(expected = "Creator share is too high")]
+fn config_is_validated() {
+    call(T0, "owner.near");
+    let config = Config { creator_share_bps: 10_001, ..Config::default() };
+    let _ = Contract::new(
+        acc("owner.near"),
+        acc("operator.near"),
+        acc("arbiter.near"),
+        acc("treasury.near"),
+        acc("usdc.near"),
+        Some(config),
+    );
+}
+
+fn with_balance(sec: u64, caller: &str, balance: NearToken) {
+    let mut ctx = VMContextBuilder::new();
+    ctx.current_account_id(acc("market.near"))
+        .predecessor_account_id(acc(caller))
+        .signer_account_id(acc(caller))
+        .block_timestamp(sec * 1_000_000_000)
+        .prepaid_gas(Gas::from_tgas(300))
+        // The builder's default of 1 MB would dwarf every balance used here.
+        .storage_usage(1_000)
+        .account_balance(balance);
+    testing_env!(ctx.build());
+}
+
+/// One bond is outstanding: a bet may not use the NEAR that backs it.
+#[test]
+#[should_panic(expected = "The contract needs more NEAR for storage")]
+fn a_bet_cannot_eat_into_bonds() {
+    let mut c = contract();
+    let id = create(&mut c);
+    with_balance(T0 + 10, "usdc.near", NearToken::from_millinear(1_500));
+    let msg = format!(r#"{{"action":"buy","market_id":"{}","side":"yes","min_shares":"0"}}"#, id.0);
+    let _ = c.ft_on_transfer(acc("yes.near"), U128(USDC as u128), msg);
+}
+
+#[test]
+fn a_bet_goes_through_when_bonds_and_the_reserve_are_covered() {
+    let mut c = contract();
+    let id = create(&mut c);
+    with_balance(T0 + 10, "usdc.near", NearToken::from_near(3));
+    let msg = format!(r#"{{"action":"buy","market_id":"{}","side":"yes","min_shares":"0"}}"#, id.0);
+    let _ = c.ft_on_transfer(acc("yes.near"), U128(USDC as u128), msg);
+    assert_eq!(c.get_market(id).unwrap().trades, 1);
+}
+
+#[test]
+fn free_near_excludes_bonds_and_the_reserve() {
+    let mut c = contract();
+    create(&mut c);
+    with_balance(T0 + 10, "anyone.near", NearToken::from_near(5));
+    let free = c.get_free_near().as_near();
+    assert!(free >= 2 && free < 3, "free {free}");
+}
+
+#[test]
+fn bonds_are_released_when_a_market_ends() {
+    let mut c = contract();
+    let id = two_sided(&mut c);
+    assert_eq!(c.bonds_outstanding, NearToken::from_near(1).as_yoctonear());
+    receipt(&mut c, id, STRIKE);
+    challenge(&mut c, id);
+    assert_eq!(c.bonds_outstanding, NearToken::from_near(2).as_yoctonear());
+    call(EXPIRY + 3, "arbiter.near");
+    c.arbitrate(id, Decision::Uphold);
+    assert_eq!(c.bonds_outstanding, 0);
 }
 
 // ---- claimable -------------------------------------------------------------

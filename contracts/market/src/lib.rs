@@ -2,8 +2,9 @@
 //!
 //! A market is created from a post: its rules are locked at creation against a
 //! bond, people bet USDC on it, and after expiry the operator posts a receipt.
-//! For a price market the contract derives the outcome from the locked strike;
-//! for any other market the operator proposes it with evidence. Anyone can
+//! For a price market the operator supplies the price and the contract derives
+//! the outcome from the locked strike (the price itself is not verified on
+//! chain); for any other market the operator proposes the outcome. Anyone can
 //! challenge a receipt for a bond, and finalizing opens redemption and updates
 //! the post author's forecasting record.
 //!
@@ -41,6 +42,12 @@ const GAS_FT_TRANSFER: Gas = Gas::from_tgas(20);
 const GAS_ON_PAYOUT: Gas = Gas::from_tgas(15);
 const MIN_PAYOUT_GAS: Gas = Gas::from_tgas(60);
 const ONE_YOCTO: NearToken = NearToken::from_yoctonear(1);
+/// Kept free at all times so that a failed payout can always be recorded.
+const NEAR_RESERVE: NearToken = NearToken::from_near(1);
+/// Expiry cannot be further out than this.
+const MAX_EXPIRY_HORIZON_SEC: u64 = 10 * 365 * 24 * 60 * 60;
+const MAX_FEE_BPS: u16 = 5_000;
+const MAX_SHARE_BPS: u16 = 10_000;
 
 const MAX_LABEL: usize = 40;
 const MAX_SHORT_TEXT: usize = 200;
@@ -108,6 +115,8 @@ pub struct Contract {
     total_pool_collateral: u128,
     total_claimable: u128,
     in_flight: u128,
+    /// NEAR held for creation and challenge bonds. Storage may not eat into it.
+    bonds_outstanding: u128,
 }
 
 #[near]
@@ -121,13 +130,15 @@ impl Contract {
         collateral: AccountId,
         config: Option<Config>,
     ) -> Self {
+        let config = config.unwrap_or_default();
+        validate_config(&config);
         Self {
             owner,
             operator,
             arbiter,
             treasury,
             collateral,
-            config: config.unwrap_or_default(),
+            config,
             paused: false,
             next_id: 0,
             markets: LookupMap::new(StorageKey::Markets),
@@ -142,6 +153,7 @@ impl Contract {
             total_pool_collateral: 0,
             total_claimable: 0,
             in_flight: 0,
+            bonds_outstanding: 0,
         }
     }
 
@@ -167,6 +179,7 @@ impl Contract {
             expiry > now + self.config.trade_freeze_sec as u64,
             "Expiry is too soon"
         );
+        require!(expiry <= now + MAX_EXPIRY_HORIZON_SEC, "Expiry is too far out");
 
         let window = challenge_window_sec.unwrap_or(self.config.default_challenge_window_sec);
         require!(
@@ -254,6 +267,7 @@ impl Contract {
         if !excess.is_zero() {
             let _ = Promise::new(creator.clone()).transfer(excess);
         }
+        self.bonds_outstanding += bond.as_yoctonear();
 
         Event::MarketCreated { market_id: U64(id), creator, post_id, rules_hash: hash_hex }.emit();
         U64(id)
@@ -318,6 +332,7 @@ impl Contract {
             evidence.hash.len() <= MAX_SHORT_TEXT && evidence.uri.len() <= MAX_LONG_TEXT,
             "Evidence is too long"
         );
+        require!(!evidence.uri.is_empty(), "Evidence is required");
         let mut market = self.market(market_id.0);
         require!(market.status == Status::Open, "Market is not open");
         let now = now_sec();
@@ -331,6 +346,7 @@ impl Contract {
                     .oracle
                     .as_ref()
                     .unwrap_or_else(|| fail("This market has no price oracle".to_string()));
+                require!(price.0 > 0, "Price must be positive");
                 require!(expo == oracle.expo, "Price scale does not match the rules");
                 require!(
                     publish_time_sec.0 >= expiry
@@ -354,12 +370,18 @@ impl Contract {
                     !reason.is_empty() && reason.len() <= MAX_LONG_TEXT,
                     "A reason is required"
                 );
-                require!(!evidence.uri.is_empty(), "Evidence is required");
                 let outcome = if outcome == Side::Yes { Outcome::Yes } else { Outcome::No };
                 (outcome, None, None, Some(reason))
             }
             Report::Invalid { kind, reason } => {
-                require!(reason.len() <= MAX_LONG_TEXT, "Reason is too long");
+                require!(
+                    !reason.is_empty() && reason.len() <= MAX_LONG_TEXT,
+                    "A reason is required"
+                );
+                require!(
+                    market.rules.oracle.is_none() || kind == InvalidKind::OracleMissed,
+                    "A price market can only be invalid for a missed oracle window"
+                );
                 (Outcome::Invalid(kind), None, None, Some(reason))
             }
         };
@@ -376,6 +398,7 @@ impl Contract {
         self.markets.insert(market_id.0, market);
         self.open.remove(&market_id.0);
         self.awaiting_finalize.insert(market_id.0);
+        self.assert_near_reserve(NearToken::from_yoctonear(0));
         Event::ReceiptPosted { market_id, outcome }.emit();
     }
 
@@ -393,6 +416,10 @@ impl Contract {
         let attached = env::attached_deposit();
         require!(attached >= bond, "Attach the challenge bond");
         let challenger = env::predecessor_account_id();
+        require!(
+            challenger != self.arbiter && challenger != self.operator,
+            "The operator and the arbiter cannot challenge"
+        );
         let excess = attached.saturating_sub(bond);
         if !excess.is_zero() {
             let _ = Promise::new(challenger.clone()).transfer(excess);
@@ -406,6 +433,8 @@ impl Contract {
         });
         market.status = Status::Challenged;
         self.markets.insert(market_id.0, market);
+        self.bonds_outstanding += bond.as_yoctonear();
+        self.assert_near_reserve(excess);
         Event::Challenged { market_id, challenger }.emit();
     }
 
@@ -450,19 +479,26 @@ impl Contract {
         self.cancel(market);
     }
 
-    /// Anyone, when the operator or the arbiter has gone silent, so funds can
-    /// never be trapped.
+    /// Anyone, when a role has gone silent, so funds can never be trapped. A
+    /// silent operator cancels the market. A silent arbiter leaves the receipt
+    /// standing, counted from the challenge, so a challenge cannot void a result.
     pub fn claim_stuck(&mut self, market_id: U64) {
         let market = self.market(market_id.0);
-        require!(
-            matches!(market.status, Status::Open | Status::Challenged),
-            "Market is not stuck"
-        );
-        require!(
-            now_sec() >= market.rules.expiry_sec.0 + self.config.stuck_after_sec as u64,
-            "Too early"
-        );
-        self.cancel(market);
+        let now = now_sec();
+        let wait = self.config.stuck_after_sec as u64;
+        match market.status {
+            Status::Open => {
+                require!(now >= market.rules.expiry_sec.0 + wait, "Too early");
+                self.cancel(market);
+            }
+            Status::Challenged => {
+                let challenged_at = market.challenge.as_ref().map_or(0, |c| c.at_sec.0);
+                require!(now >= challenged_at + wait, "Too early");
+                let outcome = receipt_of(&market).outcome;
+                self.settle(market, outcome, None);
+            }
+            _ => fail("Market is not stuck".to_string()),
+        }
     }
 
     // ---- payouts ----------------------------------------------------------
@@ -669,31 +705,51 @@ impl Contract {
         U128(self.claimable.get(&account_id).copied().unwrap_or(0))
     }
 
-    /// Expired markets still waiting for a receipt.
-    pub fn get_due_markets(&self, limit: Option<u32>) -> Vec<MarketView> {
+    /// Expired markets among `limit` open markets starting at `from_index`.
+    /// Page through `get_open_count` to see them all.
+    pub fn get_due_markets(&self, from_index: Option<u32>, limit: Option<u32>) -> Vec<MarketView> {
         let now = now_sec();
         self.open
             .iter()
+            .skip(from_index.unwrap_or(0) as usize)
+            .take(limit.unwrap_or(50).min(100) as usize)
             .filter_map(|id| self.markets.get(id))
             .filter(|m| now >= m.rules.expiry_sec.0)
-            .take(limit.unwrap_or(50).min(100) as usize)
             .map(view_of)
             .collect()
     }
 
-    /// Receipts whose challenge window has closed.
-    pub fn get_finalizable(&self, limit: Option<u32>) -> Vec<U64> {
+    pub fn get_open_count(&self) -> u32 {
+        self.open.len()
+    }
+
+    /// Finalizable receipts among `limit` entries starting at `from_index`.
+    pub fn get_finalizable(&self, from_index: Option<u32>, limit: Option<u32>) -> Vec<U64> {
         let now = now_sec();
         self.awaiting_finalize
             .iter()
+            .skip(from_index.unwrap_or(0) as usize)
+            .take(limit.unwrap_or(50).min(100) as usize)
             .filter_map(|id| self.markets.get(id))
             .filter(|m| {
                 m.status == Status::ReceiptPosted
                     && now >= receipt_of(m).posted_at_sec.0 + m.challenge_window_sec as u64
             })
-            .take(limit.unwrap_or(50).min(100) as usize)
             .map(|m| U64(m.id))
             .collect()
+    }
+
+    pub fn get_awaiting_finalize_count(&self) -> u32 {
+        self.awaiting_finalize.len()
+    }
+
+    /// NEAR available for storage, beyond bonds and the reserve. Top it up by
+    /// sending NEAR to the contract when it runs low.
+    pub fn get_free_near(&self) -> NearToken {
+        self.account_near()
+            .saturating_sub(self.storage_near())
+            .saturating_sub(NearToken::from_yoctonear(self.bonds_outstanding))
+            .saturating_sub(NEAR_RESERVE)
     }
 
     /// The contract must hold at least the sum of these in collateral.
@@ -734,7 +790,6 @@ impl Contract {
         require!(amount >= self.config.min_buy.0, "Below the minimum buy");
 
         let key = (market_id.0, buyer.clone());
-        let is_new = !self.positions.contains_key(&key);
         let position = self.position(&key);
         let plan = plan_buy(
             &PoolSnapshot::from(&market.pool),
@@ -757,8 +812,8 @@ impl Contract {
         self.credit(&treasury, plan.platform_cut as u128);
         self.positions.insert(key, plan.new_position.into());
 
-        if is_new {
-            let mut ids = self.by_user.get(&buyer).cloned().unwrap_or_default();
+        let mut ids = self.by_user.get(&buyer).cloned().unwrap_or_default();
+        if !ids.contains(&market_id.0) {
             ids.push(market_id.0);
             self.by_user.insert(buyer.clone(), ids);
         }
@@ -773,10 +828,12 @@ impl Contract {
         }
         .emit();
         self.markets.insert(market_id.0, market);
+        self.assert_near_reserve(NearToken::from_yoctonear(0));
     }
 
     /// Ends a market: settles the pool, then the bonds, then the record.
-    /// `challenge_won` is `None` when nobody challenged.
+    /// `challenge_won` is `None` when nobody ruled on the challenge, either
+    /// because there was none or because the arbiter stayed silent.
     fn settle(&mut self, mut market: Market, outcome: Outcome, challenge_won: Option<bool>) {
         let now = now_sec() as i64;
         let two_sided = market.pool.total_yes_cost_acc > 0 && market.pool.total_no_cost_acc > 0;
@@ -802,6 +859,7 @@ impl Contract {
         }
 
         let bond = market.creation_bond;
+        self.bonds_outstanding -= bond.as_yoctonear();
         match outcome {
             Outcome::Invalid(InvalidKind::AmbiguousRules) => {
                 let to = match (challenge_won, &market.challenge) {
@@ -816,11 +874,13 @@ impl Contract {
         }
 
         if let Some(c) = &market.challenge {
-            let to = if challenge_won == Some(true) {
-                c.challenger.clone()
-            } else {
+            // Only a ruling against the challenger forfeits the bond.
+            let to = if challenge_won == Some(false) {
                 self.treasury.clone()
+            } else {
+                c.challenger.clone()
             };
+            self.bonds_outstanding -= c.bond.as_yoctonear();
             let _ = Promise::new(to).transfer(c.bond);
         }
 
@@ -834,12 +894,18 @@ impl Contract {
 
     fn cancel(&mut self, mut market: Market) {
         cancel_pool(&mut market.pool, now_sec() as i64);
+        self.bonds_outstanding -= market.creation_bond.as_yoctonear();
         let _ = Promise::new(market.creator.clone()).transfer(market.creation_bond);
         if let Some(c) = &market.challenge {
+            self.bonds_outstanding -= c.bond.as_yoctonear();
             let _ = Promise::new(c.challenger.clone()).transfer(c.bond);
         }
         market.status = Status::Cancelled;
         let id = market.id;
+        // A cancelled market no longer takes up one of the post's slots.
+        if let Some(ids) = self.by_post.get_mut(&market.post.post_id) {
+            ids.retain(|m| *m != id);
+        }
         self.markets.insert(id, market);
         self.open.remove(&id);
         self.awaiting_finalize.remove(&id);
@@ -882,6 +948,32 @@ impl Contract {
                     .with_static_gas(GAS_ON_PAYOUT)
                     .on_payout(account, U128(amount)),
             )
+    }
+
+    fn account_near(&self) -> NearToken {
+        env::account_balance()
+    }
+
+    fn storage_near(&self) -> NearToken {
+        env::storage_byte_cost().saturating_mul(env::storage_usage() as u128)
+    }
+
+    /// Bets and receipts grow storage that nobody pays for directly. They stop
+    /// before touching NEAR held for bonds or the reserve for failed payouts.
+    /// `leaving` is NEAR in the balance that is about to be refunded.
+    fn assert_near_reserve(&mut self, leaving: NearToken) {
+        self.markets.flush();
+        self.positions.flush();
+        self.by_user.flush();
+        self.claimable.flush();
+        self.open.flush();
+        self.awaiting_finalize.flush();
+        let needed = self
+            .storage_near()
+            .saturating_add(NearToken::from_yoctonear(self.bonds_outstanding))
+            .saturating_add(NEAR_RESERVE)
+            .saturating_add(leaving);
+        require!(self.account_near() >= needed, "The contract needs more NEAR for storage");
     }
 
     fn assert_owner(&self) {
@@ -938,6 +1030,23 @@ fn view_of(m: &Market) -> MarketView {
 
 fn receipt_of(market: &Market) -> &Receipt {
     market.receipt.as_ref().unwrap_or_else(|| fail("No receipt".to_string()))
+}
+
+fn validate_config(c: &Config) {
+    require!(
+        c.trade_fee_bps <= MAX_FEE_BPS && c.redeem_fee_bps <= MAX_FEE_BPS,
+        "Fee is too high"
+    );
+    require!(c.creator_share_bps <= MAX_SHARE_BPS, "Creator share is too high");
+    require!(
+        c.min_challenge_window_sec > 0
+            && c.min_challenge_window_sec <= c.default_challenge_window_sec
+            && c.default_challenge_window_sec <= c.max_challenge_window_sec,
+        "Challenge windows are inconsistent"
+    );
+    require!(c.virtual_liquidity_l.0 >= 1_000_000, "Virtual liquidity is too low");
+    require!(c.max_markets_per_post > 0, "Markets per post must be positive");
+    require!(c.min_buy.0 > 0, "Minimum buy must be positive");
 }
 
 fn validate_text(post: &PostRef, rules: &Rules, draft: &DraftRef) {

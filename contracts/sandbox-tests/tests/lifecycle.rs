@@ -492,6 +492,22 @@ async fn a_won_challenge_flips_the_winner_and_returns_the_bond() -> anyhow::Resu
 }
 
 #[tokio::test]
+async fn a_silent_arbiter_cannot_turn_a_challenge_into_a_void() -> anyhow::Result<()> {
+    let e = setup().await?;
+    let id = challenged(&e).await?;
+    // stuck_after_sec is 3600 in this setup, so it is too early right after the challenge.
+    let early = e
+        .bob
+        .call(e.market.id(), "claim_stuck")
+        .args_json(json!({ "market_id": id.to_string() }))
+        .transact()
+        .await?;
+    assert!(early.is_failure());
+    assert_eq!(e.get_market(id).await?["status"], "challenged");
+    Ok(())
+}
+
+#[tokio::test]
 async fn cancelling_refunds_the_stake_and_the_bond() -> anyhow::Result<()> {
     let e = setup().await?;
     let (id, _) = e.create("p1").await?;
