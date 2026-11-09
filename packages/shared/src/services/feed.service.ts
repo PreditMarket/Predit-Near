@@ -1,4 +1,3 @@
-import apiClient from '@/lib/axios';
 import type {
   ExternalQuote,
   FeedAuthor,
@@ -74,75 +73,12 @@ export function postDtoToFeedItem(p: PostDto): Extract<FeedItem, { kind: 'post' 
 }
 
 export const feedService = {
-  async listPosts(params: {
-    cursor?: string | null;
-    limit?: number;
-    authorIds?: string[];
-    marketIds?: string[];
-    parentId?: string | 'null';
-    saved?: boolean;
-    following?: boolean;
-  } = {}): Promise<Paginated<PostDto>> {
-    const q: Record<string, string> = {};
-    if (params.cursor) q.cursor = params.cursor;
-    if (params.limit) q.limit = String(params.limit);
-    if (params.authorIds?.length) q.authorIds = params.authorIds.join(',');
-    if (params.marketIds?.length) q.marketIds = params.marketIds.join(',');
-    if (params.parentId !== undefined) q.parentId = params.parentId;
-    if (params.saved) q.saved = 'true';
-    if (params.following) q.following = 'true';
-    const { data } = await apiClient.get<ListResponse>('/posts', { params: q });
-    return { items: data.items, nextCursor: data.nextCursor ?? null };
-  },
-
-  async createPost(body: {
-    content: string;
-    marketId?: string;
-    parentPostId?: string;
-    quotedPostId?: string;
-    media?: PostMedia[];
-  }, options: { idempotencyKey?: string } = {}): Promise<PostDto> {
-    // BE answers a repeated key with the post it already created (201), and
-    // 409 while the first request with that key is still being handled.
-    const { data } = await apiClient.post<PostDto>('/posts', body, {
-      headers: options.idempotencyKey
-        ? { 'Idempotency-Key': options.idempotencyKey }
-        : undefined,
-    });
-    return data;
-  },
-
-  async deletePost(id: string): Promise<void> {
-    await apiClient.delete(`/posts/${id}`);
-  },
-
-  async likePost(id: string): Promise<PostDto> {
-    const { data } = await apiClient.post<PostDto>(`/posts/${id}/like`);
-    return data;
-  },
-
-  async unlikePost(id: string): Promise<PostDto> {
-    const { data } = await apiClient.delete<PostDto>(`/posts/${id}/like`);
-    return data;
-  },
-
-  async repostPost(id: string): Promise<PostDto> {
-    const { data } = await apiClient.post<PostDto>(`/posts/${id}/repost`);
-    return data;
-  },
-
-  async unrepostPost(id: string): Promise<PostDto> {
-    const { data } = await apiClient.delete<PostDto>(`/posts/${id}/repost`);
-    return data;
-  },
-
-  async savePost(id: string): Promise<PostDto> {
-    const { data } = await apiClient.post<PostDto>(`/posts/${id}/save`);
-    return data;
-  },
-
-  async unsavePost(id: string): Promise<PostDto> {
-    const { data } = await apiClient.delete<PostDto>(`/posts/${id}/save`);
-    return data;
+  async listPosts(params: { cursor?: string | null; limit?: number } = {}): Promise<Paginated<PostDto>> {
+    const q = new URLSearchParams();
+    if (params.cursor) q.set('cursor', params.cursor);
+    if (params.limit) q.set('limit', String(params.limit));
+    const res = await fetch(`/api/feed?${q.toString()}`);
+    if (!res.ok) throw new Error('Could not load the feed');
+    return (await res.json()) as Paginated<PostDto>;
   },
 };

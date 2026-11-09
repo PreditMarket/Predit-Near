@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { MarketListKolStatus } from '@/components/market/market-list-kol';
+import type { NearMarketPhase } from '@/lib/near/map';
 import { POSITIONS_SORTS, type PositionsSort } from '@/lib/v2/portfolio-positions';
 
 export type PortfolioTab =
@@ -17,7 +17,9 @@ const TABS: PortfolioTab[] = [
   'cancelled',
   'my-markets',
 ];
-export const MARKET_STATUSES: MarketListKolStatus[] = [
+export type CreatedMarketsFilter = 'all' | NearMarketPhase;
+
+export const MARKET_STATUSES: CreatedMarketsFilter[] = [
   'all',
   'open',
   'closed',
@@ -38,7 +40,7 @@ export function usePositionsUrl() {
   const [tab, setTab] = useState<PortfolioTab>('open');
   const [sort, setSort] = useState<PositionsSort>('recent');
   const [search, setSearch] = useState('');
-  const [marketsStatus, setMarketsStatus] = useState<MarketListKolStatus>('all');
+  const [marketsStatus, setMarketsStatus] = useState<CreatedMarketsFilter>('all');
   const [marketsSearch, setMarketsSearch] = useState('');
   const hydrated = useRef(false);
 

@@ -1,21 +1,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { apiBaseUrl } from '@/lib/axios';
 import { playableVideoUrl } from './x-media';
 
 describe('playableVideoUrl', () => {
   afterEach(() => vi.unstubAllEnvs());
 
-  it('routes tweet videos through the BE proxy', () => {
+  it("routes tweet videos through this app's proxy route", () => {
     const src = 'https://video.twimg.com/amplify_video/1/vid/avc1/1280x720/a.mp4?tag=29';
     expect(playableVideoUrl(src)).toBe(
-      `${apiBaseUrl}/x-media/video?url=${encodeURIComponent(src)}`,
+      `/api/x-media/video?url=${encodeURIComponent(src)}`,
     );
   });
 
   it('also proxies the newer video-s.twimg.com host', () => {
     const src = 'https://video-s.twimg.com/amplify_video/2/vid/avc1/1286x720/b.mp4?tag=29';
     expect(playableVideoUrl(src)).toBe(
-      `${apiBaseUrl}/x-media/video?url=${encodeURIComponent(src)}`,
+      `/api/x-media/video?url=${encodeURIComponent(src)}`,
     );
   });
 

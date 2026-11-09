@@ -154,4 +154,6 @@ export type FeedItem =
 export interface Paginated<T> {
   items: T[];
   nextCursor?: string | null;
+  /** Sample posts, shown when the real feed is not available. */
+  sample?: boolean;
 }

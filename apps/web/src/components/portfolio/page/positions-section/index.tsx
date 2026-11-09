@@ -3,7 +3,6 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2, Search as SearchIcon } from 'lucide-react';
-import MarketListKol, { type MarketListKolStatus } from '@/components/market/market-list-kol';
 import { ResponsiveTable, SegmentedTabs, type SegmentedTabOption } from '@/components/v2';
 import type { PositionsSort, PositionsTab } from '@/lib/v2/portfolio-positions';
 import { useNearWallet } from '@/store/near-wallet.store';
@@ -11,14 +10,15 @@ import { PositionCard } from './position-card';
 import { POSITION_COLUMNS } from './position-columns';
 import { SortMenu } from './sort-menu';
 import { usePortfolioPositions } from './use-portfolio-positions';
-import { MARKET_STATUSES, usePositionsUrl, type PortfolioTab } from './use-positions-url';
+import { CreatedMarkets } from './created-markets';
+import { MARKET_STATUSES, usePositionsUrl, type CreatedMarketsFilter, type PortfolioTab } from './use-positions-url';
 
 const SORT_OPTIONS: { value: PositionsSort; label: ReactNode }[] = [
   { value: 'recent', label: 'Recent' },
   { value: 'value', label: 'Value' },
 ];
 
-const STATUS_LABEL: Record<MarketListKolStatus, string> = {
+const STATUS_LABEL: Record<CreatedMarketsFilter, string> = {
   all: 'All',
   open: 'Open',
   closed: 'Closed',
@@ -120,11 +120,7 @@ export function PositionsSection() {
 
       <div className="mt-4">
         {myMarkets ? (
-          <MarketListKol
-            hideToolbar
-            externalSearchTerm={url.marketsSearch}
-            externalStatusFilter={url.marketsStatus}
-          />
+          <CreatedMarkets search={url.marketsSearch} status={url.marketsStatus} />
         ) : (
           positionsTab && (
             <>

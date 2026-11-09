@@ -9,8 +9,9 @@ import {
   Play,
 } from 'lucide-react';
 import { UserAvatar } from '@/components/v2';
+import type { NearMarket } from '@/lib/near/types';
+import { PredictionBar } from './prediction-bar';
 import { displayName } from '@/lib/display-name';
-import { profilePath } from '@/lib/v2/social';
 import { XLogo, xProfileUrl } from '@/components/shared/x-logo';
 import { tokenizeContent } from '@/lib/linkify';
 import { playableVideoUrl } from '@/lib/x-media';
@@ -23,50 +24,14 @@ import type {
 
 type PostItem = Extract<FeedItem, { kind: 'post' }>;
 
-interface FeedPostProps {
-  item: FeedItem;
-  /** Called when the user clicks the reply icon or the post body — the
-   *  parent shell swaps center to thread view. If absent, the reply
-   *  icon and body clicks are inert (used inside ThreadView itself). */
-  onOpenThread?: () => void;
-  /** Called after the viewer deleted this post (ThreadView closes). */
-  onDeleted?: () => void;
+/** A post and, under it, the markets created from it. */
+export function FeedPost({ item, markets }: { item: FeedItem; markets?: NearMarket[] }) {
+  return item.kind === 'post' ? <PostVariant item={item} markets={markets} /> : null;
 }
 
-/**
- * Universal feed card. Phase 01 only renders the `post` variant; later
- * phases (03–06) add trade + take variants. Kinds not yet wired render
- * a fallback stub so a stray item from a future phase never crashes.
- */
-export function FeedPost({ item, onOpenThread, onDeleted }: FeedPostProps) {
-  if (item.kind === 'post')
-    return <PostVariant item={item} onOpenThread={onOpenThread} onDeleted={onDeleted} />;
-  return null;
-}
-
-function PostVariant({
-  item,
-  onOpenThread,
-  onDeleted,
-}: {
-  item: PostItem;
-  onOpenThread?: () => void;
-  onDeleted?: () => void;
-}) {
+function PostVariant({ item, markets }: { item: PostItem; markets?: NearMarket[] }) {
   return (
-    <article
-      className={`px-5 py-3.5 border-b border-border/60 hover:bg-muted/40 transition-colors ${
-        onOpenThread ? 'cursor-pointer' : ''
-      }`}
-      onClick={(e) => {
-        if (
-          !onOpenThread ||
-          (e.target as HTMLElement).closest('button, a, textarea, input, video')
-        )
-          return;
-        onOpenThread();
-      }}
-    >
+    <article className="px-5 py-3.5 border-b border-border/60 hover:bg-muted/40 transition-colors">
       {item.repostedBy && (
         <div className="pl-[52px] flex items-center gap-1.5 text-[11px] text-muted-foreground mb-1.5">
           <Repeat className="w-3 h-3" />
@@ -74,23 +39,11 @@ function PostVariant({
         </div>
       )}
       <div className="grid grid-cols-[44px_1fr] gap-3">
-      {item.author.handle ? (
-        // Opens the author's profile — follow from there, X KOLs included.
-        <Link prefetch={false}
-          href={profilePath(item.author.handle)}
-          aria-label={authorName(item.author)}
-          className="self-start"
-        >
-          {/* Seeded by the handle, as on the profile and the author's trades. */}
-          <UserAvatar address={item.author.handle} size={40} photoUrl={item.author.avatar} />
-        </Link>
-      ) : (
-        <UserAvatar address={item.author.id} size={40} photoUrl={item.author.avatar} />
-      )}
+      <UserAvatar address={item.author.handle ?? item.author.id} size={40} photoUrl={item.author.avatar} />
       <div className="flex flex-col gap-1.5 min-w-0">
         <PostHeader
           name={authorName(item.author)}
-          href={item.author.handle ? profilePath(item.author.handle) : undefined}
+          href={item.source === 'x' && item.author.handle ? xProfileUrl(item.author.handle) : undefined}
           handle={item.author.handle ?? null}
           tierRank={item.author.tierRank ?? null}
           tier={item.author.tier ?? null}
@@ -109,6 +62,7 @@ function PostVariant({
         {item.linkPreview && <LinkPreviewCard preview={item.linkPreview} />}
         {item.externalQuote && <ExternalQuoteCard quote={item.externalQuote} />}
         <PostActions item={item} />
+        <PredictionBar postId={item.id} markets={markets} />
       </div>
       </div>
     </article>

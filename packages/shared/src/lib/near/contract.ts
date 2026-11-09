@@ -128,3 +128,32 @@ export const sellOnNear = (marketId: string, side: NearSide, shares: bigint, min
 export const redeemOnNear = (marketId: string) => payout('redeem', { market_id: marketId });
 export const refundOnNear = (marketId: string) => payout('refund', { market_id: marketId });
 export const withdrawOnNear = () => payout('withdraw', {});
+
+/** The markets created from each post. The contract answers 100 posts per call. */
+export async function getNearMarketsForPosts(postIds: string[]): Promise<Map<string, NearMarket[]>> {
+  const chunks: string[][] = [];
+  for (let i = 0; i < postIds.length; i += 100) chunks.push(postIds.slice(i, i + 100));
+  const answers = await Promise.all(
+    chunks.map((post_ids) =>
+      nearView<[string, NearMarket[]][]>(MARKET, 'get_markets_for_posts', { post_ids }),
+    ),
+  );
+  return new Map(answers.flat());
+}
+
+/** When the account may use the faucet again, in milliseconds. */
+export async function getNearFaucetReadyAt(accountId: string): Promise<number> {
+  return Number(await nearView<string>(USDC, 'faucet_ready_at', { account_id: accountId }));
+}
+
+export async function claimNearFaucet(): Promise<string> {
+  const outcome = await useNearWallet.getState().send({
+    receiverId: USDC,
+    methodName: 'faucet',
+    args: {},
+    gas: `50${TGAS}`,
+    deposit: '0',
+  });
+  resultOf(outcome);
+  return txHash(outcome);
+}

@@ -7,7 +7,7 @@ import type {
 } from '@/services/pamm-market.service';
 import { NearAddress } from './address';
 import { NEAR_MARKET_CONTRACT, NEAR_USDC_CONTRACT, USDC_DECIMALS } from './config';
-import type { NearMarket, NearPosition, NearSide } from './types';
+import type { NearMarket, NearOutcome, NearPosition, NearPost, NearSide } from './types';
 
 const iso = (sec: string | number) => new Date(Number(sec) * 1000).toISOString();
 
@@ -38,6 +38,72 @@ const pendingOutcome = (m: NearMarket): 'yes' | 'no' | null => {
   return outcome === 'yes' || outcome === 'no' ? outcome : null;
 };
 
+/** Only http(s) links reach an href: these strings are written by market creators. */
+export function safeHttpUrl(value: string): string | null {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The tweet a market was created from, when it can be linked. */
+export function postUrl(post: NearPost): string | null {
+  const handle = /^x:([A-Za-z0-9_]{1,15})$/.exec(post.author_ref)?.[1];
+  return post.source === 'x' && handle && /^\d+$/.test(post.post_id)
+    ? `https://x.com/${handle}/status/${post.post_id}`
+    : null;
+}
+
+/** Whether the contract still takes bets on this market right now. */
+export const isTradable = (m: NearMarket) =>
+  m.status === 'open' && nowSec() < Number(m.rules.expiry_sec) - m.trade_freeze_sec;
+
+export function outcomeLabel(m: NearMarket, outcome: NearOutcome): string {
+  if (outcome === 'yes') return m.rules.yes_label;
+  if (outcome === 'no') return m.rules.no_label;
+  return 'Invalid';
+}
+
+export type NearMarketPhase = 'open' | 'closed' | 'resolved' | 'cancelled';
+
+/** Coarse phase, for filters. */
+export function phaseOf(m: NearMarket): NearMarketPhase {
+  if (m.status === 'cancelled') return 'cancelled';
+  if (m.status === 'finalized') return winnerOf(m) ? 'resolved' : 'cancelled';
+  return isTradable(m) ? 'open' : 'closed';
+}
+
+export function phaseLabel(m: NearMarket): string {
+  switch (m.status) {
+    case 'open':
+      return isTradable(m) ? 'Open' : 'Waiting for result';
+    case 'receipt_posted':
+      return 'Result proposed';
+    case 'challenged':
+      return 'Challenged';
+    case 'cancelled':
+      return 'Cancelled';
+    case 'finalized': {
+      const winner = winnerOf(m);
+      if (winner) return `Resolved ${outcomeLabel(m, winner)}`;
+      // A one-sided market keeps its yes/no outcome but pays everyone back.
+      return typeof m.outcome === 'object' ? 'Resolved invalid' : 'Refunded';
+    }
+  }
+}
+
+export type NearBondState = 'locked' | 'returned' | 'forfeited';
+
+/** Ambiguous rules are the creator's fault, so that one outcome costs them the bond. */
+export function bondStateOf(m: NearMarket): NearBondState {
+  if (m.status === 'cancelled') return 'returned';
+  if (m.status !== 'finalized') return 'locked';
+  const outcome = m.outcome;
+  return typeof outcome === 'object' && outcome?.invalid === 'ambiguous_rules' ? 'forfeited' : 'returned';
+}
+
 /** A contract market in the shape the market screens read. */
 export function toPammMarket(m: NearMarket): PammMarket {
   const created = iso(m.created_at_sec);
@@ -54,7 +120,7 @@ export function toPammMarket(m: NearMarket): PammMarket {
     category: m.rules.category
       ? ({ id: m.rules.category, slug: m.rules.category, name: m.rules.category } as PammMarket['category'])
       : null,
-    categoryId: m.rules.category || null,
+    categoryId: m.rules.category.toLowerCase() || null,
     collateralMint: NEAR_USDC_CONTRACT,
     marketVersion: 'v3_shares',
     positionModel: 'pda',
@@ -68,13 +134,12 @@ export function toPammMarket(m: NearMarket): PammMarket {
     createdAt: created,
     updatedAt: posted ?? created,
     rules: {
-      description: m.rules.description,
       outcomeRules: [
         { rule: m.rules.yes_condition, outcomeIndex: 0 },
         { rule: m.rules.no_condition, outcomeIndex: 1 },
       ],
     },
-    resolutionSourceUrl: m.rules.resolution_source,
+    resolutionSourceUrl: safeHttpUrl(m.rules.resolution_source),
     pendingResolution: m.status === 'finalized' ? null : pendingOutcome(m),
     aiResolvedAt: posted,
     tradeCount: m.trades,

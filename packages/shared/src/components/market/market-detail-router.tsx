@@ -47,9 +47,8 @@ function PammDetailContent({ poolAddress }: { poolAddress: string }) {
     return (
       <div className="space-y-3.5">
         <Skeleton className="h-[480px] w-full rounded-[10px]" />
-        <div className="grid gap-3.5 xl:grid-cols-[minmax(0,1.15fr)_340px_320px]">
+        <div className="grid gap-3.5 xl:grid-cols-[minmax(0,1.15fr)_340px]">
           <Skeleton className="h-56 w-full rounded-[10px]" />
-          <Skeleton className="h-96 w-full rounded-[10px]" />
           <Skeleton className="h-96 w-full rounded-[10px]" />
         </div>
       </div>

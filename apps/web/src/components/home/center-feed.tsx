@@ -1,5 +1,6 @@
 'use client';
 
+import { usePostMarkets } from '@/hooks/pamm/use-post-markets';
 import { usePostsFeed } from '@/hooks/use-posts-feed';
 import { FeedPost } from './feed-post';
 import { FeedItemSkeleton } from './feed-states';
@@ -8,6 +9,7 @@ import { FeedItemSkeleton } from './feed-states';
 export function CenterFeed() {
   const feed = usePostsFeed({});
   const isEmpty = !feed.isLoading && feed.items.length === 0;
+  const { data: postMarkets } = usePostMarkets(feed.items.map((item) => item.id));
 
   return (
     <div className="flex flex-col min-w-0">
@@ -15,6 +17,11 @@ export function CenterFeed() {
         Feed
       </div>
 
+      {feed.sample && (
+        <div data-testid="feed-sample-note" className="border-b border-border/60 px-5 py-2 text-[12px] text-muted-foreground">
+          Sample posts: the live X feed is not connected here.
+        </div>
+      )}
       {feed.isLoading && <FeedItemSkeleton count={4} />}
       {feed.isError && !feed.isLoading && (
         <div className="px-5 py-16 text-center text-[13px] text-muted-foreground">
@@ -28,7 +35,7 @@ export function CenterFeed() {
         <div className="px-5 py-16 text-center text-[13px] text-muted-foreground">No posts yet.</div>
       )}
       {feed.items.map((item) => (
-        <FeedPost key={item.id} item={item} />
+        <FeedPost key={item.id} item={item} markets={postMarkets?.get(item.id)} />
       ))}
       {feed.hasNextPage && (
         <button

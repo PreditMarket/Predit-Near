@@ -12,12 +12,7 @@ import {
 
 export { POSTS_FEED_QUERY_KEY, postsFeedKey, type PostsFeedFilters };
 
-/**
- * Infinite list of posts for the home Feed tab (Phase 01). Later phases
- * merge this with trade + take sources via `useMergedFeed`; for now the
- * Feed tab renders just posts so we can ship a demoable slice without
- * waiting on the other endpoints.
- */
+/** Infinite list of posts for the home feed. */
 export function usePostsFeed(filters: PostsFeedFilters = {}) {
   const limit = filters.limit ?? 20;
   const key = postsFeedKey(filters);
@@ -25,18 +20,11 @@ export function usePostsFeed(filters: PostsFeedFilters = {}) {
   const query = useInfiniteQuery<Paginated<Extract<FeedItem, { kind: 'post' }>>>({
     queryKey: key,
     queryFn: async ({ pageParam }) => {
-      const page = await feedService.listPosts({
-        cursor: pageParam as string | undefined,
-        limit,
-        authorIds: filters.authorIds,
-        marketIds: filters.marketIds,
-        parentId: filters.parentId,
-        saved: filters.saved,
-        following: filters.following !== undefined,
-      });
+      const page = await feedService.listPosts({ cursor: pageParam as string | undefined, limit });
       return {
         items: page.items.map(postDtoToFeedItem),
         nextCursor: page.nextCursor ?? null,
+        sample: page.sample,
       };
     },
     initialPageParam: undefined as string | undefined,
@@ -54,6 +42,7 @@ export function usePostsFeed(filters: PostsFeedFilters = {}) {
 
   return {
     items,
+    sample: !!query.data?.pages[0]?.sample,
     isLoading: query.isPending,
     isError: query.isError,
     hasNextPage: !!query.hasNextPage,

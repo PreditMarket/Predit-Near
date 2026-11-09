@@ -45,3 +45,35 @@ export async function nearView<T>(
   }
   throw lastError instanceof Error ? lastError : new Error('NEAR RPC unavailable');
 }
+
+/** An account's NEAR in yocto, or null when it does not exist on chain. */
+export async function getNearNativeBalance(accountId: string): Promise<bigint | null> {
+  const body = JSON.stringify({
+    jsonrpc: '2.0',
+    id: 'account',
+    method: 'query',
+    params: { request_type: 'view_account', finality: 'optimistic', account_id: accountId },
+  });
+
+  let lastError: unknown;
+  for (const url of NEAR_RPC_URLS) {
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body,
+        cache: 'no-store',
+      });
+      const json = (await res.json()) as {
+        result?: { amount?: string; error?: string };
+        error?: { cause?: { name?: string } };
+      };
+      if (json.error?.cause?.name === 'UNKNOWN_ACCOUNT') return null;
+      if (json.result?.amount) return BigInt(json.result.amount);
+      lastError = new Error('Unexpected account response');
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError;
+}

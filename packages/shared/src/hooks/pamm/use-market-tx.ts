@@ -22,7 +22,7 @@ export function useMarketTx<Args>(
       void qc.invalidateQueries({ queryKey: ['pamm', 'market', poolAddress] });
       void qc.invalidateQueries({ queryKey: ['pamm', 'userBalances'] });
       void qc.invalidateQueries({ queryKey: ['pamm', 'v3Position'] });
-      void qc.invalidateQueries({ queryKey: ['near', 'balance'] });
+      void qc.invalidateQueries({ queryKey: ['near'] });
       void usePortfolioStore.getState().fetchAll();
     },
     onError: (err: Error) => {

@@ -5,6 +5,7 @@ import { MarketDescriptionContent } from '@/components/market/market-description
 import { fmtPct, fmtVol } from '@/components/shared/market-card';
 import type { PoolStateResult } from '@/hooks/pamm/use-pool-state';
 import { useConfig } from '@/hooks/pamm/use-config';
+import { NearMarketProof } from './near-market-proof';
 import { useTradingBan } from '@/hooks/pamm/use-trading-ban';
 import { formatDate } from '@/lib/date';
 import type { MarketRules } from '@/services/market.service';
@@ -627,7 +628,7 @@ export function PoolDetailLayout({
 
   return (
     <>
-      <div className="grid gap-3.5 lg:grid-cols-[1fr_340px] xl:grid-cols-[1fr_340px_360px] items-start pb-28 lg:pb-0">
+      <div className="grid gap-3.5 lg:grid-cols-[1fr_340px] items-start pb-28 lg:pb-0">
         {/* ── Col 1: chart + trades ── */}
         <div className="max-lg:contents lg:flex lg:flex-col lg:gap-3.5">
           {/* Chart card */}
@@ -1085,6 +1086,8 @@ export function PoolDetailLayout({
             </div>
           </div>
 
+          <NearMarketProof marketId={poolAddress} />
+
           {/* Description / About + Rules + Pool info */}
           <div
             className={`max-lg:order-3 rounded-[10px] border border-border bg-card overflow-hidden`}
@@ -1134,117 +1137,6 @@ export function PoolDetailLayout({
             </div>
           </div>
 
-          {/* Trades history */}
-          <div
-            className={`max-lg:order-2 rounded-[10px] border border-border bg-card overflow-hidden`}
-          >
-            <div className="flex items-center gap-2 px-[18px] py-3 border-b border-border">
-              <span className="text-[12.5px] font-semibold">
-                Trades history
-              </span>
-              <span className="flex items-center gap-1 font-mono text-[8.5px] text-success">
-                <span className="text-[7px]">●</span> live
-              </span>
-            </div>
-            <div className="overflow-x-auto">
-              <div
-                className="grid gap-x-2 px-[18px] py-2 bg-background border-b border-border font-mono text-[8.5px] font-bold uppercase tracking-[0.12em] text-muted-foreground"
-                style={{
-                  gridTemplateColumns: '60px 88px 84px 1fr 56px 76px',
-                  minWidth: '460px',
-                }}
-              >
-                <span>Time</span>
-                <span>Trader</span>
-                <span className="text-right">Side</span>
-                <span className="text-right">Shares</span>
-                <span className="text-right">Price</span>
-                <span className="text-right">Tx</span>
-              </div>
-              {trades.length === 0 ? (
-                <div className="py-8 text-center font-mono text-[11px] text-muted-foreground">
-                  No trades yet
-                </div>
-              ) : (
-                trades.map((t, i) => (
-                  <div
-                    key={t.txSig || i}
-                    className="grid items-center gap-x-2 px-[18px] py-2 border-b border-border last:border-0 font-mono text-[11px]"
-                    style={{
-                      gridTemplateColumns: '60px 88px 84px 1fr 56px 76px',
-                      minWidth: '460px',
-                    }}
-                  >
-                    <span className="text-muted-foreground text-[10.5px]">
-                      {t.time} ago
-                    </span>
-                    <span className="truncate text-foreground font-medium">
-                      {t.handle}
-                    </span>
-                    <span className="flex items-center justify-end gap-1">
-                      <span
-                        className={`font-bold ${t.isYes ? 'text-success' : 'text-danger'}`}
-                      >
-                        {t.outcome}
-                      </span>
-                      <span
-                        className={`rounded-[3px] px-[4px] py-0.5 text-[8px] font-bold ${t.isBuy ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'}`}
-                      >
-                        {t.action}
-                      </span>
-                    </span>
-                    <span className="text-right text-muted-foreground">
-                      {t.shares}
-                    </span>
-                    <span className="text-right font-semibold text-foreground">
-                      {t.price}
-                    </span>
-                    <a
-                      href={t.solscanUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      title={`View ${t.txSig} on the explorer`}
-                      className="flex items-center justify-end gap-1 text-[10.5px] text-primary hover:underline"
-                    >
-                      {t.txShort}
-                      <ExternalLink className="h-3 w-3 shrink-0" />
-                    </a>
-                  </div>
-                ))
-              )}
-            </div>
-            {/* /overflow-x-auto */}
-            {/* Pagination */}
-            {(tradePage > 1 || tradesHasNext) && (
-              <div className="flex items-center justify-between gap-2 px-[18px] py-2 border-t border-border font-mono text-[9.5px]">
-                <button
-                  onClick={() => setTradePage((p) => Math.max(1, p - 1))}
-                  disabled={tradePage <= 1}
-                  className="touch-hit cursor-pointer rounded-[4px] border border-border px-2 py-0.5 transition-colors hover:bg-muted/30 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  Prev
-                </button>
-                <span className="text-muted-foreground">Page {tradePage}</span>
-                <button
-                  onClick={() =>
-                    setTradePage((p) => (tradesHasNext ? p + 1 : p))
-                  }
-                  disabled={!tradesHasNext}
-                  className="touch-hit cursor-pointer rounded-[4px] border border-border px-2 py-0.5 transition-colors hover:bg-muted/30 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  Next
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Bonus XP Awards — admin only, shown when market has isBonusXp */}
-          {market.isBonusXp && user?.isAdmin && (
-            <BonusXpAwardsTable
-              marketId={poolAddress}
-              isResolved={isResolved}
-            />
-          )}
         </div>
 
         {/* ── Col 2: how-to + order ticket ── */}
@@ -1262,14 +1154,14 @@ export function PoolDetailLayout({
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-[12.5px] font-semibold">
-                  How resolution work?
+                  How is this resolved?
                 </div>
                 <div className="mt-0.5 truncate font-mono text-[10.5px] text-muted-foreground">
                   {new Date(expiryTs * 1000).toLocaleDateString('en-US', {
                     month: 'short',
                     day: 'numeric',
                   })}
-                  {' · On-chain resolver · Permissionless'}
+                  {' · NEAR AI reads · a person confirms'}
                 </div>
               </div>
               <ChevronDown
@@ -1280,13 +1172,9 @@ export function PoolDetailLayout({
             {howOpen && (
               <div className="border-t border-border px-4 pb-4">
                 <p className="mt-3 mb-3 text-[11.5px] leading-[1.6] text-muted-foreground">
-                  After expiry a AI agents DAO with minimum threshold of 2/3
-                  will submits the winning side on-chain. Winning outcome{' '}
-                  {poolState.marketVersion === 'v2_position'
-                    ? 'position'
-                    : 'token'}{' '}
-                  holders redeem 1:1 for {collateralSymbol} collateral. No human
-                  voting, no oracle bribery.
+                  After expiry, NEAR AI reads the source named in the rules and suggests a result. A person
+                  confirms it and posts a receipt on chain. Anyone can challenge the receipt for a bond during
+                  the challenge window. Winners then redeem their share of the {collateralSymbol} pool.
                 </p>
                 {isResolved && (
                   <div
@@ -1297,7 +1185,7 @@ export function PoolDetailLayout({
                     }`}
                   >
                     <span className="font-mono text-[8.5px] font-bold uppercase tracking-[0.12em] opacity-70">
-                      AI resolved
+                      Resolved
                     </span>
                     <span className="font-mono text-[12px] font-black">
                       {(effectiveResolutionCode === 1
@@ -1307,16 +1195,10 @@ export function PoolDetailLayout({
                     </span>
                   </div>
                 )}
-                <div className="mb-3 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                  <Info className="h-3 w-3 shrink-0" />
-                  <span>
-                    Settlement by AI agent may take up to 24 hours after expiry.
-                  </span>
-                </div>
                 <div className="mb-[10px] flex gap-[6px]">
                   <div className="flex-1 rounded-[6px] border border-border bg-background px-[10px] py-2">
                     <div className="mb-[3px] font-mono text-[8px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
-                      Brain
+                      Result operator
                     </div>
                     <div className="break-all font-mono text-[11px] font-bold text-brand-purple">
                       {resolverShort}
