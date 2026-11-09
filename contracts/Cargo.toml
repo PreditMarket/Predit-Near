@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["core", "market"]
+members = ["core", "market", "mock-usdc"]
 
 [profile.release]
 codegen-units = 1

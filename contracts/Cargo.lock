@@ -1182,6 +1182,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "near-contract-standards"
+version = "5.30.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5172408539a27bda9a5bb611e1dcdb0825ee26296bf37ccec9299c7f90357834"
+dependencies = [
+ "near-sdk",
+]
+
+[[package]]
 name = "near-crypto"
 version = "0.38.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1695,8 +1704,17 @@ version = "0.1.0"
 name = "predit-market"
 version = "0.1.0"
 dependencies = [
+ "near-contract-standards",
  "near-sdk",
  "predit-core",
+]
+
+[[package]]
+name = "predit-mock-usdc"
+version = "0.1.0"
+dependencies = [
+ "near-contract-standards",
+ "near-sdk",
 ]
 
 [[package]]
