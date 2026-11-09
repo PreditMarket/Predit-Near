@@ -7,6 +7,8 @@
 # Usage: ./testnet-e2e.sh <account-prefix>
 #   OPERATOR_KEY=<path>  key file of the operator's limited key
 #                        (default: the first function-call key found)
+#   FUNDER=<account>     pay for the two test bettors from this account
+#                        instead of the faucet (2.5 NEAR each)
 set -uo pipefail
 
 P="${1:?usage: testnet-e2e.sh <account-prefix>}"
@@ -54,7 +56,11 @@ fi
 echo "== accounts and funds"
 for a in "$ALICE" "$BOB"; do
   if ! near account view-account-summary "$a" $NET now >/dev/null 2>&1; then
-    near account create-account sponsor-by-faucet-service "$a" autogenerate-new-keypair save-to-legacy-keychain $NET create >/dev/null 2>&1 || die "create $a"
+    if [ -n "${FUNDER:-}" ]; then
+      near account create-account fund-myself "$a" '2.5 NEAR' autogenerate-new-keypair save-to-legacy-keychain sign-as "$FUNDER" $NET $SIGN >/dev/null 2>&1 || die "create $a"
+    else
+      near account create-account sponsor-by-faucet-service "$a" autogenerate-new-keypair save-to-legacy-keychain $NET create >/dev/null 2>&1 || die "create $a"
+    fi
   fi
   run "$USDC" faucet json-args '{}' prepaid-gas '50.0 Tgas' attached-deposit '0 NEAR' sign-as "$a" $NET $SIGN >/dev/null
 done
