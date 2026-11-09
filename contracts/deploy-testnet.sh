@@ -28,10 +28,12 @@ near contract deploy "$MARKET" use-file target/near/predit_market/predit_market.
   "{\"owner\":\"$OWNER\",\"operator\":\"$OPERATOR\",\"arbiter\":\"$ARBITER\",\"treasury\":\"$TREASURY\",\"collateral\":\"$USDC\"}" \
   prepaid-gas '100.0 Tgas' attached-deposit '0 NEAR' $NET $SIGN
 
-# The market needs a USDC balance before it can receive bets.
-near contract call-function as-transaction "$USDC" storage_deposit \
-  json-args "{\"account_id\":\"$MARKET\"}" prepaid-gas '100.0 Tgas' attached-deposit '0.01 NEAR' \
-  sign-as "$OWNER" $NET $SIGN
+# The market needs a USDC balance to receive bets, and the treasury to collect fees.
+for account in "$MARKET" "$TREASURY"; do
+  near contract call-function as-transaction "$USDC" storage_deposit \
+    json-args "{\"account_id\":\"$account\"}" prepaid-gas '100.0 Tgas' attached-deposit '0.01 NEAR' \
+    sign-as "$OWNER" $NET $SIGN
+done
 
 # The key the agent runs with: it can only post receipts and finalize.
 near account add-key "$OPERATOR" grant-function-call-access \
