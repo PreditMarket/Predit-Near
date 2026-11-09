@@ -5,8 +5,11 @@ import { isImplicitAccount, NEAR_ACCOUNT_ID, serverAccount } from '@/lib/server-
 export const dynamic = 'force-dynamic';
 
 const ONE_NEAR = BigInt(10) ** BigInt(24);
-const GRANT = ONE_NEAR / BigInt(20); // 0.05 NEAR
-const ENOUGH = ONE_NEAR / BigInt(50); // 0.02 NEAR
+// NEAR checks an account can cover all the gas it attaches before running a
+// transaction, and refunds what is unused. A 150 Tgas bet needs about 0.15 NEAR
+// on hand, though it spends a small fraction of that.
+const GRANT = ONE_NEAR / BigInt(4); // 0.25 NEAR
+const ENOUGH = ONE_NEAR / BigInt(5); // 0.2 NEAR
 
 /**
  * Gas for an account that has none. There is no database, so the limit is the
@@ -29,7 +32,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const outcome = await funder.transfer({ receiverId: accountId, amount: GRANT });
-    return NextResponse.json({ funded: true, amount: '0.05', txHash: outcome.transaction.hash });
+    return NextResponse.json({ funded: true, amount: '0.25', txHash: outcome.transaction.hash });
   } catch (err) {
     console.error('onboard transfer failed', err);
     return NextResponse.json({ error: 'Could not send gas' }, { status: 502 });

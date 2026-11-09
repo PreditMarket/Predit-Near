@@ -49,12 +49,12 @@ export function MarketCreatedCard({
 
   const handleSkip = () => {
     onDismiss();
-    router.push('/markets');
+    router.push(url);
   };
 
   const handleViewMyMarkets = () => {
     onDismiss();
-    router.push('/markets?tab=my-markets');
+    router.push('/portfolio?tab=my-markets');
   };
 
   const absUrl = useShareUrl(url);

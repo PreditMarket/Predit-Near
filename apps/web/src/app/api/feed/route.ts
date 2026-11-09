@@ -55,6 +55,11 @@ async function allPosts(): Promise<{ posts: PostDto[]; sample: boolean }> {
 /** Posts newest first; the cursor is an offset into the merged list. */
 export async function GET(req: NextRequest) {
   const params = req.nextUrl.searchParams;
+  const id = params.get('id');
+  if (id) {
+    const post = (await allPosts()).posts.find((p) => p.id === id);
+    return post ? NextResponse.json({ post }) : NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
   const start = Math.max(Number(params.get('cursor')) || 0, 0);
   const limit = Math.min(Math.max(Number(params.get('limit')) || 20, 1), MAX_LIMIT);
   const { posts, sample } = await allPosts();

@@ -1,6 +1,6 @@
 import { NEAR_MARKET_CONTRACT as MARKET, NEAR_USDC_CONTRACT as USDC } from './config';
 import { nearView } from './rpc';
-import type { NearMarket, NearPosition, NearSide } from './types';
+import type { NearMarket, NearPosition, NearPost, NearRules, NearSide } from './types';
 import { useNearWallet, type NearTxOutcome } from '@/store/near-wallet.store';
 
 const PAGE = 100;
@@ -157,3 +157,32 @@ export async function claimNearFaucet(): Promise<string> {
   resultOf(outcome);
   return txHash(outcome);
 }
+
+/** Over the bond, to cover storage. The contract refunds what it does not use. */
+export const CREATE_MARKET_MARGIN = BigInt(10) ** BigInt(23); // 0.1 NEAR
+
+export const getNearCreationBond = async () =>
+  BigInt((await nearView<{ creation_bond: string }>(MARKET, 'get_config', {})).creation_bond);
+
+export interface NearCreateMarketArgs {
+  post: NearPost;
+  claim_side: NearSide;
+  rules: NearRules;
+  draft: { model: string; chat_id: string };
+}
+
+/** One transaction: locks the rules and places the bond. */
+export async function createMarketOnNear(
+  args: NearCreateMarketArgs,
+  bond: bigint,
+): Promise<{ marketId: string; hash: string }> {
+  const outcome = await useNearWallet.getState().send({
+    receiverId: MARKET,
+    methodName: 'create_market',
+    args: { ...args },
+    gas: `100${TGAS}`,
+    deposit: (bond + CREATE_MARKET_MARGIN).toString(),
+  });
+  return { marketId: resultOf(outcome).replace(/"/g, ''), hash: txHash(outcome) };
+}
+
