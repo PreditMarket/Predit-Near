@@ -25,11 +25,27 @@ import type {
 type PostItem = Extract<FeedItem, { kind: 'post' }>;
 
 /** A post and, under it, the markets created from it. */
-export function FeedPost({ item, markets }: { item: FeedItem; markets?: NearMarket[] }) {
-  return item.kind === 'post' ? <PostVariant item={item} markets={markets} /> : null;
+export function FeedPost({
+  item,
+  markets,
+  detectedClaim,
+}: {
+  item: FeedItem;
+  markets?: NearMarket[];
+  detectedClaim?: string;
+}) {
+  return item.kind === 'post' ? <PostVariant item={item} markets={markets} detectedClaim={detectedClaim} /> : null;
 }
 
-function PostVariant({ item, markets }: { item: PostItem; markets?: NearMarket[] }) {
+function PostVariant({
+  item,
+  markets,
+  detectedClaim,
+}: {
+  item: PostItem;
+  markets?: NearMarket[];
+  detectedClaim?: string;
+}) {
   return (
     <article className="px-5 py-3.5 border-b border-border/60 hover:bg-muted/40 transition-colors">
       {item.repostedBy && (
@@ -62,7 +78,7 @@ function PostVariant({ item, markets }: { item: PostItem; markets?: NearMarket[]
         {item.linkPreview && <LinkPreviewCard preview={item.linkPreview} />}
         {item.externalQuote && <ExternalQuoteCard quote={item.externalQuote} />}
         <PostActions item={item} />
-        <PredictionBar postId={item.id} markets={markets} />
+        <PredictionBar postId={item.id} markets={markets} detectedClaim={detectedClaim} />
       </div>
       </div>
     </article>

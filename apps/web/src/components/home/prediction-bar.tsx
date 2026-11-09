@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { Loader2, Plus } from 'lucide-react';
+import { Loader2, Plus, Sparkles } from 'lucide-react';
 import { QuickTradeDialog } from '@/components/pamm/quick-trade-dialog';
 import { usePortfolioRedeem } from '@/hooks/pamm/use-portfolio-redeem';
 import { useV3Refund } from '@/hooks/pamm/use-v3-refund';
@@ -157,11 +157,11 @@ function PostMarket({ market }: { market: NearMarket }) {
 }
 
 /** Creating needs a wallet, so a signed-out visitor connects one first. */
-function CreateMarketButton({ postId }: { postId: string }) {
+function CreateMarketButton({ postId, detectedClaim }: { postId: string; detectedClaim?: string }) {
   const router = useRouter();
   const gate = useWalletGate();
   return (
-    <div className="mt-2">
+    <div className="mt-2 flex flex-wrap items-center gap-2">
       <button
         type="button"
         data-testid="post-create-market"
@@ -172,15 +172,33 @@ function CreateMarketButton({ postId }: { postId: string }) {
         <Plus className="h-3.5 w-3.5" />
         Create market
       </button>
+      {detectedClaim && (
+        <span
+          data-testid="post-prediction-detected"
+          title={detectedClaim}
+          className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 font-mono text-[10.5px] font-bold text-primary"
+        >
+          <Sparkles className="h-3 w-3" />
+          Prediction detected
+        </span>
+      )}
     </div>
   );
 }
 
 /** Under a post: the markets created from it, or a way to create the first. */
-export function PredictionBar({ postId, markets }: { postId: string; markets?: NearMarket[] }) {
+export function PredictionBar({
+  postId,
+  markets,
+  detectedClaim,
+}: {
+  postId: string;
+  markets?: NearMarket[];
+  detectedClaim?: string;
+}) {
   if (!markets) return <div className="mt-2 h-9 animate-pulse rounded-lg bg-muted/40" aria-hidden />;
 
-  if (markets.length === 0) return <CreateMarketButton postId={postId} />;
+  if (markets.length === 0) return <CreateMarketButton postId={postId} detectedClaim={detectedClaim} />;
 
   const byVolume = [...markets].sort((a, b) => Number(BigInt(b.volume) - BigInt(a.volume)));
   return (

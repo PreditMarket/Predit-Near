@@ -1,38 +1,26 @@
 'use client';
 
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Sparkles } from 'lucide-react';
 import { MarketCreatedCard } from '@/components/market/create/market-created-card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { createMarketOnNear, CREATE_MARKET_MARGIN, getNearCreationBond } from '@/lib/near/contract';
+import { fitBytes, MAX_LABEL, MAX_LONG, MAX_SHORT, textBytes as bytes, type MarketDraft } from '@/lib/near/market-draft';
+import { safeHttpUrl } from '@/lib/near/map';
 import { getNearNativeBalance } from '@/lib/near/rpc';
 import type { NearSide } from '@/lib/near/types';
 import { getCategories } from '@/services/categories.service';
 import type { PostDto } from '@/services/feed.service';
 import { useNearWallet } from '@/store/near-wallet.store';
 
-const MAX_SHORT = 200;
-const MAX_LONG = 600;
-const MAX_LABEL = 40;
 const MIN_LEAD_MS = 10 * 60_000;
 const DEFAULT_LEAD_MS = 7 * 24 * 3_600_000;
 
 const INPUT =
   'w-full rounded-md border border-border bg-background px-3 py-2 text-[13px] text-foreground outline-none focus:border-primary';
-const bytes = (text: string) => new TextEncoder().encode(text).length;
-
-/** The longest start of `text` that fits the contract's byte limit. */
-function fitBytes(text: string, max: number): string {
-  let out = '';
-  for (const char of text) {
-    if (bytes(out + char) > max) break;
-    out += char;
-  }
-  return out;
-}
 
 /** The value a datetime-local input expects, in the viewer's time zone. */
 function localDateTime(ms: number): string {
@@ -40,7 +28,7 @@ function localDateTime(ms: number): string {
   return new Date(ms - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 }
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+function Field({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
   return (
     <label className="flex flex-col gap-1.5">
       <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{label}</span>
@@ -65,6 +53,27 @@ async function fetchPost(id: string): Promise<PostDto | null> {
   return ((await res.json()) as { post: PostDto }).post;
 }
 
+type PostDraft = { draft: MarketDraft; model: string; chatId: string };
+
+async function fetchDraft(postId: string): Promise<PostDraft> {
+  const res = await fetch(`/api/draft?post=${encodeURIComponent(postId)}`);
+  if (!res.ok) throw new Error('No draft');
+  return (await res.json()) as PostDraft;
+}
+
+function AiNote({ drafting, failed }: { drafting: boolean; failed: boolean }) {
+  return (
+    <p data-testid="create-ai-note" className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-[12px] text-foreground">
+      {drafting ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-primary" /> : <Sparkles className="h-3.5 w-3.5 shrink-0 text-primary" />}
+      {drafting
+        ? 'NEAR AI is drafting this market from the post. This can take up to a minute…'
+        : failed
+          ? 'NEAR AI could not draft this post. Fill in the market yourself.'
+          : 'Drafted by NEAR AI. Check every field and open the source: the rules cannot change once locked.'}
+    </p>
+  );
+}
+
 function CreateForm({ post }: { post: PostDto }) {
   const accountId = useNearWallet((s) => s.accountId) as string;
   const queryClient = useQueryClient();
@@ -84,8 +93,30 @@ function CreateForm({ post }: { post: PostDto }) {
     imageUrl: firstImage,
     claimSide: 'yes' as NearSide,
   });
-  const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
+  const touched = useRef(new Set<string>());
+  const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => {
+    touched.current.add(key);
     setForm((f) => ({ ...f, [key]: value }));
+  };
+
+  const {
+    data: ai,
+    isLoading: drafting,
+    isError: draftFailed,
+  } = useQuery({
+    queryKey: ['post-draft', post.id],
+    queryFn: () => fetchDraft(post.id),
+    staleTime: Infinity,
+    retry: false,
+  });
+  // A field the creator already edited keeps their words.
+  useEffect(() => {
+    if (!ai) return;
+    const { deadlineMs, ...texts } = ai.draft;
+    const fields = deadlineMs ? { ...texts, deadline: localDateTime(deadlineMs) } : texts;
+    const unedited = Object.entries(fields).filter(([key, value]) => value && !touched.current.has(key));
+    setForm((f) => ({ ...f, ...Object.fromEntries(unedited) }));
+  }, [ai]);
 
   const [phase, setPhase] = useState<'idle' | 'signing' | 'done'>('idle');
   const [created, setCreated] = useState<string | null>(null);
@@ -153,7 +184,7 @@ function CreateForm({ post }: { post: PostDto }) {
             image_url: form.imageUrl.trim(),
             expiry_sec: String(expiry),
           },
-          draft: { model: 'manual', chat_id: '' },
+          draft: ai ? { model: ai.model, chat_id: ai.chatId } : { model: 'manual', chat_id: '' },
         },
         bond,
       );
@@ -176,6 +207,8 @@ function CreateForm({ post }: { post: PostDto }) {
         </div>
         <p className="whitespace-pre-wrap break-words text-[13px] text-foreground">{post.content}</p>
       </section>
+
+      <AiNote drafting={drafting} failed={draftFailed} />
 
       <Field label="Question">
         <input data-testid="create-question" className={INPUT} value={form.question} onChange={(e) => set('question', e.target.value)} />
@@ -200,7 +233,22 @@ function CreateForm({ post }: { post: PostDto }) {
       <Field label="Invalid if">
         <textarea className={INPUT} rows={2} value={form.invalidConditions} onChange={(e) => set('invalidConditions', e.target.value)} />
       </Field>
-      <Field label="Source" hint="The https page NEAR AI will read at the deadline.">
+      <Field
+        label="Source"
+        hint={
+          <>
+            The https page NEAR AI will read at the deadline.
+            {safeHttpUrl(form.source) && (
+              <>
+                {' '}
+                <a data-testid="create-source-open" href={safeHttpUrl(form.source) as string} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                  Open it
+                </a>
+              </>
+            )}
+          </>
+        }
+      >
         <input data-testid="create-source" className={INPUT} placeholder="https://" value={form.source} onChange={(e) => set('source', e.target.value)} />
       </Field>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -236,7 +284,7 @@ function CreateForm({ post }: { post: PostDto }) {
       {problem && <p data-testid="create-problem" className="text-[12px] text-muted-foreground">{problem}</p>}
       {error && <p data-testid="create-error" className="text-[12px] text-danger">{error}</p>}
 
-      <Button data-testid="create-submit" disabled={!!problem || shortOfNear || bond === undefined || phase !== 'idle'} onClick={() => void submit()}>
+      <Button data-testid="create-submit" disabled={!!problem || drafting || shortOfNear || bond === undefined || phase !== 'idle'} onClick={() => void submit()}>
         Lock rules and create · {bondNear} NEAR bond
       </Button>
 

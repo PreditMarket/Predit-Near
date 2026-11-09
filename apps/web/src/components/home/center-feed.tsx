@@ -1,5 +1,6 @@
 'use client';
 
+import { usePostDetections } from '@/hooks/pamm/use-post-detections';
 import { usePostMarkets } from '@/hooks/pamm/use-post-markets';
 import { usePostsFeed } from '@/hooks/use-posts-feed';
 import { FeedPost } from './feed-post';
@@ -10,6 +11,8 @@ export function CenterFeed() {
   const feed = usePostsFeed({});
   const isEmpty = !feed.isLoading && feed.items.length === 0;
   const { data: postMarkets } = usePostMarkets(feed.items.map((item) => item.id));
+  const withoutMarket = postMarkets ? feed.items.filter((item) => !postMarkets.get(item.id)?.length) : [];
+  const { data: detected } = usePostDetections(withoutMarket.map((item) => item.id));
 
   return (
     <div className="flex flex-col min-w-0">
@@ -35,7 +38,7 @@ export function CenterFeed() {
         <div className="px-5 py-16 text-center text-[13px] text-muted-foreground">No posts yet.</div>
       )}
       {feed.items.map((item) => (
-        <FeedPost key={item.id} item={item} markets={postMarkets?.get(item.id)} />
+        <FeedPost key={item.id} item={item} markets={postMarkets?.get(item.id)} detectedClaim={detected?.[item.id]} />
       ))}
       {feed.hasNextPage && (
         <button
