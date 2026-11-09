@@ -3,41 +3,11 @@
 import { useState, type CSSProperties, type ReactNode } from 'react';
 import Link from 'next/link';
 import {
-  MessageCircle,
   Repeat,
-  Heart,
-  Bookmark,
   Clock,
   BadgeCheck,
-  MoreHorizontal,
-  Trash2,
   Play,
 } from 'lucide-react';
-import useAuthStore from '@/store/auth.store';
-import { useAppShellStore } from '@/store/app-shell-store';
-import {
-  useDeletePost,
-  useToggleLike,
-  useToggleRepost,
-  useToggleSave,
-} from '@/hooks/use-post-engagement';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { useOutboxPending } from '@/store/outbox.store';
 import { UserAvatar } from '@/components/v2';
 import { displayName } from '@/lib/display-name';
 import { profilePath } from '@/lib/v2/social';
@@ -48,7 +18,6 @@ import type {
   ExternalQuote,
   FeedItem,
   LinkPreview,
-  PostCounts,
   PostMedia,
 } from '@/types/feed';
 
@@ -84,11 +53,6 @@ function PostVariant({
   onOpenThread?: () => void;
   onDeleted?: () => void;
 }) {
-  // A write to this post (or the post itself) waits in the offline outbox.
-  const pending = useOutboxPending(item.id);
-  const { user } = useAuthStore();
-  // Not on a post still waiting to be sent: it has no server id yet.
-  const isOwn = !!user && user.id === item.author.id && !pending;
   return (
     <article
       className={`px-5 py-3.5 border-b border-border/60 hover:bg-muted/40 transition-colors ${
@@ -131,10 +95,10 @@ function PostVariant({
           tierRank={item.author.tierRank ?? null}
           tier={item.author.tier ?? null}
           createdAt={item.createdAt}
-          pending={pending}
+          pending={false}
           fromX={item.source === 'x'}
           kol={!!item.author.isVirtual}
-          menu={isOwn ? <PostMenu item={item} onDeleted={onDeleted} /> : null}
+          menu={null}
         />
         {item.content && (
           <div className="text-[14px] leading-[1.45] text-white whitespace-pre-wrap break-words">
@@ -144,7 +108,7 @@ function PostVariant({
         {item.media && item.media.length > 0 && <MediaGrid media={item.media} />}
         {item.linkPreview && <LinkPreviewCard preview={item.linkPreview} />}
         {item.externalQuote && <ExternalQuoteCard quote={item.externalQuote} />}
-        <PostActions item={item} onOpenThread={onOpenThread} />
+        <PostActions item={item} />
       </div>
       </div>
     </article>
@@ -364,58 +328,6 @@ function PostHeader({
 }
 
 /** "⋯" on the viewer's own post: Delete, behind a confirm dialog. */
-function PostMenu({ item, onDeleted }: { item: PostItem; onDeleted?: () => void }) {
-  const [confirming, setConfirming] = useState(false);
-  const del = useDeletePost();
-  const fromX = item.source === 'x';
-
-  return (
-    // The menu and dialog render in portals, but React still bubbles their
-    // clicks up to the card, which would open the thread.
-    <div onClick={(e) => e.stopPropagation()}>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            aria-label="Post options"
-            className="touch-hit p-1 rounded-full text-muted-foreground hover:text-white hover:bg-muted transition-colors"
-          >
-            <MoreHorizontal className="w-4 h-4" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem variant="destructive" onSelect={() => setConfirming(true)}>
-            <Trash2 />
-            Delete post
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      <AlertDialog open={confirming} onOpenChange={setConfirming}>
-        <AlertDialogContent className="sm:max-w-[420px]">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete post?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {fromX
-                ? "It's removed from Deor only — the tweet stays on X, and it won't come back on the next sync. This can't be undone."
-                : "It's removed from your profile and the feed. This can't be undone."}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => del.mutate(item.id, { onSuccess: () => onDeleted?.() })}
-              className="bg-danger/10 text-danger hover:bg-danger/20 border-none"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
-  );
-}
-
 /** Very small relative-time helper (avoid pulling date-fns just for feed). */
 function formatTime(iso: string): string {
   const t = Date.parse(iso);
@@ -588,117 +500,21 @@ function MediaVideo({
   );
 }
 
-function PostActions({
-  item,
-  onOpenThread,
-}: {
-  item: PostItem;
-  onOpenThread?: () => void;
-}) {
-  const { user } = useAuthStore();
-  const setOpen = useAppShellStore((s) => s.setOpen);
-  const likeMutation = useToggleLike();
-  const repostMutation = useToggleRepost();
-  const saveMutation = useToggleSave();
-  const counts = item.counts ?? {};
-
-  const requireAuth = (fn: () => void) => () => {
-    if (!user) {
-      setOpen('walletConnectOpen', true);
-      return;
-    }
-    fn();
-  };
-
-  const toggleLike = requireAuth(() =>
-    likeMutation.mutate({ postId: item.id, next: !item.viewerLiked }),
-  );
-  const toggleRepost = requireAuth(() =>
-    repostMutation.mutate({ postId: item.id, next: !item.viewerReposted }),
-  );
-  const toggleSave = requireAuth(() =>
-    saveMutation.mutate({ postId: item.id, next: !item.viewerSaved }),
-  );
-
+function PostActions({ item }: { item: PostItem }) {
+  if (!item.externalUrl) return null;
   return (
-    <div className="flex items-center gap-5 mt-1.5 text-muted-foreground">
-      <ActBtn
-        icon={<MessageCircle className="w-3.5 h-3.5" />}
-        label={counts.replies ?? 0}
-        onClick={onOpenThread}
-      />
-      <ActBtn
-        icon={<Repeat className="w-3.5 h-3.5" />}
-        label={counts.reposts ?? 0}
-        onClick={toggleRepost}
-        active={item.viewerReposted}
-        activeClassName="text-success"
-      />
-      <ActBtn
-        icon={<Heart className="w-3.5 h-3.5" fill={item.viewerLiked ? 'currentColor' : 'none'} />}
-        label={counts.likes ?? 0}
-        onClick={toggleLike}
-        active={item.viewerLiked}
-        activeClassName="text-danger"
-      />
-      {item.externalUrl && (
-        <a
-          href={item.externalUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label="View on X"
-          className="touch-hit ml-auto inline-flex items-center gap-1.5 px-2 py-1 rounded-full [font-family:var(--font-mono)] text-[12px] text-muted-foreground hover:text-white hover:bg-muted transition-colors"
-        >
-          View on
-          <XLogo className="w-3 h-3" />
-        </a>
-      )}
-      <button
-        type="button"
-        onClick={toggleSave}
-        className={`touch-hit ${item.externalUrl ? '' : 'ml-auto '}inline-flex items-center gap-1.5 px-2 py-1 rounded-full [font-family:var(--font-mono)] text-[12px] transition-colors ${
-          item.viewerSaved
-            ? 'text-primary'
-            : 'text-muted-foreground hover:text-white'
-        } hover:bg-muted`}
-        aria-label={item.viewerSaved ? 'Unsave' : 'Save'}
+    <div className="mt-1.5 flex items-center text-muted-foreground">
+      <a
+        href={item.externalUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="View on X"
+        className="touch-hit ml-auto inline-flex items-center gap-1.5 rounded-full px-2 py-1 [font-family:var(--font-mono)] text-[12px] text-muted-foreground transition-colors hover:bg-muted hover:text-white"
       >
-        <Bookmark
-          className="w-3.5 h-3.5"
-          fill={item.viewerSaved ? 'currentColor' : 'none'}
-        />
-      </button>
+        View on
+        <XLogo className="h-3 w-3" />
+      </a>
     </div>
-  );
-}
-
-function ActBtn({
-  icon,
-  label,
-  className = '',
-  onClick,
-  active,
-  activeClassName,
-}: {
-  icon: ReactNode;
-  label: string | number;
-  className?: string;
-  onClick?: () => void;
-  active?: boolean;
-  activeClassName?: string;
-}) {
-  const activeStyle = active && activeClassName ? activeClassName : '';
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`touch-hit inline-flex items-center gap-1.5 px-2 py-1 rounded-full [font-family:var(--font-mono)] text-[12px] hover:bg-muted transition-colors ${
-        active ? '' : 'text-muted-foreground hover:text-white'
-      } ${activeStyle} ${className}`}
-    >
-      {icon}
-      <span>{label}</span>
-    </button>
   );
 }
 

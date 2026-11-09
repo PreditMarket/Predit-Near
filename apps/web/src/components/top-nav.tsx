@@ -16,12 +16,9 @@
 import { Menu } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-is-mobile';
-import { usePammAccess } from '@/hooks/use-pamm-access';
 import { useAppShellStore } from '@/store/app-shell-store';
 import useAuthStore from '@/store/auth.store';
-import { checkIsAdmin, checkIsCreator, checkIsKol } from '@/utils/is-admin';
 import { BrandMark } from '@/components/nav/brand-mark';
 import { ScreenSwitcher } from '@/components/nav/screen-switcher';
 import { MobileDrawer } from '@/components/nav/mobile-drawer';
@@ -37,14 +34,7 @@ export function TopNav() {
   const user = useAuthStore((s) => s.user);
   const setOpen = useAppShellStore((s) => s.setOpen);
 
-  const isAdmin = checkIsAdmin(user);
-  const canManageMarkets = checkIsCreator(user) || checkIsKol(user);
   const isMobile = useIsMobile(1024);
-
-  // Light mode temporarily disabled — force dark for icon/logo swaps.
-  // Restore original `useState(() => localStorage.getItem('theme') === 'dark')`
-  // when re-enabling the dark mode toggle.
-  const [darkMode] = useState(true);
 
   // Scroll-aware hide/show: topnav slides up when the user scrolls down past
   // a threshold; slides back when they scroll up. Filter bars underneath
@@ -85,14 +75,9 @@ export function TopNav() {
     };
   }, []);
 
-  const pammAccess = usePammAccess();
-
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const navItems = useMemo(
-    () => buildNavItems(isAdmin, canManageMarkets, darkMode),
-    [isAdmin, canManageMarkets, darkMode],
-  );
+  const navItems = useMemo(() => buildNavItems(), []);
   const currentPage = getCurrentPage(pathname);
 
   // Close mobile drawer on route change (submenu state lives inside its owners).
@@ -104,20 +89,10 @@ export function TopNav() {
    * Guard for nav clicks. Returns true if navigation should proceed.
    * Used by NavButton onClick handlers — caller does `e.preventDefault()` on false.
    */
-  const canNavigate = (id: string, requiresAuth: boolean): boolean => {
+  const canNavigate = (_id: string, requiresAuth: boolean): boolean => {
     if (requiresAuth && !user) {
       setOpen('walletConnectOpen', true);
       return false;
-    }
-    if (pammAccess && (id === 'pamm' || id.startsWith('pamm/'))) {
-      // The account's wallet comes with sign-in; missing only while BE is
-      // still setting it up.
-      if (!user?.solanaWallet) {
-        toast.error(
-          'Your wallet is still being set up — try again in a moment.',
-        );
-        return false;
-      }
     }
     return true;
   };

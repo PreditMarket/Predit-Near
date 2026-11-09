@@ -1,10 +1,7 @@
 import { TopNav } from '@/components/top-nav';
 import { AppDialogsHost } from '@/components/app-shell/dialogs-host';
 import { FundsDialogHost } from '@/components/app-shell/funds-dialog-host';
-import { AnnouncementBanner } from '@/components/announcement-banner';
-import { BottomBar } from '@/components/home/bottom-bar';
 import { MobileBottomNav } from '@/components/nav/mobile-bottom-nav';
-import { PhoenixSettlingWatcher } from '@/components/phoenix/phoenix-settling-watcher';
 import { OfflineDataBanner } from '@/components/pwa/offline-data-banner';
 
 export default function AppLayout({
@@ -17,7 +14,6 @@ export default function AppLayout({
     // BottomBar's to pad — it's the last thing on screen. Height is
     // --app-h, not h-dvh: see globals.css.
     <div className="flex flex-col h-(--app-h) bg-background overflow-hidden pt-[env(safe-area-inset-top)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
-      <AnnouncementBanner />
       {/* A column, so the page (template.tsx) gets exactly the height left
           under the nav: rail pages then fit the screen and leave nothing to
           scroll — before, nav + a 100%-tall page always overflowed by the
@@ -27,13 +23,10 @@ export default function AppLayout({
         <OfflineDataBanner />
         {children}
       </div>
-      <BottomBar />
       <MobileBottomNav />
       <AppDialogsHost />
       {/* Every deposit, withdraw and transfer dialog: opened through useFundsDialog. */}
       <FundsDialogHost />
-      {/* One poller for a Phoenix deposit in flight; every surface only reads it. */}
-      <PhoenixSettlingWatcher />
     </div>
   );
 }
