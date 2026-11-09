@@ -56,6 +56,20 @@ impl Contract {
         U128(FAUCET_AMOUNT)
     }
 
+    /// Credits an account as if a deposit had arrived from another chain.
+    /// Testnet demo only, and only the token account itself can call it.
+    pub fn simulate_deposit(&mut self, account_id: AccountId, amount: U128) -> U128 {
+        require!(
+            env::predecessor_account_id() == env::current_account_id(),
+            "Token account only"
+        );
+        if !self.token.accounts.contains_key(&account_id) {
+            self.token.internal_register_account(&account_id);
+        }
+        self.token.internal_deposit(&account_id, amount.0);
+        amount
+    }
+
     pub fn faucet_ready_at(&self, account_id: AccountId) -> U64 {
         U64(self.last_claim.get(&account_id).map_or(0, |t| t + FAUCET_COOLDOWN_MS))
     }

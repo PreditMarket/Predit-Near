@@ -504,6 +504,20 @@ async fn a_silent_arbiter_cannot_turn_a_challenge_into_a_void() -> anyhow::Resul
 }
 
 #[tokio::test]
+async fn only_the_token_account_can_simulate_a_deposit() -> anyhow::Result<()> {
+    let e = setup().await?;
+    let newcomer = account(&e.worker, "newcomer").await?;
+    let args = json!({ "account_id": newcomer.id(), "amount": (25 * USDC).to_string() });
+
+    let denied = e.alice.call(e.usdc.id(), "simulate_deposit").args_json(args.clone()).transact().await?;
+    assert!(denied.is_failure());
+
+    e.usdc.call("simulate_deposit").args_json(args).transact().await?.into_result()?;
+    assert_eq!(e.balance(newcomer.id()).await?, 25 * USDC);
+    Ok(())
+}
+
+#[tokio::test]
 async fn cancelling_refunds_the_stake_and_the_bond() -> anyhow::Result<()> {
     let e = setup().await?;
     let (id, _) = e.create("p1").await?;
