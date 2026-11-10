@@ -50,30 +50,53 @@ export interface NearAiCompletion {
   responseBody: string;
 }
 
-/** One completion whose answer is a JSON object. Thrown errors never carry the key. */
-export async function nearAiJson(system: string, user: string, maxTokens: number): Promise<NearAiCompletion> {
+export interface NearAiMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+
+/** One completion. Thrown errors never carry the key. */
+async function complete(
+  messages: NearAiMessage[],
+  { maxTokens, json, temperature }: { maxTokens: number; json: boolean; temperature: number },
+): Promise<{ content: string; chatId: string; requestBody: string; responseBody: string }> {
   const key = nearAiKey();
   if (!key) throw new Error('NEAR AI is not configured');
 
   const request = JSON.stringify({
     model: NEAR_AI_MODEL,
-    temperature: 0.2,
+    temperature,
     reasoning_effort: 'low',
     max_tokens: maxTokens,
-    response_format: { type: 'json_object' },
-    messages: [
-      { role: 'system', content: system },
-      { role: 'user', content: user },
-    ],
+    ...(json ? { response_format: { type: 'json_object' } } : {}),
+    messages,
   });
   const res = await send(key, request);
 
   const responseBody = await res.text();
   const body = JSON.parse(responseBody) as { id?: string; choices?: { message?: { content?: string | null } }[] };
-  const json = body.choices?.[0]?.message?.content?.match(/\{[\s\S]*\}/)?.[0];
-  if (!json) throw new Error('NEAR AI returned no JSON');
-  return { value: JSON.parse(json) as unknown, chatId: body.id ?? '', requestBody: request, responseBody };
+  const content = body.choices?.[0]?.message?.content?.trim();
+  if (!content) throw new Error('NEAR AI returned no answer');
+  return { content, chatId: body.id ?? '', requestBody: request, responseBody };
 }
+
+/** One completion whose answer is a JSON object. */
+export async function nearAiJson(system: string, user: string, maxTokens: number): Promise<NearAiCompletion> {
+  const { content, ...rest } = await complete(
+    [
+      { role: 'system', content: system },
+      { role: 'user', content: user },
+    ],
+    { maxTokens, json: true, temperature: 0.2 },
+  );
+  const json = content.match(/\{[\s\S]*\}/)?.[0];
+  if (!json) throw new Error('NEAR AI returned no JSON');
+  return { value: JSON.parse(json) as unknown, ...rest };
+}
+
+/** A conversation turn answered in plain text. */
+export const nearAiChat = (messages: NearAiMessage[], maxTokens: number) =>
+  complete(messages, { maxTokens, json: false, temperature: 0.3 });
 
 export interface NearAiSignature {
   signedText: string;
