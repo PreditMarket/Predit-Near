@@ -56,11 +56,10 @@ async function fetchPickable(): Promise<Pickable[]> {
 
 function PostPicker({ onPick }: { onPick: (postId: string) => void }) {
   const { data, isLoading, isError } = useQuery({ queryKey: ['create-picker'], queryFn: fetchPickable, staleTime: 60_000 });
-  if (isLoading) return <div className="h-48 animate-pulse rounded-lg bg-muted/40" aria-hidden />;
+  if (isLoading) return <div className="m-5 h-48 animate-pulse rounded-lg bg-muted/40" aria-hidden />;
   if (isError || !data) return <p className="py-8 text-center text-[13px] text-muted-foreground">Could not load the feed.</p>;
   return (
-    <div className="flex flex-col gap-2" data-testid="create-picker">
-      <p className="text-[12.5px] text-muted-foreground">Markets are created from a post. Pick one:</p>
+    <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-5 py-4" data-testid="create-picker">
       {data.map(({ post, markets, claim }) => (
         <button
           key={post.id}
@@ -68,7 +67,7 @@ function PostPicker({ onPick }: { onPick: (postId: string) => void }) {
           data-testid="create-pick"
           data-post={post.id}
           onClick={() => onPick(post.id)}
-          className="flex flex-col gap-1 rounded-lg border border-border bg-card px-3 py-2 text-left hover:border-primary/60"
+          className="flex flex-col gap-1 rounded-xl border border-border/70 bg-card/60 px-3 py-2.5 text-left transition-colors hover:border-primary/60"
         >
           <span className="flex flex-wrap items-center gap-2 font-mono text-[10.5px] text-muted-foreground">
             @{post.author.handle}
@@ -93,7 +92,7 @@ function PostForm({ postId, onCreated }: { postId: string; onCreated: (market: {
     queryFn: () => fetchPost(postId),
     staleTime: Infinity,
   });
-  if (isLoading) return <div className="h-48 animate-pulse rounded-lg bg-muted/40" aria-hidden />;
+  if (isLoading) return <div className="m-5 h-48 animate-pulse rounded-lg bg-muted/40" aria-hidden />;
   if (isError || !post) return <p className="py-8 text-center text-[13px] text-muted-foreground">This post is no longer in the feed.</p>;
   return <CreateMarketForm post={post} onCreated={onCreated} />;
 }
@@ -123,46 +122,61 @@ export function CreateMarketDialog() {
         <DialogContent
           data-testid="create-market-dialog"
           showCloseButton={!created}
-          className={created ? 'max-w-md border-0 bg-transparent p-0 shadow-none' : 'max-h-[92vh] max-w-2xl overflow-y-auto'}
+          className={
+            created
+              ? 'max-w-md border-0 bg-transparent p-0 shadow-none'
+              : 'flex max-h-[92dvh] flex-col gap-0 overflow-hidden rounded-2xl border-border/70 p-0 sm:max-w-[600px]'
+          }
         >
-          <DialogTitle className={created ? 'sr-only' : ''}>{created ? 'Market created' : 'Create a market'}</DialogTitle>
-          <DialogDescription className="sr-only">Turn a post into a prediction market on NEAR.</DialogDescription>
+          {!created && (
+            <header className="flex items-start gap-2 border-b border-border/70 px-5 py-4 pr-12">
+              {postId && fromPicker && (
+                <button
+                  type="button"
+                  aria-label="Pick another post"
+                  title="Pick another post"
+                  onClick={() => openFor(null)}
+                  className="-ml-1 mt-0.5 inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                </button>
+              )}
+              <div className="min-w-0">
+                <DialogTitle className="text-[16px] font-bold">Create a market</DialogTitle>
+                <DialogDescription className="mt-0.5 text-[12px] text-muted-foreground">
+                  {postId ? 'Turn this post into a YES/NO market. The rules lock on chain when you create it.' : 'Markets start from a post. Pick one.'}
+                </DialogDescription>
+              </div>
+            </header>
+          )}
           {created ? (
-            <MarketCreatedCard
-              itemLabel="Your Market"
-              itemTitle={created.question}
-              url={`/market/${created.id}`}
-              onDismiss={finish}
-              primaryAction={{
-                label: 'Bet on it now',
-                onClick: async () => {
-                  const market = await readNewMarket(created.id);
-                  finish();
-                  if (market) setTrading(market);
-                  else toast.error('The market is on chain but not readable yet. Open it from under its post.');
-                },
-              }}
-              skipAction={{ label: 'Done', onClick: finish }}
-            />
+            <>
+              <DialogTitle className="sr-only">Market created</DialogTitle>
+              <DialogDescription className="sr-only">Your market is on NEAR.</DialogDescription>
+              <MarketCreatedCard
+                itemLabel="Your Market"
+                itemTitle={created.question}
+                url={`/market/${created.id}`}
+                onDismiss={finish}
+                primaryAction={{
+                  label: 'Bet on it now',
+                  onClick: async () => {
+                    const market = await readNewMarket(created.id);
+                    finish();
+                    if (market) setTrading(market);
+                    else toast.error('The market is on chain but not readable yet. Open it from under its post.');
+                  },
+                }}
+                skipAction={{ label: 'Done', onClick: finish }}
+              />
+            </>
           ) : !accountId ? (
-            <div className="flex flex-col items-center gap-3 py-10 text-center text-[13px] text-muted-foreground">
+            <div className="flex flex-col items-center gap-3 px-5 py-10 text-center text-[13px] text-muted-foreground">
               <p>Connect a NEAR wallet to create a market.</p>
               <Button onClick={() => void connect()}>Connect wallet</Button>
             </div>
           ) : postId ? (
-            <div className="flex flex-col gap-3">
-              {fromPicker && (
-                <button
-                  type="button"
-                  onClick={() => openFor(null)}
-                  className="inline-flex items-center gap-1 self-start text-[12px] text-muted-foreground hover:text-foreground"
-                >
-                  <ArrowLeft className="h-3.5 w-3.5" />
-                  Pick another post
-                </button>
-              )}
-              <PostForm key={postId} postId={postId} onCreated={setCreated} />
-            </div>
+            <PostForm key={postId} postId={postId} onCreated={setCreated} />
           ) : (
             <PostPicker
               onPick={(id) => {

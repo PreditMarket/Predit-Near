@@ -13,6 +13,8 @@ interface ResultPanelProps {
   metricValue: string;
   /** Compact ROI chip next to the value (e.g. "+38%"). */
   metricRoi?: string;
+  /** One line under the metric explaining it. */
+  metricHint?: string;
   /** True when the metric represents a loss on Sell — flips whole panel red. */
   negative?: boolean;
 }
@@ -27,6 +29,7 @@ export function ResultPanel({
   metricLabel,
   metricValue,
   metricRoi,
+  metricHint,
   negative = false,
 }: ResultPanelProps) {
   // Mockup uses base green #4ade80 (green-400) for tints.
@@ -73,6 +76,11 @@ export function ResultPanel({
           )}
         </span>
       </div>
+      {metricHint && (
+        <p data-testid="result-metric-hint" className="font-sans text-[11px] leading-snug text-muted-foreground">
+          {metricHint}
+        </p>
+      )}
     </div>
   );
 }

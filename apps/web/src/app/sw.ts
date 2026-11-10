@@ -16,9 +16,8 @@
  * (next.config.ts, lib/pwa/precache.ts); every other chunk is cached as it's
  * first loaded (routes.ts, next-static).
  *
- * Updates: no automatic skipWaiting. A new worker waits until the user takes
- * the "New version available — Reload" toast, or until their next route
- * change (service-worker-registrar.tsx), so the JS never changes under
+ * Updates: no automatic skipWaiting. A new worker waits until the user's
+ * next route change (service-worker-registrar.tsx), so the JS never changes under
  * someone mid-signature. `clientsClaim` only matters on a first install (no
  * older worker to displace): it lets the first visit work offline at once.
  *

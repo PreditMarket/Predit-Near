@@ -133,7 +133,7 @@ function Answer({ content, markets, onTrade }: { content: string; markets: Map<s
   return <div className="whitespace-pre-wrap break-words text-[12.5px] leading-relaxed text-foreground">{parts}</div>;
 }
 
-/** The right column: questions about Predit's markets and feed, answered by NEAR AI in a TEE. */
+/** The right column: questions about Predit's markets and feed, answered by Predit AI (NEAR AI in a TEE). */
 export function RightRailNearAi({ onCollapse }: { onCollapse: () => void }) {
   const accountId = useNearWallet((s) => s.accountId);
   const connect = useNearWallet((s) => s.connect);
@@ -173,7 +173,7 @@ export function RightRailNearAi({ onCollapse }: { onCollapse: () => void }) {
         body: JSON.stringify({ accountId, messages: history.map(({ role, content }) => ({ role, content })) }),
       });
       const body = (await res.json()) as { answer?: string; chatId?: string; error?: string };
-      if (!res.ok || !body.answer) throw new Error(body.error ?? 'NEAR AI did not answer');
+      if (!res.ok || !body.answer) throw new Error(body.error ?? 'Predit AI did not answer');
       const answered = [...history, { role: 'assistant' as const, content: body.answer, chatId: body.chatId }];
       update(answered);
       // The enclave's signature comes a moment after the answer.
@@ -196,18 +196,18 @@ export function RightRailNearAi({ onCollapse }: { onCollapse: () => void }) {
   };
 
   return (
-    <aside className={RAIL} aria-label="NEAR AI" data-testid="right-rail">
+    <aside className={RAIL} aria-label="Predit AI" data-testid="right-rail">
       <ColumnBar className="gap-1.5">
         <button
           type="button"
           onClick={onCollapse}
-          aria-label="Collapse NEAR AI"
+          aria-label="Collapse Predit AI"
           title="Collapse"
           className="inline-flex h-[22px] w-[22px] items-center justify-center rounded-[5px] text-muted-foreground transition-colors hover:bg-accent/70 hover:text-white"
         >
           <ChevronRight className="h-3.5 w-3.5" />
         </button>
-        <ColumnTitle>NEAR AI</ColumnTitle>
+        <ColumnTitle>Predit AI</ColumnTitle>
         {messages.length > 0 && (
           <button
             type="button"
@@ -226,7 +226,7 @@ export function RightRailNearAi({ onCollapse }: { onCollapse: () => void }) {
           <div className="flex flex-col gap-3">
             <p className="flex items-start gap-2 text-[12.5px] text-muted-foreground">
               <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
-              Ask about the markets and posts here. NEAR AI answers from what is on chain and in the feed, running in a TEE that signs each answer.
+              Ask about the markets and posts here. Predit AI answers from what is on chain and in the feed. It runs on NEAR AI in a TEE that signs each answer.
             </p>
             {SUGGESTIONS.map((s) => (
               <button
@@ -267,7 +267,7 @@ export function RightRailNearAi({ onCollapse }: { onCollapse: () => void }) {
           {asking && (
             <p className="flex items-center gap-2 text-[12px] text-muted-foreground">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              NEAR AI is thinking…
+              Predit AI is thinking…
             </p>
           )}
           {error && <p data-testid="ai-error" className="text-[12px] text-danger">{error}</p>}
@@ -296,7 +296,7 @@ export function RightRailNearAi({ onCollapse }: { onCollapse: () => void }) {
               }}
               rows={2}
               maxLength={500}
-              placeholder="Ask NEAR AI…"
+              placeholder="Ask Predit AI…"
               className="min-h-[40px] flex-1 resize-none rounded-md border border-border bg-background px-2.5 py-2 text-[12.5px] text-foreground outline-none focus:border-primary"
             />
             <Button type="submit" size="icon" data-testid="ai-send" disabled={!draft.trim() || asking} aria-label="Ask">
@@ -305,7 +305,7 @@ export function RightRailNearAi({ onCollapse }: { onCollapse: () => void }) {
           </form>
         ) : (
           <Button className="w-full" data-testid="ai-connect" onClick={() => void connect()}>
-            Connect a wallet to ask NEAR AI
+            Connect a wallet to ask Predit AI
           </Button>
         )}
       </div>

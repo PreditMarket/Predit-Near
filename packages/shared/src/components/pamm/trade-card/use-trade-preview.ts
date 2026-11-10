@@ -141,7 +141,7 @@ export function useBuyPreview({
       potentialProfit,
       roi,
     };
-  }, [amountRaw, scale, isV3, v3Quote, buyQuote, redeemFeeBps]);
+  }, [amountRaw, scale, isV3, v3Quote, buyQuote, redeemFeeBps, buySide, v3Payout]);
 }
 
 interface SellPreviewArgs {

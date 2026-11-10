@@ -45,7 +45,7 @@ test.describe('home rails', () => {
   test('both rails fold to a strip and stay folded after a reload', async ({ page }) => {
     await page.goto('/');
     await page.getByRole('button', { name: 'Collapse Markets' }).click();
-    await page.getByRole('button', { name: 'Collapse NEAR AI' }).click();
+    await page.getByRole('button', { name: 'Collapse Predit AI' }).click();
     await expect(page.getByTestId('left-rail')).toHaveCount(0);
     await expect(page.getByTestId('right-rail')).toHaveCount(0);
     await page.reload();
@@ -54,13 +54,13 @@ test.describe('home rails', () => {
     await expect(page.getByTestId('right-rail')).toHaveCount(0);
   });
 
-  test('NEAR AI asks for a wallet first', async ({ page }) => {
+  test('Predit AI asks for a wallet first', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByTestId('right-rail').getByTestId('ai-connect')).toBeVisible();
     await expect(page.getByTestId('ai-suggestion').first()).toBeDisabled();
   });
 
-  test('NEAR AI answers with cards to bet on and to create from, signed', async ({ page }) => {
+  test('Predit AI answers with cards to bet on and to create from, signed', async ({ page }) => {
     await injectWallet(page, ALICE);
     const open = (await allMarkets()).filter(isTradable);
     test.skip(open.length === 0, 'no open market on the demo contract');
@@ -88,10 +88,10 @@ test.describe('home rails', () => {
     await expect(rail.getByTestId('ai-answer')).toHaveCount(0);
   });
 
-  test('NEAR AI says so when the day is used up', async ({ page }) => {
+  test('Predit AI says so when the day is used up', async ({ page }) => {
     await injectWallet(page, ALICE);
     await page.route('**/api/chat', (route) =>
-      route.fulfill({ status: 429, json: { error: 'That is all the questions for today. NEAR AI credit is limited on this testnet.' } }),
+      route.fulfill({ status: 429, json: { error: 'That is all the questions for today. AI credit is limited on this testnet.' } }),
     );
     await page.goto('/');
     await page.getByTestId('ai-suggestion').first().click();

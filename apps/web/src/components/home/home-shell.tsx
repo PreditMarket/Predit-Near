@@ -8,9 +8,9 @@ import { LeftRailMarkets } from './left-rail-markets';
 import { RightRailNearAi } from './right-rail-near-ai';
 
 /**
- * Three columns, as in Predit: Markets | the feed | NEAR AI. Each side column
+ * Three columns, as in Predit: Markets | the feed | Predit AI. Each side column
  * is sized by dragging its edge and folds to a strip, remembered in this
- * browser. Narrower screens drop NEAR AI below lg and Markets below md.
+ * browser. Narrower screens drop Predit AI below lg and Markets below md.
  */
 export function HomeShell() {
   const widths = useHomeLayoutStore((s) => s.widths);
@@ -34,11 +34,9 @@ export function HomeShell() {
           <LeftRailMarkets onCollapse={() => setFolded('market', true)} />
         </HomeColumn>
         <div className="min-w-0">
-          <div className="mx-auto w-full max-w-[680px] border-x border-border/60">
-            <CenterFeed />
-          </div>
+          <CenterFeed />
         </div>
-        <HomeColumn id="ai" title="NEAR AI" edge="left" className="hidden lg:block">
+        <HomeColumn id="ai" title="Predit AI" edge="left" className="hidden lg:block">
           <RightRailNearAi onCollapse={() => setFolded('ai', true)} />
         </HomeColumn>
       </div>

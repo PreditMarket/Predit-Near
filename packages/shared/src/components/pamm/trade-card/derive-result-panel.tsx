@@ -9,6 +9,8 @@ export interface ResultTextArgs {
   buyPreview: BuyPreview | null;
   sellPreview: SellPreview | null;
   sideLabel: string;
+  /** The other side, whose bets pay a winner's profit. */
+  oppositeSideLabel?: string;
   collateralSymbol: string;
   /** Cost basis for the active side (0..1). Zero if unknown. */
   avgCost: number;
@@ -22,6 +24,8 @@ export interface ResultTexts {
   metricLabel: string;
   metricValue: string;
   metricRoi?: string;
+  /** One line under the metric, when its value needs explaining. */
+  metricHint?: string;
   negative: boolean;
 }
 
@@ -77,14 +81,21 @@ export function deriveResultTexts(a: ResultTextArgs): ResultTexts {
   // V3 payout depends on opposite-side liquidity. When no losers exist yet
   // (or bonus < fee), projected profit can land ≤ 0 — show a dash instead of
   // "+$-x.xx". Matches the Advance panel's Max profit tile behavior.
+  // A winner's profit is the losing side's money, so with no bets (or only
+  // small ones) against this side there is nothing to win yet: say so, as a
+  // bare dash read as broken.
   const profit = a.buyPreview.potentialProfit;
   const hasProfit = profit > 0;
+  const other = a.oppositeSideLabel ?? 'the other side';
   return {
     paymentText,
     payoutText,
     metricLabel: 'Potential profit',
-    metricValue: hasProfit ? `+${usd2(profit)}` : '—',
+    metricValue: hasProfit ? `+${usd2(profit)}` : '$0 so far',
     metricRoi: hasProfit ? `+${Math.round(a.buyPreview.roi)}%` : undefined,
+    metricHint: hasProfit
+      ? undefined
+      : `Winners split the ${other} bets, and there are too few yet. Profit grows as people bet ${other}.`,
     negative: false,
   };
 }

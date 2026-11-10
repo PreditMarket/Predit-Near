@@ -504,6 +504,7 @@ export function SwapPanel({
     buyPreview,
     sellPreview,
     sideLabel,
+    oppositeSideLabel,
     collateralSymbol,
     avgCost,
     amountUsd: amtNum,
@@ -750,6 +751,7 @@ export function SwapPanel({
             metricLabel={resultTexts.metricLabel}
             metricValue={resultTexts.metricValue}
             metricRoi={resultTexts.metricRoi}
+            metricHint={resultTexts.metricHint}
             negative={resultTexts.negative}
           />
         </div>
