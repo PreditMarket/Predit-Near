@@ -174,7 +174,14 @@ export function CreateMarketDialog() {
         </DialogContent>
       </Dialog>
       {trading && (
-        <QuickTradeDialog market={toPammMarket(trading)} open initialSide="yes" onOpenChange={(next) => !next && setTrading(null)} />
+        <QuickTradeDialog
+          market={toPammMarket(trading)}
+          open
+          initialSide="yes"
+          // As under a post: one tap to bet, the chips change the amount.
+          preset={{ amountUsd: 5 }}
+          onOpenChange={(next) => !next && setTrading(null)}
+        />
       )}
     </>
   );

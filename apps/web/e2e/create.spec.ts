@@ -53,7 +53,8 @@ test.describe('create a market without leaving the feed', () => {
     await dialog.getByTestId('create-submit').click();
     await expect(dialog.getByTestId('created-primary')).toHaveText('Bet on it now');
     await dialog.getByTestId('created-primary').click();
-    await expect(page.getByTestId('submit-trade-btn').first()).toBeVisible();
+    await expect(page.getByTestId('amount-input').first()).toHaveValue('5');
+    await expect(page.getByTestId('submit-trade-btn').first()).toBeEnabled();
     expect(new URL(page.url()).pathname).toBe('/');
   });
 
