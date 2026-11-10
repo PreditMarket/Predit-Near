@@ -24,15 +24,6 @@ Off chain, an agent snapshots the source at the deadline, NEAR AI (in a TEE) sug
 | `sandbox-tests/` | End-to-end tests on a local NEAR node |
 | `testnet-e2e.sh`, `testnet-fullcase.py` | Suites against a deployed testnet contract |
 
-## Deployed on testnet
-
-| Contract | Account |
-|---|---|
-| Market | `predit-markets-market.testnet` |
-| Mock USDC | `predit-markets-usdc.testnet` |
-
-Market code SHA-256: `f447aac6786a81ba7abfb130c4e65684fff31e4461f7d34c6fef60ad3051b38e`.
-
 ## Try it
 
 Needs Rust (pinned in `rust-toolchain.toml`) and [`cargo-near`](https://github.com/near/cargo-near) 0.23. No keys needed for the first two.
@@ -50,11 +41,3 @@ FUNDER=<account> FUND_AMOUNT='6 NEAR' ./deploy-testnet.sh <prefix>
 FUNDER=<account> ./testnet-e2e.sh <prefix>                     # about 3 minutes
 FUNDERS=<a>,<b>,<c> python3 -I testnet-fullcase.py <prefix>    # about 36 minutes
 ```
-
-## Limits
-
-- The contract cannot tell whether a result is true. It relies on NEAR AI's reading, the admin's decision, the challenge window and the arbiter.
-- It checks the NEAR AI reading is present and well formed, not that it is genuine; that check runs off chain.
-- The demo uses a 60-second challenge window (`demo-config.json`); the default minimum is 1 hour.
-- The post's author and their side are declared by the market's creator.
-- No position limits, no migration path.
