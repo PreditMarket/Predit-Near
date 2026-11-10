@@ -86,3 +86,4 @@ docs/
 # Source snapshots and AI readings written by the resolve agent
 .data/
 /apps/web/test-results/
+/apps/web/.next-*/

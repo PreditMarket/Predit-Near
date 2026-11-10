@@ -21,6 +21,8 @@ const LEGACY_ICON_REDIRECTS: Array<[string, string]> = [
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // A second build (tests, a demo) can sit beside `next dev` without either overwriting the other.
+  distDir: process.env.NEXT_DIST_DIR || '.next',
   // isomorphic-dompurify pulls jsdom into the server bundle for SSR sanitize.
   // Mark as external so webpack stops bundling it, and include jsdom's
   // runtime assets (default-stylesheet.css, etc.) in the output trace so

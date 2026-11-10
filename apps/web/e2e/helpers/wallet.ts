@@ -15,11 +15,14 @@ export async function injectWallet(
     mode = 'dry',
     connected = true,
     answer,
+    name = 'E2E Wallet',
   }: {
     mode?: WalletMode;
     connected?: boolean;
     /** Dry mode: a transaction outcome to hand back instead of refusing, e.g. a contract's return value. */
     answer?: (calls: FunctionCall[]) => unknown;
+    /** What the wallet selector shows. */
+    name?: string;
   } = {},
 ): Promise<FunctionCall[]> {
   const calls: FunctionCall[] = [];
@@ -50,7 +53,7 @@ export async function injectWallet(
   });
 
   await page.addInitScript(
-    ({ account, startConnected }) => {
+    ({ account, startConnected, walletName }) => {
       const key = 'e2e-wallet-on';
       if (startConnected && !sessionStorage.getItem('e2e-wallet-init')) {
         sessionStorage.setItem('e2e-wallet-init', '1');
@@ -61,7 +64,7 @@ export async function injectWallet(
       const wallet = {
         manifest: {
           id: 'e2e-wallet',
-          name: 'E2E Wallet',
+          name: walletName,
           icon: '',
           website: 'https://example.com',
           description: '',
@@ -92,7 +95,7 @@ export async function injectWallet(
         window.dispatchEvent(new CustomEvent('near-wallet-injected', { detail: wallet })),
       );
     },
-    { account: accountId, startConnected: connected },
+    { account: accountId, startConnected: connected, walletName: name },
   );
   return calls;
 }
