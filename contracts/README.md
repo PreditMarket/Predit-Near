@@ -6,7 +6,7 @@ Runs on NEAR testnet with a mock USDC. **Not audited: do not use with real money
 
 ## How a market works
 
-1. `create_market` for a post, with a bond. The rules are locked and their hash stored.
+1. `create_market` for a post. The rules are locked and their hash stored. The creator pays the storage and the configured bond (0 on the testnet demo; the owner sets it with `set_config`).
 2. Bet with USDC through `ft_transfer_call`; `sell` until the trade freeze.
 3. After the deadline, the operator posts a `post_receipt`: outcome, reason, the source snapshot's hash, a link to the evidence, and the NEAR AI reading (model, chat id, signed text, signature, signing address).
 4. Anyone can `challenge` within the window, with a bond. The `arbiter` upholds or overturns.

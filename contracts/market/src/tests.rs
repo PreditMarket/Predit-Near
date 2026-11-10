@@ -1121,6 +1121,51 @@ fn withdraw_needs_a_balance() {
 
 #[test]
 #[should_panic(expected = "Owner only")]
+fn set_config_is_owner_only() {
+    let mut c = contract();
+    call(T0, "operator.near");
+    c.set_config(Config::default());
+}
+
+#[test]
+#[should_panic(expected = "Challenge windows are inconsistent")]
+fn set_config_is_validated() {
+    let mut c = contract();
+    call(T0, "owner.near");
+    c.set_config(Config { min_challenge_window_sec: 0, ..Config::default() });
+}
+
+#[test]
+fn set_config_leaves_existing_markets_alone() {
+    let mut c = contract();
+    let before = create(&mut c);
+    call(T0, "owner.near");
+    c.set_config(Config { creation_bond: NearToken::from_yoctonear(0), min_challenge_window_sec: 60, ..Config::default() });
+    assert_eq!(c.get_config().creation_bond, NearToken::from_yoctonear(0));
+    assert_eq!(c.get_market(before).unwrap().creation_bond, Config::default().creation_bond);
+}
+
+#[test]
+fn a_market_can_be_created_without_a_bond() {
+    let mut c = contract();
+    call(T0, "owner.near");
+    c.set_config(Config { creation_bond: NearToken::from_yoctonear(0), min_challenge_window_sec: 60, ..Config::default() });
+    // Storage only: well under 0.1 NEAR.
+    at(T0, "creator.near", NearToken::from_millinear(100));
+    let id = c.create_market(post("free"), Side::Yes, rules(), draft(), Some(120));
+    assert_eq!(c.get_market(id).unwrap().creation_bond, NearToken::from_yoctonear(0));
+    assert_eq!(c.bonds_outstanding, 0);
+    // It settles like any other, with no bond to return.
+    buy(&mut c, "alice.near", id, Side::Yes, 5_000_000);
+    buy(&mut c, "bob.near", id, Side::No, 5_000_000);
+    receipt(&mut c, id, Side::Yes);
+    finalize(&mut c, id);
+    assert_eq!(status(&c, id), Status::Finalized);
+    assert_eq!(c.bonds_outstanding, 0);
+}
+
+#[test]
+#[should_panic(expected = "Owner only")]
 fn set_roles_is_owner_only() {
     let mut c = contract();
     call(T0, "operator.near");

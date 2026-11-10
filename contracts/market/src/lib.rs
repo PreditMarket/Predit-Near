@@ -569,6 +569,14 @@ impl Contract {
         self.paused = paused;
     }
 
+    /// Parameters for markets created from now on; existing markets keep the bond,
+    /// window and fees they were created with. The demo sets the creation bond to 0.
+    pub fn set_config(&mut self, config: Config) {
+        self.assert_owner();
+        validate_config(&config);
+        self.config = config;
+    }
+
     pub fn set_roles(
         &mut self,
         operator: Option<AccountId>,
@@ -837,17 +845,14 @@ impl Contract {
 
         let bond = market.creation_bond;
         self.bonds_outstanding -= bond.as_yoctonear();
-        match outcome {
-            Outcome::Invalid(InvalidKind::AmbiguousRules) => {
-                let to = match (challenge_won, &market.challenge) {
-                    (Some(true), Some(c)) => c.challenger.clone(),
-                    _ => self.treasury.clone(),
-                };
-                let _ = Promise::new(to).transfer(bond);
-            }
-            _ => {
-                let _ = Promise::new(market.creator.clone()).transfer(bond);
-            }
+        // A market created without a bond has nothing to move.
+        if !bond.is_zero() {
+            let to = match (outcome, challenge_won, &market.challenge) {
+                (Outcome::Invalid(InvalidKind::AmbiguousRules), Some(true), Some(c)) => c.challenger.clone(),
+                (Outcome::Invalid(InvalidKind::AmbiguousRules), _, _) => self.treasury.clone(),
+                _ => market.creator.clone(),
+            };
+            let _ = Promise::new(to).transfer(bond);
         }
 
         if let Some(c) = &market.challenge {
@@ -872,7 +877,9 @@ impl Contract {
     fn cancel(&mut self, mut market: Market) {
         cancel_pool(&mut market.pool, now_sec() as i64);
         self.bonds_outstanding -= market.creation_bond.as_yoctonear();
-        let _ = Promise::new(market.creator.clone()).transfer(market.creation_bond);
+        if !market.creation_bond.is_zero() {
+            let _ = Promise::new(market.creator.clone()).transfer(market.creation_bond);
+        }
         if let Some(c) = &market.challenge {
             self.bonds_outstanding -= c.bond.as_yoctonear();
             let _ = Promise::new(c.challenger.clone()).transfer(c.bond);
