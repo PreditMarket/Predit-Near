@@ -73,7 +73,7 @@ function MenuBody({ onFunds, onNavigate }: { onFunds: (dialog: FundsDialog) => v
         </span>
       </div>
       <div className="flex flex-col gap-1.5 border-t border-border pt-2.5">
-        {claimable > BigInt(0) && <Row label="Ready to withdraw" value={`${usdc(claimable)} ${USDC_SYMBOL}`} testId="balance-menu-claimable" />}
+        {claimable > BigInt(0) && <Row label="To collect" value={`${usdc(claimable)} ${USDC_SYMBOL}`} testId="balance-menu-claimable" />}
         <Row
           label="NEAR for gas"
           value={native === undefined ? '…' : (Number(native ?? BigInt(0)) / 1e24).toLocaleString('en-US', { maximumFractionDigits: 3 })}

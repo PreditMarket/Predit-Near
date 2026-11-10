@@ -19,7 +19,7 @@ export function MarketCell({ view }: { view: PositionView }) {
       <div className="flex items-center gap-1.5 flex-wrap">
         <span className={cn(CHIP, 'tracking-wider', view.sourceClass)}>{view.sourceLabel}</span>
         <span className={cn(CHIP, view.sideClass)}>{view.sideLabel}</span>
-        <span className={cn(CHIP, view.statusClass)}>{position.status}</span>
+        <span className={cn(CHIP, view.statusClass)}>{view.statusLabel}</span>
         {position.source === 'pamm' && position.marketUrl && (
           <PammShareButton
             url={position.marketUrl}
@@ -128,7 +128,7 @@ export function PayoutCell({ view }: { view: PositionView }) {
     case 'closed':
       return <span className={cn(PILL, 'bg-muted/40 text-muted-foreground')}>Closed</span>;
     case 'lost':
-      return <span className={cn(PILL, 'bg-(--brand-danger-soft) text-danger')}>Lost</span>;
+      return <span className={cn(PILL, 'bg-(--brand-danger-soft) text-danger')}>Wrong</span>;
     case 'claimed':
       return (
         <span className={cn(PILL, 'bg-(--brand-success-soft) text-success')}>Claimed</span>

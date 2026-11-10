@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { DETECTED, stubFeed } from './helpers/feed';
+import { DETECTED, POSTS, stubFeed } from './helpers/feed';
 import { MARKET, view, type ChainMarket } from './helpers/near';
 import { injectWallet } from './helpers/wallet';
 
@@ -77,5 +77,21 @@ test.describe('social feed', () => {
     expect(bet.args.receiver_id).toBe(MARKET);
     expect(bet.args.amount).toBe('1000000');
     expect(JSON.parse(bet.args.msg as string)).toMatchObject({ action: 'buy', market_id: btc.id, side: 'yes' });
+  });
+
+  test('older posts load on their own as the reader scrolls down', async ({ page }) => {
+    // Two pages: the first two posts, then the rest.
+    await page.route('**/api/feed**', (route) => {
+      const url = new URL(route.request().url());
+      if (url.searchParams.get('id')) return route.fallback();
+      const second = url.searchParams.get('cursor') === '2';
+      return route.fulfill({ json: { items: second ? POSTS.slice(2) : POSTS.slice(0, 2), nextCursor: second ? null : '2', sample: true } });
+    });
+    await page.goto('/');
+    // A short first page sits within reach of the end already, so no click is needed.
+    await page.locator('article').first().waitFor();
+    await page.getByTestId('feed-sentinel').scrollIntoViewIfNeeded();
+    await expect(page.locator('article')).toHaveCount(POSTS.length);
+    await expect(page.getByRole('button', { name: 'Load more' })).toHaveCount(0);
   });
 });

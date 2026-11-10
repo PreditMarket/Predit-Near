@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { usePostDetections } from '@/hooks/pamm/use-post-detections';
 import { usePostMarkets } from '@/hooks/pamm/use-post-markets';
 import { usePostsFeed } from '@/hooks/use-posts-feed';
@@ -13,6 +14,22 @@ export function CenterFeed() {
   const { data: postMarkets } = usePostMarkets(feed.items.map((item) => item.id));
   const withoutMarket = postMarkets ? feed.items.filter((item) => !postMarkets.get(item.id)?.length) : [];
   const { data: detected } = usePostDetections(withoutMarket.map((item) => item.id));
+
+  // Older posts load before the reader reaches the end; the button stays as a fallback.
+  const sentinel = useRef<HTMLDivElement>(null);
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = feed;
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el || !hasNextPage) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting) && !isFetchingNextPage) void fetchNextPage();
+      },
+      { rootMargin: '0px 0px 900px 0px' },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   return (
     <div className="flex flex-col min-w-0">
@@ -40,6 +57,7 @@ export function CenterFeed() {
       {feed.items.map((item) => (
         <FeedPost key={item.id} item={item} markets={postMarkets?.get(item.id)} detectedClaim={detected?.[item.id]} />
       ))}
+      <div ref={sentinel} aria-hidden data-testid="feed-sentinel" />
       {feed.hasNextPage && (
         <button
           type="button"

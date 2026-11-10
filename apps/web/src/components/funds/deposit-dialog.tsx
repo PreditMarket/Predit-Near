@@ -12,11 +12,7 @@ import { useNearFunds } from '@/hooks/pamm/use-near-funds';
 import { nearExplorerTxUrl, USDC_DECIMALS, USDC_SYMBOL } from '@/lib/near/config';
 import { claimNearFaucet, getNearFaucetReadyAt } from '@/lib/near/contract';
 import { getNearNativeBalance } from '@/lib/near/rpc';
-import {
-  SIMULATED_CHAINS,
-  simulatedAddress,
-  type SimulatedChain,
-} from '@/lib/near/simulated-deposit';
+import { SIMULATED_CHAINS, type SimulatedChain } from '@/lib/near/simulated-deposit';
 import { useNearWallet } from '@/store/near-wallet.store';
 import { refreshFunds } from './refresh-funds';
 
@@ -116,6 +112,20 @@ function NearTab({ accountId }: { accountId: string }) {
   );
 }
 
+/** A colour per chain, for the picker's dot. */
+const CHAIN_TONE: Record<SimulatedChain, string> = {
+  base: '#3b82f6',
+  arbitrum: '#28a0f0',
+  solana: '#9b5cf6',
+  bnb: '#f0b90b',
+};
+const AMOUNTS = [25, 50, 100];
+const DEPOSIT_STEPS: { step: SimStep; label: (chain: string) => string }[] = [
+  { step: 'PENDING_DEPOSIT', label: () => 'Deposit sent' },
+  { step: 'PROCESSING', label: (chain) => `Confirming on ${chain}` },
+  { step: 'SUCCESS', label: () => 'Credited to NEAR' },
+];
+
 function OtherChainsTab({ accountId }: { accountId: string }) {
   const queryClient = useQueryClient();
   const [chain, setChain] = useState<SimulatedChain>('base');
@@ -124,11 +134,12 @@ function OtherChainsTab({ accountId }: { accountId: string }) {
   const [txHash, setTxHash] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const address = simulatedAddress(chain, accountId);
+  const chainName = SIMULATED_CHAINS.find((c) => c.id === chain)?.name ?? chain;
   const running = step === 'PENDING_DEPOSIT' || step === 'PROCESSING';
   const value = Number(amount);
+  const valid = value >= 1 && value <= 1000;
 
-  const simulate = async () => {
+  const deposit = async () => {
     setError(null);
     setTxHash(null);
     setStep('PENDING_DEPOSIT');
@@ -141,7 +152,7 @@ function OtherChainsTab({ accountId }: { accountId: string }) {
         body: JSON.stringify({ accountId, chain, amount: value }),
       });
       const body = (await res.json()) as { txHash?: string; error?: string };
-      if (!res.ok) throw new Error(body.error ?? 'Simulated deposit failed');
+      if (!res.ok) throw new Error(body.error ?? 'The deposit failed');
       setTxHash(body.txHash ?? null);
       setStep('SUCCESS');
       refreshFunds(queryClient);
@@ -153,72 +164,94 @@ function OtherChainsTab({ accountId }: { accountId: string }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div
-        data-testid="testnet-simulation-label"
-        className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-[12px] text-warning"
-      >
-        <strong>Testnet simulation.</strong> No funds move on any other chain. Do not send real money: the
-        address below is not a real address.
-      </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {SIMULATED_CHAINS.map((c) => (
           <button
             key={c.id}
             type="button"
+            data-testid={`deposit-chain-${c.id}`}
+            disabled={running}
             onClick={() => setChain(c.id)}
-            className={`rounded-md border px-3 py-1.5 font-mono text-[12px] ${
-              chain === c.id ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground'
+            className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-[12.5px] font-semibold transition-colors ${
+              chain === c.id ? 'border-primary bg-primary/10 text-foreground' : 'border-border text-muted-foreground hover:text-foreground'
             }`}
           >
+            <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: CHAIN_TONE[c.id] }} />
             {c.name}
           </button>
         ))}
       </div>
-      <div className={CARD}>
-        <div className="self-center rounded-lg bg-white p-2">
-          <QRCodeSVG value={address} size={140} />
-        </div>
-        <div className="flex min-w-0 flex-1 flex-col gap-3">
-          <AddressRow label="Simulated deposit address" address={address} full />
-          <label className="flex flex-col gap-1">
-            <span className={STAT_LABEL}>Amount (1 to 1,000)</span>
+
+      <div className="flex flex-col gap-1 rounded-xl border border-border bg-elevated">
+        <label className="flex flex-col gap-1.5 px-4 pt-3">
+          <span className={STAT_LABEL}>From · USDC on {chainName}</span>
+          <span className="flex items-center gap-2">
             <input
               data-testid="simulate-amount"
               inputMode="decimal"
               value={amount}
+              disabled={running}
               onChange={(e) => setAmount(e.target.value)}
-              className="h-9 rounded-md border border-border bg-background px-3 font-mono text-[13px] outline-none"
+              className="min-w-0 flex-1 bg-transparent font-mono text-[26px] font-bold tabular-nums text-foreground outline-none"
             />
-          </label>
-          <Balances accountId={accountId} />
+            <span className="font-mono text-[13px] font-semibold text-muted-foreground">USDC</span>
+          </span>
+        </label>
+        <div className="flex gap-1.5 px-4 pb-3">
+          {AMOUNTS.map((a) => (
+            <button
+              key={a}
+              type="button"
+              disabled={running}
+              onClick={() => setAmount(String(a))}
+              className="rounded-md border border-border px-2.5 py-1 font-mono text-[11px] text-muted-foreground hover:text-foreground"
+            >
+              {a}
+            </button>
+          ))}
+        </div>
+        <div className="flex flex-col gap-1 border-t border-border px-4 py-3">
+          <span className={STAT_LABEL}>To · your NEAR account</span>
+          <span className="flex items-center justify-between gap-3 text-[13px]">
+            <span className="truncate font-mono">{accountId}</span>
+            <span className="shrink-0 font-mono font-bold tabular-nums">
+              {valid ? value.toLocaleString('en-US') : '–'} {USDC_SYMBOL}
+            </span>
+          </span>
+          <span className="text-[11.5px] text-muted-foreground">Usually arrives in about a minute.</span>
         </div>
       </div>
-      <Button
-        data-testid="simulate-deposit"
-        disabled={running || !(value >= 1 && value <= 1000)}
-        onClick={() => void simulate()}
-      >
-        {running ? 'Simulating…' : 'Simulate deposit'}
+
+      <Balances accountId={accountId} />
+
+      <Button data-testid="simulate-deposit" disabled={running || !valid} onClick={() => void deposit()}>
+        {running ? 'Depositing…' : `Deposit ${valid ? value.toLocaleString('en-US') : ''} USDC from ${chainName}`}
       </Button>
+
       {step !== 'idle' && (
-        <ol className="flex flex-col gap-1 font-mono text-[12px]" data-testid="simulate-status">
-          {SIM_STEPS.map((s) => {
-            const reached = step === 'FAILED' ? false : SIM_STEPS.indexOf(step) >= SIM_STEPS.indexOf(s);
+        <ol className="grid grid-cols-3 gap-2" data-testid="simulate-status" data-step={step}>
+          {DEPOSIT_STEPS.map(({ step: s, label }) => {
+            const reached = step !== 'FAILED' && SIM_STEPS.indexOf(step) >= SIM_STEPS.indexOf(s);
+            const current = step === s && s !== 'SUCCESS';
             return (
-              <li key={s} className={reached ? 'text-success' : 'text-muted-foreground'}>
-                {reached ? '●' : '○'} {s}
+              <li
+                key={s}
+                className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[11.5px] font-semibold ${
+                  reached ? 'border-success/40 bg-success/10 text-success' : 'border-border text-muted-foreground'
+                }`}
+              >
+                <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${reached ? 'bg-success' : 'bg-muted-foreground/40'} ${current ? 'animate-pulse' : ''}`} />
+                {label(chainName)}
               </li>
             );
           })}
-          {step === 'FAILED' && <li className="text-danger">● FAILED: {error}</li>}
-          {txHash && (
-            <li>
-              <a href={nearExplorerTxUrl(txHash)} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                View the credit on the explorer
-              </a>
-            </li>
-          )}
         </ol>
+      )}
+      {step === 'FAILED' && <p className="text-[12px] text-danger">{error}</p>}
+      {txHash && (
+        <a href={nearExplorerTxUrl(txHash)} target="_blank" rel="noopener noreferrer" className="self-start text-[12px] text-primary hover:underline">
+          View the credit on NEAR
+        </a>
       )}
     </div>
   );

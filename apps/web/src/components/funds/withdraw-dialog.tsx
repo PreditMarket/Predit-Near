@@ -69,7 +69,7 @@ function ClaimableRow() {
   return (
     <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-background/40 px-3 py-2 text-[12.5px]">
       <span>
-        <span className={STAT_LABEL}>Ready to withdraw</span>
+        <span className={STAT_LABEL}>To collect</span>
         <span className="block font-mono">
           {formatUsdc(claimable)} {USDC_SYMBOL} held by the market contract
         </span>

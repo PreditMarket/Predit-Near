@@ -20,6 +20,14 @@ function statusStyle(status: string): string {
   return 'bg-muted/40 text-muted-foreground';
 }
 
+/** A settled prediction was right or wrong; it is not a bet won or lost. */
+function statusLabel(status: string): string {
+  const s = status?.toLowerCase();
+  if (s === 'won') return 'Right';
+  if (s === 'lost') return 'Wrong';
+  return status;
+}
+
 const DOLLAR_PEGGED = new Set(['', 'USDC', 'USDT', 'USD']);
 
 /** An amount in the position's collateral: `$12.00`, `1,000 XP`, `3.5 BONK`. */
@@ -47,6 +55,7 @@ export interface PositionView {
   sourceLabel: string;
   sourceClass: string;
   statusClass: string;
+  statusLabel: string;
   /** The market's own outcome label when it has one, upper-cased. */
   sideLabel: string;
   sideClass: string;
@@ -97,6 +106,7 @@ export function derivePositionView(position: UnifiedPosition): PositionView {
     sourceLabel: SOURCE_LABEL[source],
     sourceClass: SOURCE_STYLE[source],
     statusClass: statusStyle(status),
+    statusLabel: statusLabel(status),
     sideLabel,
     sideClass:
       side === 'yes'

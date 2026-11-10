@@ -6,7 +6,7 @@ import { cn } from '@/components/ui/utils';
 import { formatPct } from '@/lib/format';
 import { usePortfolioStore } from '@/store/portfolio.store';
 
-/** Win rate on settled prediction positions. */
+/** How often this account's settled predictions were right. */
 export function PortfolioStats({ className }: { className?: string }) {
   const { winRate, wins, losses, summaryLoading } = usePortfolioStore(
     useShallow((s) => ({
@@ -22,7 +22,7 @@ export function PortfolioStats({ className }: { className?: string }) {
     <div className={cn('grid gap-3', className)}>
       <StatTile
         data-testid="portfolio-win-rate"
-        label="Win rate"
+        label="Hit rate"
         loading={summaryLoading}
         value={
           <span
@@ -37,7 +37,7 @@ export function PortfolioStats({ className }: { className?: string }) {
             {formatPct(winRate, { dp: 0 })}
           </span>
         }
-        sub={<span>{wins}W · {losses}L settled</span>}
+        sub={<span>{wins} right · {losses} wrong</span>}
       />
     </div>
   );

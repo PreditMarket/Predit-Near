@@ -24,7 +24,7 @@ test.describe('balance, deposit and withdraw', () => {
     await expect(page.getByTestId('balance-withdraw')).toBeVisible();
   });
 
-  test('deposit opens as a dialog with the NEAR address, the faucet and the labelled simulation', async ({ page }) => {
+  test('deposit opens as a dialog with the NEAR address, the faucet and other chains', async ({ page }) => {
     await page.goto('/markets');
     await page.getByTestId('balance-pill').click();
     await page.getByTestId('balance-deposit').click();
@@ -33,8 +33,10 @@ test.describe('balance, deposit and withdraw', () => {
     await expect(dialog.getByTestId('deposit-faucet')).toBeVisible();
     await expect(dialog.getByText(ACCOUNT).first()).toBeVisible();
     await dialog.getByRole('tab', { name: 'Other chains' }).or(dialog.getByRole('button', { name: 'Other chains' })).first().click();
-    await expect(dialog.getByTestId('testnet-simulation-label')).toBeVisible();
-    await expect(dialog.getByTestId('simulate-deposit')).toBeVisible();
+    await dialog.getByTestId('deposit-chain-arbitrum').click();
+    await dialog.getByTestId('simulate-amount').fill('50');
+    await expect(dialog.getByTestId('simulate-deposit')).toHaveText('Deposit 50 USDC from Arbitrum');
+    await expect(dialog.getByText(ACCOUNT).first()).toBeVisible();
   });
 
   test('withdraw sends tUSDC to a NEAR account', async ({ page }) => {
