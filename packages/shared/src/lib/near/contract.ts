@@ -1,6 +1,6 @@
 import { NEAR_MARKET_CONTRACT as MARKET, NEAR_USDC_CONTRACT as USDC } from './config';
 import { nearView } from './rpc';
-import type { NearMarket, NearPosition, NearPost, NearRules, NearSide } from './types';
+import type { NearForecastRecord, NearMarket, NearPosition, NearPost, NearRules, NearSide } from './types';
 import { useNearWallet, type NearTxOutcome } from '@/store/near-wallet.store';
 
 const PAGE = 100;
@@ -45,6 +45,9 @@ export const getNearClaimable = async (accountId: string) =>
 
 export const getNearUsdcBalance = async (accountId: string) =>
   BigInt(await nearView<string>(USDC, 'ft_balance_of', { account_id: accountId }));
+
+export const getNearRecord = (authorRef: string) =>
+  nearView<NearForecastRecord>(MARKET, 'get_record', { author_ref: authorRef });
 
 export const getNearPaused = () => nearView<boolean>(MARKET, 'is_paused');
 
@@ -163,6 +166,21 @@ export const CREATE_MARKET_MARGIN = BigInt(10) ** BigInt(23); // 0.1 NEAR
 
 export const getNearCreationBond = async () =>
   BigInt((await nearView<{ creation_bond: string }>(MARKET, 'get_config', {})).creation_bond);
+
+export const getNearChallengeBond = async () =>
+  BigInt((await nearView<{ challenge_bond: string }>(MARKET, 'get_config', {})).challenge_bond);
+
+/** Disputes a posted result. The bond is lost if the arbiter upholds the result. */
+export async function challengeOnNear(marketId: string, reason: string, bond: bigint): Promise<void> {
+  const outcome = await useNearWallet.getState().send({
+    receiverId: MARKET,
+    methodName: 'challenge',
+    args: { market_id: marketId, reason_uri: reason },
+    gas: `100${TGAS}`,
+    deposit: bond.toString(),
+  });
+  resultOf(outcome);
+}
 
 export interface NearCreateMarketArgs {
   post: NearPost;

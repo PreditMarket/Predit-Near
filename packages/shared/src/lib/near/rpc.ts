@@ -1,5 +1,8 @@
 import { NEAR_RPC_URLS } from './config';
 
+/** An RPC that stops answering must not hold up the next one. */
+const RPC_TIMEOUT_MS = 10_000;
+
 const toBase64 = (text: string) =>
   typeof window === 'undefined'
     ? Buffer.from(text, 'utf8').toString('base64')
@@ -34,6 +37,7 @@ export async function nearView<T>(
         headers: { 'content-type': 'application/json' },
         body,
         cache: 'no-store',
+        signal: AbortSignal.timeout(RPC_TIMEOUT_MS),
       });
       const json = await res.json();
       if (json.error) throw new Error(json.error.message ?? 'RPC error');
@@ -63,6 +67,7 @@ export async function getNearNativeBalance(accountId: string): Promise<bigint | 
         headers: { 'content-type': 'application/json' },
         body,
         cache: 'no-store',
+        signal: AbortSignal.timeout(RPC_TIMEOUT_MS),
       });
       const json = (await res.json()) as {
         result?: { amount?: string; error?: string };

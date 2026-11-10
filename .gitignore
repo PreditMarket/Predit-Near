@@ -82,3 +82,6 @@ docs/
 /apps/web/playwright/recordings/
 /apps/web/playwright/staging-report/
 /apps/web/playwright/staging-results/
+
+# Source snapshots and AI readings written by the resolve agent
+.data/

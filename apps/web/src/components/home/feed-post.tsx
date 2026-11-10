@@ -59,7 +59,7 @@ function PostVariant({
       <div className="flex flex-col gap-1.5 min-w-0">
         <PostHeader
           name={authorName(item.author)}
-          href={item.source === 'x' && item.author.handle ? xProfileUrl(item.author.handle) : undefined}
+          href={item.source === 'x' && item.author.handle ? `/u/@${item.author.handle}` : undefined}
           handle={item.author.handle ?? null}
           tierRank={item.author.tierRank ?? null}
           tier={item.author.tier ?? null}

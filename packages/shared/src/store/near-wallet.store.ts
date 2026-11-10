@@ -21,6 +21,12 @@ export interface NearTxOutcome {
   status?: { SuccessValue?: string; Failure?: unknown } | string;
 }
 
+export interface SignedNearMessage {
+  accountId: string;
+  publicKey: string;
+  signature: string;
+}
+
 type WalletStatus = 'loading' | 'connected' | 'disconnected';
 
 interface NearWalletState {
@@ -30,6 +36,7 @@ interface NearWalletState {
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
   send: (call: NearFunctionCall) => Promise<NearTxOutcome>;
+  signMessage: (params: { message: string; recipient: string; nonce: Uint8Array }) => Promise<SignedNearMessage>;
 }
 
 let connector: Promise<NearConnector> | null = null;
@@ -106,5 +113,13 @@ export const useNearWallet = create<NearWalletState>((_, get) => ({
       actions: [{ type: 'FunctionCall', params: { methodName, args, gas, deposit } }],
     });
     return outcome as NearTxOutcome;
+  },
+
+  async signMessage({ message, recipient, nonce }) {
+    const signerId = get().accountId;
+    if (!signerId) throw new Error('Connect a NEAR wallet first');
+    const nearConnector = await getConnector();
+    const wallet = await nearConnector.wallet();
+    return wallet.signMessage({ network: NEAR_NETWORK, signerId, message, recipient, nonce });
   },
 }));

@@ -12,7 +12,7 @@ export const NEAR_USDC_CONTRACT =
 export const NEAR_RPC_URLS =
   NEAR_NETWORK === 'mainnet'
     ? ['https://free.rpc.fastnear.com', 'https://rpc.mainnet.near.org']
-    : ['https://test.rpc.fastnear.com', 'https://rpc.testnet.near.org'];
+    : ['https://test.rpc.fastnear.com', 'https://near-testnet.drpc.org', 'https://rpc.testnet.near.org'];
 
 export const USDC_DECIMALS = 6;
 export const USDC_SYMBOL = NEAR_NETWORK === 'mainnet' ? 'USDC' : 'tUSDC';
