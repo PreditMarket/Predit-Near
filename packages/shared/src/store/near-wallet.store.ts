@@ -33,6 +33,8 @@ interface NearWalletState {
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
   send: (call: NearFunctionCall) => Promise<NearTxOutcome>;
+  /** Several calls to one contract, signed and sent as one transaction. */
+  sendAll: (receiverId: string, calls: Omit<NearFunctionCall, 'receiverId'>[]) => Promise<NearTxOutcome>;
   signMessage: (params: { message: string; recipient: string; nonce: Uint8Array }) => Promise<SignedNearMessage>;
 }
 
@@ -88,7 +90,11 @@ export const useNearWallet = create<NearWalletState>((_, get) => ({
     setAccount(null);
   },
 
-  async send({ receiverId, methodName, args, gas, deposit }) {
+  send({ receiverId, ...call }) {
+    return get().sendAll(receiverId, [call]);
+  },
+
+  async sendAll(receiverId, calls) {
     const signerId = get().accountId;
     if (!signerId) throw new Error('Connect a NEAR wallet first');
     const nearConnector = await getConnector();
@@ -97,7 +103,10 @@ export const useNearWallet = create<NearWalletState>((_, get) => ({
       network: NEAR_NETWORK,
       signerId,
       receiverId,
-      actions: [{ type: 'FunctionCall', params: { methodName, args, gas, deposit } }],
+      actions: calls.map(({ methodName, args, gas, deposit }) => ({
+        type: 'FunctionCall',
+        params: { methodName, args, gas, deposit },
+      })),
     });
     return outcome as NearTxOutcome;
   },

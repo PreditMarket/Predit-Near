@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ChevronDown, Copy, ExternalLink, LogOut, Wallet } from 'lucide-react';
+import { ChevronDown, Copy, ExternalLink, LogOut, UserRound, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   DropdownMenu,
@@ -10,20 +10,21 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useNearFunds } from '@/hooks/pamm/use-near-funds';
-import { nearExplorerAccountUrl, USDC_DECIMALS, USDC_SYMBOL } from '@/lib/near/config';
+import { nearExplorerAccountUrl } from '@/lib/near/config';
 import { useNearWallet } from '@/store/near-wallet.store';
 
 const PILL =
   'inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-card px-3 font-mono text-[12px] text-foreground hover:bg-muted';
+/** The same height as the balance pill beside it. */
+const ACCOUNT_PILL =
+  'group inline-flex h-6.5 items-center gap-1.5 rounded-md border border-border bg-muted/20 px-2.5 font-mono text-[10.5px] font-bold leading-none text-foreground transition-colors hover:border-ring data-[state=open]:border-ring';
 
-/** Connect button when signed out; account, balance and sign-out when signed in. */
+/** Connect button when signed out; the account and sign-out when signed in. The balance has its own pill. */
 export function NearAccountMenu() {
   const accountId = useNearWallet((s) => s.accountId);
   const status = useNearWallet((s) => s.status);
   const connect = useNearWallet((s) => s.connect);
   const disconnect = useNearWallet((s) => s.disconnect);
-  const { data: funds } = useNearFunds();
 
   if (!accountId) {
     return (
@@ -40,23 +41,14 @@ export function NearAccountMenu() {
     );
   }
 
-  const balance = funds ? Number(funds.usdc) / 10 ** USDC_DECIMALS : null;
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className={PILL} data-testid="near-account">
-        <span className="tabular-nums">
-          {balance === null ? '…' : balance.toLocaleString('en-US', { maximumFractionDigits: 2 })}{' '}
-          {USDC_SYMBOL}
-        </span>
-        <span className="hidden max-w-[140px] truncate text-muted-foreground sm:inline">
-          {accountId}
-        </span>
-        <ChevronDown className="h-3 w-3 text-muted-foreground" />
+      <DropdownMenuTrigger className={ACCOUNT_PILL} data-testid="near-account">
+        <UserRound className="size-3 text-muted-foreground" />
+        <span className="hidden max-w-[160px] truncate sm:inline">{accountId}</span>
+        <ChevronDown className="size-3 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem asChild>
-          <Link href="/deposit">Deposit</Link>
-        </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href="/portfolio">Portfolio</Link>
         </DropdownMenuItem>

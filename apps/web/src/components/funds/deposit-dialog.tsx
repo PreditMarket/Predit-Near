@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { AddressRow } from '@/components/v2/address-row';
 import { SegmentedTabs } from '@/components/v2';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { useNearFunds } from '@/hooks/pamm/use-near-funds';
 import { nearExplorerTxUrl, USDC_DECIMALS, USDC_SYMBOL } from '@/lib/near/config';
 import { claimNearFaucet, getNearFaucetReadyAt } from '@/lib/near/contract';
@@ -26,16 +27,16 @@ const TABS = [
   { value: 'other' as const, label: 'Other chains' },
 ];
 const SIM_STEPS: SimStep[] = ['PENDING_DEPOSIT', 'PROCESSING', 'SUCCESS'];
-const CARD = 'flex flex-col gap-4 rounded-xl border border-border bg-elevated p-4 sm:flex-row';
+export const CARD = 'flex flex-col gap-4 rounded-xl border border-border bg-elevated p-4 sm:flex-row';
 const STAT = 'rounded-lg border border-border bg-background/40 px-3 py-2';
-const STAT_LABEL = 'font-mono text-[10px] font-bold uppercase tracking-wider text-muted-foreground';
+export const STAT_LABEL = 'font-mono text-[10px] font-bold uppercase tracking-wider text-muted-foreground';
 
 function formatWait(ms: number) {
   const minutes = Math.ceil(ms / 60_000);
   return minutes >= 60 ? `${Math.floor(minutes / 60)}h ${minutes % 60}m` : `${minutes}m`;
 }
 
-function Balances({ accountId }: { accountId: string }) {
+export function Balances({ accountId }: { accountId: string }) {
   const { data: funds } = useNearFunds();
   const { data: native } = useQuery({
     queryKey: ['near', 'balance', 'native', accountId],
@@ -223,28 +224,22 @@ function OtherChainsTab({ accountId }: { accountId: string }) {
 }
 
 /** Funding: tUSDC lands in the account's own NEAR wallet, whichever way it comes. */
-export function NearDeposit() {
+export function DepositDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
   const accountId = useNearWallet((s) => s.accountId);
-  const status = useNearWallet((s) => s.status);
-  const connect = useNearWallet((s) => s.connect);
   const [tab, setTab] = useState<Tab>('near');
 
-  if (!accountId) {
-    return (
-      <div className="flex flex-col items-center gap-3 py-16 text-center">
-        <p className="text-[13px] text-muted-foreground">Connect a NEAR wallet to deposit.</p>
-        <Button disabled={status === 'loading'} onClick={() => void connect()}>
-          {status === 'loading' ? 'Connecting…' : 'Connect wallet'}
-        </Button>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex flex-col gap-4">
-      <h1 className="text-[18px] font-bold">Deposit</h1>
-      <SegmentedTabs value={tab} onChange={setTab} options={TABS} data-testid="deposit-tabs" />
-      {tab === 'near' ? <NearTab accountId={accountId} /> : <OtherChainsTab accountId={accountId} />}
-    </div>
+    <Dialog open={open && !!accountId} onOpenChange={onOpenChange}>
+      <DialogContent data-testid="deposit-dialog" className="max-h-[90vh] max-w-xl overflow-y-auto">
+        <DialogTitle>Deposit</DialogTitle>
+        <DialogDescription className="sr-only">Add {USDC_SYMBOL} to your NEAR account.</DialogDescription>
+        {accountId && (
+          <div className="flex flex-col gap-4">
+            <SegmentedTabs value={tab} onChange={setTab} options={TABS} data-testid="deposit-tabs" />
+            {tab === 'near' ? <NearTab accountId={accountId} /> : <OtherChainsTab accountId={accountId} />}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

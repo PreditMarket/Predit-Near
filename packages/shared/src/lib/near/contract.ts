@@ -46,6 +46,30 @@ export const getNearClaimable = async (accountId: string) =>
 export const getNearUsdcBalance = async (accountId: string) =>
   BigInt(await nearView<string>(USDC, 'ft_balance_of', { account_id: accountId }));
 
+/** Sends tUSDC from the connected account, registering the receiver with the token first if needed. */
+export async function transferUsdcOnNear(receiverId: string, amount: bigint, memo?: string): Promise<string> {
+  const registered = await nearView<unknown>(USDC, 'storage_balance_of', { account_id: receiverId });
+  const calls = [];
+  if (!registered) {
+    const { min } = await nearView<{ min: string }>(USDC, 'storage_balance_bounds');
+    calls.push({
+      methodName: 'storage_deposit',
+      args: { account_id: receiverId, registration_only: true },
+      gas: `30${TGAS}`,
+      deposit: min,
+    });
+  }
+  calls.push({
+    methodName: 'ft_transfer',
+    args: { receiver_id: receiverId, amount: amount.toString(), ...(memo ? { memo } : {}) },
+    gas: `30${TGAS}`,
+    deposit: ONE_YOCTO,
+  });
+  const outcome = await useNearWallet.getState().sendAll(USDC, calls);
+  resultOf(outcome);
+  return txHash(outcome);
+}
+
 export const getNearRecord = (authorRef: string) =>
   nearView<NearForecastRecord>(MARKET, 'get_record', { author_ref: authorRef });
 

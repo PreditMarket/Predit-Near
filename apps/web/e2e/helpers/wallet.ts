@@ -17,17 +17,21 @@ export async function injectWallet(
   const signer = mode === 'live' ? await signerFor(accountId) : null;
 
   await page.exposeFunction('__e2eSign', async (tx: { receiverId: string; actions: { params?: Record<string, unknown> }[] }) => {
-    const action = (tx.actions[0].params ?? tx.actions[0]) as { methodName: string; args: unknown; gas: unknown; deposit: unknown };
-    const call: FunctionCall = {
-      receiverId: tx.receiverId,
-      methodName: action.methodName,
-      args: (typeof action.args === 'string' ? JSON.parse(action.args) : action.args) as Record<string, unknown>,
-      gas: String(action.gas),
-      deposit: String(action.deposit),
-    };
-    calls.push(call);
+    const batch: FunctionCall[] = tx.actions.map((raw) => {
+      const action = (raw.params ?? raw) as { methodName: string; args: unknown; gas: unknown; deposit: unknown };
+      return {
+        receiverId: tx.receiverId,
+        methodName: action.methodName,
+        args: (typeof action.args === 'string' ? JSON.parse(action.args) : action.args) as Record<string, unknown>,
+        gas: String(action.gas),
+        deposit: String(action.deposit),
+      };
+    });
+    calls.push(...batch);
     if (!signer) throw new Error('Rejected by the test wallet');
-    return JSON.parse(JSON.stringify(await send(signer, call)));
+    let last: unknown;
+    for (const call of batch) last = await send(signer, call);
+    return JSON.parse(JSON.stringify(last));
   });
 
   await page.exposeFunction('__e2eSignMessage', async (message: string, nonce: number[], recipient: string) => {

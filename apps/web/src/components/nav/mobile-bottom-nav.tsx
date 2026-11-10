@@ -2,7 +2,7 @@
 
 import { HoverPrefetchLink } from './hover-prefetch-link';
 import { usePathname } from 'next/navigation';
-import { House, PieChart, TrendingUp, Wallet } from 'lucide-react';
+import { House, PieChart, TrendingUp } from 'lucide-react';
 import { useNearWallet } from '@/store/near-wallet.store';
 import { getCurrentPage, hrefFor } from './nav-helpers';
 
@@ -16,7 +16,6 @@ interface Tab {
 const TABS: Tab[] = [
   { id: 'home', label: 'Feed', icon: House, requiresAuth: false },
   { id: 'markets', label: 'Markets', icon: TrendingUp, requiresAuth: false },
-  { id: 'deposit', label: 'Deposit', icon: Wallet, requiresAuth: true },
   { id: 'portfolio', label: 'Portfolio', icon: PieChart, requiresAuth: true },
 ];
 

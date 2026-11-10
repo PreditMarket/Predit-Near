@@ -9,7 +9,7 @@ test('connects through the wallet selector, survives a reload and disconnects', 
   await page.getByTestId('near-connect').click();
   await page.locator('.connect-item[data-type="e2e-wallet"]').click();
   await expect(page.getByTestId('near-account')).toContainText(ACCOUNT.slice(0, 12));
-  await expect(page.getByTestId('near-account')).toContainText('tUSDC');
+  await expect(page.getByTestId('balance-pill')).toContainText('tUSDC');
 
   await page.reload();
   await expect(page.getByTestId('near-account')).toBeVisible();

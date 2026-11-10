@@ -1,12 +1,12 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import Link from 'next/link';
 import { StatTile } from '@/components/v2';
 import { useMarketTx } from '@/hooks/pamm/use-market-tx';
 import { useNearFunds } from '@/hooks/pamm/use-near-funds';
 import { USDC_DECIMALS, USDC_SYMBOL } from '@/lib/near/config';
 import { withdrawOnNear } from '@/lib/near/contract';
+import { useFundsDialog } from '@/store/funds-dialog.store';
 import { usePortfolioStore } from '@/store/portfolio.store';
 
 const HEAD_TILE = 'px-3 py-2.5 bg-muted/20';
@@ -27,6 +27,7 @@ export function PortfolioValue() {
   const { data: funds, isLoading } = useNearFunds();
   const inPositions = usePortfolioStore((s) => s.totalValue);
   const positionsLoading = usePortfolioStore((s) => s.summaryLoading);
+  const openFunds = useFundsDialog((s) => s.open);
   const withdraw = useMarketTx('', 'Withdrawal sent', (_: void) => withdrawOnNear());
 
   const human = (raw: bigint | undefined) => Number(raw ?? BigInt(0)) / 10 ** USDC_DECIMALS;
@@ -44,9 +45,14 @@ export function PortfolioValue() {
         'Wallet',
         <Amount value={human(funds?.usdc)} />,
         isLoading,
-        <Link href="/deposit" className={ACTION}>
-          Deposit
-        </Link>,
+        <span className="flex gap-3">
+          <button type="button" data-testid="portfolio-deposit" className={ACTION} onClick={() => openFunds('deposit')}>
+            Deposit
+          </button>
+          <button type="button" data-testid="portfolio-send" className={ACTION} onClick={() => openFunds('withdraw')}>
+            Withdraw
+          </button>
+        </span>,
       )}
       {tile('In positions', <Amount value={inPositions} />, positionsLoading)}
       {tile(

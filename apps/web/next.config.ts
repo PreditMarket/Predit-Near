@@ -9,8 +9,6 @@ import { existsSync } from 'fs';
 // Relative, not '@/': this file is loaded by Node, outside the app's aliases.
 import { shellPrecache, type AppBuildPages } from '../../packages/shared/src/lib/pwa/precache';
 
-const appDir = path.dirname(fileURLToPath(import.meta.url));
-
 /** Old public/ icon paths → their public/icons/ successors (see redirects). */
 const LEGACY_ICON_REDIRECTS: Array<[string, string]> = [
   ['/icon-48x48.png', '/icons/icon-192.png'],
