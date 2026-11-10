@@ -1290,3 +1290,52 @@ fn run_random_operations(seed: u64) {
         assert_eq!(owed, taken, "seed {seed}");
     }
 }
+
+// ---- claim history ----------------------------------------------------------
+
+#[test]
+fn a_redeem_leaves_a_record_of_what_was_held_and_paid() {
+    let mut c = contract();
+    let id = two_sided(&mut c);
+    receipt(&mut c, id, Side::Yes);
+    finalize(&mut c, id);
+    let held = c.get_position(id, acc("yes.near"));
+
+    yocto(EXPIRY + 200, "yes.near");
+    let _ = c.redeem(id);
+    assert_eq!(c.get_position(id, acc("yes.near")).yes_shares.0, 0);
+
+    let claims = c.get_user_claims(acc("yes.near"));
+    assert_eq!(claims.len(), 1);
+    let (market, claim) = &claims[0];
+    assert_eq!(*market, id);
+    assert_eq!(claim.kind, ClaimKind::Redeem);
+    assert_eq!(claim.position, held);
+    assert_eq!(claim.payout.0, c.get_accounting().in_flight.0);
+    assert!(c.get_user_claims(acc("no.near")).is_empty());
+}
+
+#[test]
+fn a_refund_leaves_a_record_too() {
+    let mut c = contract();
+    let id = create(&mut c);
+    buy(&mut c, "yes.near", id, Side::Yes, 100 * USDC);
+    receipt(&mut c, id, Side::Yes);
+    finalize(&mut c, id);
+    yocto(EXPIRY + 200, "yes.near");
+    let _ = c.refund(id);
+
+    let claims = c.get_user_claims(acc("yes.near"));
+    assert_eq!(claims.len(), 1);
+    assert_eq!(claims[0].1.kind, ClaimKind::Refund);
+    assert_eq!(claims[0].1.payout.0, 99_700_000);
+    assert_eq!(claims[0].1.position.yes_cost.0, 99_700_000);
+}
+
+#[test]
+fn accounts_without_claims_have_no_records() {
+    let mut c = contract();
+    let id = two_sided(&mut c);
+    assert!(c.get_user_claims(acc("yes.near")).is_empty());
+    let _ = id;
+}

@@ -389,3 +389,39 @@ pub struct Accounting {
     pub total_claimable: U128,
     pub in_flight: U128,
 }
+
+/// How a position was paid out.
+#[near(serializers = [borsh, json])]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ClaimKind {
+    Redeem,
+    Refund,
+}
+
+/// A payout taken from a market, kept after the position is emptied so the
+/// account's history (what it held, what it was paid) survives the claim.
+#[near(serializers = [borsh])]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ClaimRecord {
+    pub kind: ClaimKind,
+    /// The position as it was just before the claim.
+    pub position: Position,
+    pub payout: u128,
+    pub at_sec: u64,
+}
+
+#[near(serializers = [json])]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ClaimView {
+    pub kind: ClaimKind,
+    pub position: PositionView,
+    pub payout: U128,
+    pub at_sec: U64,
+}
+
+impl From<ClaimRecord> for ClaimView {
+    fn from(c: ClaimRecord) -> Self {
+        Self { kind: c.kind, position: c.position.into(), payout: U128(c.payout), at_sec: U64(c.at_sec) }
+    }
+}

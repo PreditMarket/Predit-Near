@@ -66,6 +66,9 @@ enum StorageKey {
     CountedPosts,
     Open,
     AwaitingFinalize,
+    /// Claim records, written straight to storage: the contract struct (and so
+    /// the deployed state layout) is unchanged.
+    Claims,
 }
 
 #[near(serializers = [json])]
@@ -503,6 +506,7 @@ impl Contract {
         self.credit(&creator, plan.creator_cut as u128);
         let treasury = self.treasury.clone();
         self.credit(&treasury, plan.platform_cut as u128);
+        self.record_claim(market_id.0, &account, ClaimKind::Redeem, position, plan.net as u128);
         self.store_position(key, plan.new_position);
         self.markets.insert(market_id.0, market);
         self.pay(account, plan.net as u128)
@@ -527,6 +531,7 @@ impl Contract {
 
         market.pool = plan.new_pool.into();
         self.total_pool_collateral -= plan.total as u128;
+        self.record_claim(market_id.0, &account, ClaimKind::Refund, position, plan.total as u128);
         self.store_position(key, plan.new_position);
         self.markets.insert(market_id.0, market);
         self.pay(account, plan.total as u128)
@@ -677,6 +682,19 @@ impl Contract {
                             .unwrap_or_default();
                         Some((view_of(market), position.into()))
                     })
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Payouts this account took, per market, with the position it held then.
+    /// Redeemed and refunded positions are emptied, so this is their history.
+    pub fn get_user_claims(&self, account_id: AccountId) -> Vec<(U64, ClaimView)> {
+        self.by_user
+            .get(&account_id)
+            .map(|ids| {
+                ids.iter()
+                    .filter_map(|id| self.claim(*id, &account_id).map(|c| (U64(*id), c.into())))
                     .collect()
             })
             .unwrap_or_default()
@@ -910,6 +928,40 @@ impl Contract {
         } else {
             self.positions.insert(key, position.into());
         }
+    }
+
+    fn claim_key(market_id: u64, account: &AccountId) -> Vec<u8> {
+        let mut key = near_sdk::borsh::to_vec(&StorageKey::Claims).expect("key");
+        key.extend(near_sdk::borsh::to_vec(&(market_id, account)).expect("key"));
+        key
+    }
+
+    fn claim(&self, market_id: u64, account: &AccountId) -> Option<ClaimRecord> {
+        env::storage_read(&Self::claim_key(market_id, account))
+            .map(|bytes| near_sdk::borsh::from_slice(&bytes).expect("claim record"))
+    }
+
+    /// Payouts never wait on storage: a record replaces the position it
+    /// empties, about the same size. A later claim on the same market adds up.
+    fn record_claim(&mut self, market_id: u64, account: &AccountId, kind: ClaimKind, position: Position, payout: u128) {
+        let record = match self.claim(market_id, account) {
+            Some(earlier) => ClaimRecord {
+                kind,
+                position: Position {
+                    yes_shares: earlier.position.yes_shares.max(position.yes_shares),
+                    no_shares: earlier.position.no_shares.max(position.no_shares),
+                    yes_cost_acc: earlier.position.yes_cost_acc.max(position.yes_cost_acc),
+                    no_cost_acc: earlier.position.no_cost_acc.max(position.no_cost_acc),
+                },
+                payout: earlier.payout.saturating_add(payout),
+                at_sec: now_sec(),
+            },
+            None => ClaimRecord { kind, position, payout, at_sec: now_sec() },
+        };
+        env::storage_write(
+            &Self::claim_key(market_id, account),
+            &near_sdk::borsh::to_vec(&record).expect("claim record"),
+        );
     }
 
     fn credit(&mut self, account: &AccountId, amount: u128) {
