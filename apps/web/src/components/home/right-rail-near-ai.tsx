@@ -115,11 +115,21 @@ function Text({ text }: { text: string }) {
   );
 }
 
+/** Text beside a card: the card is its own block, so a list marker or dash left next to it goes. */
+const beforeCard = (text: string) => text.replace(/(^|\n)[ \t]*(?:[-*•]|\d+[.)])[ \t]*$/, '$1').replace(/\s+$/, '');
+const afterCard = (text: string) => text.replace(/^[ \t]*(?:[—–:-][ \t]*)?/, '').replace(/^\n+/, '');
+
 function Answer({ content, markets, onTrade }: { content: string; markets: Map<string, NearMarket>; onTrade: (m: NearMarket) => void }) {
   const parts: ReactNode[] = [];
   let last = 0;
+  let afterChip = false;
+  const text = (raw: string, beforeChip: boolean, key: string) => {
+    let t = afterChip ? afterCard(raw) : raw;
+    if (beforeChip) t = beforeCard(t);
+    if (t) parts.push(<Text key={key} text={t} />);
+  };
   for (const match of content.matchAll(TOKEN)) {
-    parts.push(<Text key={`t${last}`} text={content.slice(last, match.index)} />);
+    text(content.slice(last, match.index), true, `t${last}`);
     parts.push(
       match[1] === 'market' ? (
         <MarketChip key={`m${match.index}`} id={match[2]} markets={markets} onTrade={onTrade} />
@@ -127,9 +137,10 @@ function Answer({ content, markets, onTrade }: { content: string; markets: Map<s
         <PostChip key={`p${match.index}`} id={match[2]} />
       ),
     );
+    afterChip = true;
     last = (match.index ?? 0) + match[0].length;
   }
-  parts.push(<Text key="end" text={content.slice(last)} />);
+  text(content.slice(last), false, 'end');
   return <div className="whitespace-pre-wrap break-words text-[12.5px] leading-relaxed text-foreground">{parts}</div>;
 }
 
