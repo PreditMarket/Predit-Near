@@ -163,7 +163,7 @@ function PostMarket({ market }: { market: NearMarket }) {
           market={toPammMarket(market)}
           open
           initialSide={side}
-          // One tap to bet: the amount is filled in, and the chips change it.
+          // One tap to place: the amount is filled in, and the chips change it.
           preset={{ amountUsd: QUICK_BET }}
           onOpenChange={(open) => !open && setSide(null)}
         />

@@ -82,7 +82,7 @@ export function TradedCell({ view }: { view: PositionView }) {
   );
 }
 
-/** To win, or what to do now that it's settled: claim, refund, reclaim. */
+/** Payout if right, or what to do now that it's settled: claim, refund, reclaim. */
 export function PayoutCell({ view }: { view: PositionView }) {
   const { payout, position } = view;
   const unit = position.unit ?? 'USDC';

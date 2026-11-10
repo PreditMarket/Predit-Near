@@ -95,7 +95,7 @@ export function deriveResultTexts(a: ResultTextArgs): ResultTexts {
     metricRoi: hasProfit ? `+${Math.round(a.buyPreview.roi)}%` : undefined,
     metricHint: hasProfit
       ? undefined
-      : `Winners split the ${other} bets, and there are too few yet. Profit grows as people bet ${other}.`,
+      : `Profit is paid from positions on ${other}, and there are too few yet. It grows as people take ${other}.`,
     negative: false,
   };
 }

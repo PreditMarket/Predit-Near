@@ -9,7 +9,7 @@ export function usePortfolioRedeem(
   _tradeId: string,
   _marketVersion: PammMarketVersion = 'v3_shares',
 ) {
-  return useMarketTx(poolAddress, 'Redeemed winnings', (_amountOut: string) =>
+  return useMarketTx(poolAddress, 'Redeemed', (_amountOut: string) =>
     redeemOnNear(poolAddress),
   );
 }

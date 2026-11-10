@@ -78,9 +78,10 @@ async function waitForReading(page: Page, id: string) {
 /** The person decides: whatever NEAR AI suggested, they pick the outcome and say why. */
 async function confirm(page: Page, id: string, choice: 'yes' | 'no') {
   await page.goto('/admin/resolve');
+  await page.locator(`[data-testid=resolve-item][data-market="${id}"]`).click();
   const card = page.locator(`[data-testid=resolve-card][data-market="${id}"]`);
   await expect(card.getByTestId('resolve-suggestion')).toBeVisible({ timeout: 60_000 });
-  await card.getByTestId('resolve-choice').selectOption(choice);
+  await card.getByTestId(`resolve-choice-${choice}`).click();
   await card.getByTestId('resolve-reason').fill(`Checked by the e2e suite: ${choice}.`);
   await card.getByTestId('resolve-confirm').click();
   await expect.poll(async () => (await market(id)).status, { timeout: 90_000 }).toBe('receipt_posted');

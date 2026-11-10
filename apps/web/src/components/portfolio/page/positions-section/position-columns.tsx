@@ -26,7 +26,7 @@ export const POSITION_COLUMNS: ResponsiveTableColumn<PositionView>[] = [
   },
   {
     key: 'payout',
-    header: 'To win',
+    header: 'Payout if right',
     align: 'right',
     width: '110px',
     cell: (view) => <PayoutCell view={view} />,

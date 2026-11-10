@@ -26,7 +26,7 @@ test.describe('home rails', () => {
     await stubFeed(page);
   });
 
-  test('the Markets rail lists open markets and a tap opens a bet', async ({ page }) => {
+  test('the Markets rail lists open markets and a tap opens a prediction', async ({ page }) => {
     const calls = await injectWallet(page, ALICE);
     const open = (await allMarkets()).filter(isTradable);
     test.skip(open.length === 0, 'no open market on the demo contract');
@@ -60,7 +60,7 @@ test.describe('home rails', () => {
     await expect(page.getByTestId('ai-suggestion').first()).toBeDisabled();
   });
 
-  test('Predit AI answers with cards to bet on and to create from, signed', async ({ page }) => {
+  test('Predit AI answers with cards to place on and to create from, signed', async ({ page }) => {
     await injectWallet(page, ALICE);
     const open = (await allMarkets()).filter(isTradable);
     test.skip(open.length === 0, 'no open market on the demo contract');

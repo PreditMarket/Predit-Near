@@ -165,10 +165,10 @@ export function PammShareButton({
     safeQuestion.length > 80 ? `${safeQuestion.slice(0, 77)}…` : safeQuestion;
   const subject = shortQ ? `🎯 "${shortQ}"` : 'this market';
   const tweetText = side
-    ? `I'm betting ${side} on ${subject} @predit_market — join me → ${shareUrl}`
-    : `I just launched ${subject} on @predit_market — bet on YES/NO now → ${shareUrl}`;
+    ? `I'm predicting ${side} on ${subject} @predit_market — join me → ${shareUrl}`
+    : `I just launched ${subject} on @predit_market — place your prediction → ${shareUrl}`;
   const telegramText = side
-    ? `Betting ${side} on: ${shortQ || 'this market'}`
+    ? `Predicting ${side} on: ${shortQ || 'this market'}`
     : shortQ || 'this market';
 
   const iconSize = size === 'sm' ? 'h-3 w-3' : 'h-3.5 w-3.5';

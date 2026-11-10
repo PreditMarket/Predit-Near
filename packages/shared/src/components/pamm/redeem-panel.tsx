@@ -196,7 +196,7 @@ export function RedeemPanel({
     <Card className="gap-3 border-success/30">
       <CardHeader>
         <div className="flex items-center gap-2">
-          <CardTitle className="text-base">Redeem Winnings</CardTitle>
+          <CardTitle className="text-base">Redeem</CardTitle>
           <Badge
             className={resolutionCode === 1 ? 'bg-success' : 'bg-danger'}
           >

@@ -18,6 +18,7 @@ import {
   type SimulatedChain,
 } from '@/lib/near/simulated-deposit';
 import { useNearWallet } from '@/store/near-wallet.store';
+import { refreshFunds } from './refresh-funds';
 
 type Tab = 'near' | 'other';
 type SimStep = 'idle' | 'PENDING_DEPOSIT' | 'PROCESSING' | 'SUCCESS' | 'FAILED';
@@ -79,7 +80,7 @@ function NearTab({ accountId }: { accountId: string }) {
     mutationFn: claimNearFaucet,
     onSuccess: () => {
       toast.success(`100 ${USDC_SYMBOL} added to your account`);
-      void queryClient.invalidateQueries({ queryKey: ['near'] });
+      refreshFunds(queryClient);
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -143,7 +144,7 @@ function OtherChainsTab({ accountId }: { accountId: string }) {
       if (!res.ok) throw new Error(body.error ?? 'Simulated deposit failed');
       setTxHash(body.txHash ?? null);
       setStep('SUCCESS');
-      void queryClient.invalidateQueries({ queryKey: ['near'] });
+      refreshFunds(queryClient);
     } catch (err) {
       setError((err as Error).message);
       setStep('FAILED');

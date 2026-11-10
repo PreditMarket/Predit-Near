@@ -17,7 +17,7 @@ test.describe('market page', () => {
     await expect(page.getByTestId('market-challenge')).toHaveCount(0);
   });
 
-  test('a bet from the trade panel asks the wallet for a USDC transfer', async ({ page }) => {
+  test('a prediction from the trade panel asks the wallet for a USDC transfer', async ({ page }) => {
     const market = (await allMarkets()).find(isTradable);
     test.skip(!market, 'no open market');
     const calls = await injectWallet(page, 'predit-markets-alice.testnet');

@@ -61,7 +61,7 @@ function MarketChip({ id, markets, onTrade }: { id: string; markets: Map<string,
     <>
       <span className="line-clamp-2 text-[12px] font-medium text-foreground">{market.rules.question}</span>
       <span className="font-mono text-[10.5px] text-muted-foreground">
-        {tradable ? `${market.rules.yes_label} ${yes}% · tap to bet` : phaseLabel(market)}
+        {tradable ? `${market.rules.yes_label} ${yes}% · tap to place` : phaseLabel(market)}
       </span>
     </>
   );

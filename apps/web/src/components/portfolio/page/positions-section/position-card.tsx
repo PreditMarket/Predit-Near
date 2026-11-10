@@ -25,7 +25,7 @@ export function PositionCard({ view }: { view: PositionView }) {
         <Figure label="Traded">
           <TradedCell view={view} />
         </Figure>
-        <Figure label="To win">
+        <Figure label="Payout if right">
           <PayoutCell view={view} />
         </Figure>
       </div>

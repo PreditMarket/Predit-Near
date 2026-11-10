@@ -159,7 +159,7 @@ export function CreateMarketDialog() {
                 url={`/market/${created.id}`}
                 onDismiss={finish}
                 primaryAction={{
-                  label: 'Bet on it now',
+                  label: 'Place a prediction',
                   onClick: async () => {
                     const market = await readNewMarket(created.id);
                     finish();
@@ -192,7 +192,7 @@ export function CreateMarketDialog() {
           market={toPammMarket(trading)}
           open
           initialSide="yes"
-          // As under a post: one tap to bet, the chips change the amount.
+          // As under a post: one tap to place, the chips change the amount.
           preset={{ amountUsd: 5 }}
           onOpenChange={(next) => !next && setTrading(null)}
         />

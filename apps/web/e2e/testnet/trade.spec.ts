@@ -10,7 +10,7 @@ interface Position {
   no_shares: string;
 }
 
-test('a bet and its sale land on the contract', async ({ page }) => {
+test('a prediction and its sale land on the contract', async ({ page }) => {
   const market = (await allMarkets()).find(isTradable);
   test.skip(!market, 'no open market');
   const position = () => view<Position>(MARKET, 'get_position', { market_id: market!.id, account_id: ACCOUNT });

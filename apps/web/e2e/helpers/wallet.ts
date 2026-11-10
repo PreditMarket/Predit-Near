@@ -16,6 +16,8 @@ export async function injectWallet(
     connected = true,
     answer,
     name = 'E2E Wallet',
+    icon = '',
+    website = 'https://example.com',
     privateKey,
   }: {
     mode?: WalletMode;
@@ -24,6 +26,9 @@ export async function injectWallet(
     answer?: (calls: FunctionCall[]) => unknown;
     /** What the wallet selector shows. */
     name?: string;
+    /** The selector's icon (a URL or data: URI) and the site under the name. */
+    icon?: string;
+    website?: string;
     /** Live mode with this key instead of one from ~/.near-credentials. */
     privateKey?: string;
   } = {},
@@ -56,7 +61,7 @@ export async function injectWallet(
   });
 
   await page.addInitScript(
-    ({ account, startConnected, walletName }) => {
+    ({ account, startConnected, walletName, walletIcon, walletWebsite }) => {
       const key = 'e2e-wallet-on';
       if (startConnected && !sessionStorage.getItem('e2e-wallet-init')) {
         sessionStorage.setItem('e2e-wallet-init', '1');
@@ -68,8 +73,8 @@ export async function injectWallet(
         manifest: {
           id: 'e2e-wallet',
           name: walletName,
-          icon: '',
-          website: 'https://example.com',
+          icon: walletIcon,
+          website: walletWebsite,
           description: '',
           version: '1.0.0',
           type: 'injected',
@@ -98,7 +103,7 @@ export async function injectWallet(
         window.dispatchEvent(new CustomEvent('near-wallet-injected', { detail: wallet })),
       );
     },
-    { account: accountId, startConnected: connected, walletName: name },
+    { account: accountId, startConnected: connected, walletName: name, walletIcon: icon, walletWebsite: website },
   );
   return calls;
 }

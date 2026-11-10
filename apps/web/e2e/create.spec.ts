@@ -37,7 +37,7 @@ test.describe('create a market without leaving the feed', () => {
     await expect(dialog.getByTestId('create-submit')).toBeEnabled();
   });
 
-  test('once created, the market can be bet on straight away', async ({ page }) => {
+  test('once created, a prediction can be placed on the market straight away', async ({ page }) => {
     const open = (await allMarkets()).find(isTradable);
     test.skip(!open, 'no open market to stand in for the new one');
     await stubFeed(page);
@@ -51,7 +51,7 @@ test.describe('create a market without leaving the feed', () => {
     await expect(dialog.getByTestId('create-ai-note')).toContainText('Drafted by NEAR AI');
     test.skip(await dialog.getByTestId('create-short-of-near').isVisible(), `${ACCOUNT} lacks the NEAR for the bond`);
     await dialog.getByTestId('create-submit').click();
-    await expect(dialog.getByTestId('created-primary')).toHaveText('Bet on it now');
+    await expect(dialog.getByTestId('created-primary')).toHaveText('Place a prediction');
     await dialog.getByTestId('created-primary').click();
     await expect(page.getByTestId('amount-input').first()).toHaveValue('5');
     await expect(page.getByTestId('submit-trade-btn').first()).toBeEnabled();

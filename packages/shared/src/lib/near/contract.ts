@@ -131,7 +131,7 @@ export async function buyOnNear(
     deposit: ONE_YOCTO,
   });
   const used = resultOf(outcome).replace(/"/g, '');
-  if (used === '0') throw new Error('The bet was refused and your USDC was returned');
+  if (used === '0') throw new Error('The order was refused and your USDC was returned');
   return txHash(outcome);
 }
 

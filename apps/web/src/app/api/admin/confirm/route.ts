@@ -3,7 +3,6 @@ import { ADMIN_RECIPIENT, type AdminConfirmMessage } from '@/lib/near/evidence';
 import { nearView } from '@/lib/near/rpc';
 import { NEAR_MARKET_CONTRACT } from '@/lib/near/config';
 import type { NearMarket } from '@/lib/near/types';
-import { SITE_URL } from '@/lib/site-url';
 import { adminAccounts } from '@/lib/resolve/admins';
 import { readBundle } from '@/lib/resolve/evidence-store';
 import { isSignedByAccount } from '@/lib/resolve/nep413';
@@ -72,7 +71,9 @@ export async function POST(req: NextRequest) {
     return refuse('Unknown outcome', 400);
   }
 
-  const origin = req.headers.get('origin') || SITE_URL;
+  // The receipt keeps this link for good: the deployment's public address,
+  // not whatever host the admin's browser happened to use.
+  const origin = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/+$/, '') || req.headers.get('origin') || '';
   const ai = bundle.ai && {
     model: bundle.ai.model,
     chat_id: bundle.ai.chatId,

@@ -47,7 +47,7 @@ test.describe('social feed', () => {
     await expect(post.getByRole('link', { name: 'Receipt' })).toHaveAttribute('href', `/market/${fed.id}#receipt`);
   });
 
-  test('tapping a question opens a bet with the amount filled in', async ({ page }) => {
+  test('tapping a question opens a prediction with the amount filled in', async ({ page }) => {
     const calls = await injectWallet(page, 'predit-markets-alice.testnet');
     const [btc] = await marketsFor('sample-btc-q1');
     test.skip(btc?.status !== 'open', 'the demo market is closed');
@@ -63,7 +63,7 @@ test.describe('social feed', () => {
     await expect(post.getByTestId('post-market-details').first()).toHaveAttribute('href', `/market/${btc.id}`);
   });
 
-  test('predicting under a post asks the wallet for a USDC bet', async ({ page }) => {
+  test('predicting under a post asks the wallet for a USDC prediction', async ({ page }) => {
     const calls = await injectWallet(page, 'predit-markets-alice.testnet');
     const [btc] = await marketsFor('sample-btc-q1');
     await page.goto('/');

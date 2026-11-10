@@ -29,7 +29,7 @@ export const metadata: Metadata = {
     template: '%s | Predit',
   },
   description:
-    'Turn a post into a prediction market. Rules are locked on NEAR, bets are in USDC, NEAR AI reads the result and a person confirms it, open to challenge.',
+    'Turn a post into a prediction market. Rules are locked on NEAR, positions are in USDC, NEAR AI reads the result and a person confirms it, open to challenge.',
   keywords: ['prediction markets', 'NEAR', 'NEAR AI', 'social predictions', 'forecasting record'],
   authors: [{ name: 'Predit' }],
   robots: { index: true, follow: true },
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
     siteName: 'Predit',
     title: 'Predit: predictions from the posts you read',
     description:
-      'Turn a post into a prediction market. Rules are locked on NEAR, bets are in USDC, NEAR AI reads the result and a person confirms it, open to challenge.',
+      'Turn a post into a prediction market. Rules are locked on NEAR, positions are in USDC, NEAR AI reads the result and a person confirms it, open to challenge.',
     images: ['/prediction-default.jpg'],
     locale: 'en_US',
   },
@@ -46,7 +46,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Predit: predictions from the posts you read',
     description:
-      'Turn a post into a prediction market. Rules are locked on NEAR, bets are in USDC, NEAR AI reads the result and a person confirms it, open to challenge.',
+      'Turn a post into a prediction market. Rules are locked on NEAR, positions are in USDC, NEAR AI reads the result and a person confirms it, open to challenge.',
     images: ['/prediction-default.jpg'],
   },
   // The web app manifest is app/manifest.ts — Next links it on its own.

@@ -30,7 +30,7 @@ export function formatAmount(amount: number | string | null | undefined, unit?: 
   return `${formatQty(amount, { dp: 2 })} ${s}`;
 }
 
-/** What the "To win" column says, by how far along the position is. */
+/** What the "Payout if right" column says, by how far along the position is. */
 export type PositionPayout =
   | { kind: 'claim'; trade: PammMarketTrade; amount: number | null }
   | { kind: 'refund'; trade: PammMarketTrade; amount: number | null }

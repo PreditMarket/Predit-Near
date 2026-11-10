@@ -14,6 +14,7 @@ import { SIMULATED_CHAINS, type SimulatedChain } from '@/lib/near/simulated-depo
 import { useNearWallet } from '@/store/near-wallet.store';
 import { formatUsdc } from './balance-menu';
 import { Balances, STAT_LABEL } from './deposit-dialog';
+import { refreshFunds } from './refresh-funds';
 
 type Tab = 'near' | 'other';
 type SimStep = 'idle' | 'SENT_ON_NEAR' | 'BRIDGING' | 'COMPLETE' | 'FAILED';
@@ -82,7 +83,7 @@ function ClaimableRow() {
           try {
             await withdrawOnNear();
             toast.success('Moved to your wallet');
-            await queryClient.invalidateQueries({ queryKey: ['near'] });
+            refreshFunds(queryClient);
           } catch (err) {
             toast.error((err as Error).message);
           } finally {
@@ -124,7 +125,7 @@ function NearTab({ accountId }: { accountId: string }) {
       if ((await getNearNativeBalance(receiver)) === null) throw new Error(`${receiver} does not exist on NEAR testnet.`);
       setSent(await transferUsdcOnNear(receiver, units));
       setAmount('');
-      await queryClient.invalidateQueries({ queryKey: ['near'] });
+      refreshFunds(queryClient);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -188,7 +189,7 @@ function OtherChainsTab({ accountId }: { accountId: string }) {
       const hash = await transferUsdcOnNear(NEAR_USDC_CONTRACT, units, `Simulated withdrawal to ${chain}:${address.trim()}`);
       setTxHash(hash);
       setStep('SENT_ON_NEAR');
-      await queryClient.invalidateQueries({ queryKey: ['near'] });
+      refreshFunds(queryClient);
       await new Promise((resolve) => setTimeout(resolve, 1_200));
       setStep('BRIDGING');
       await new Promise((resolve) => setTimeout(resolve, 1_500));
