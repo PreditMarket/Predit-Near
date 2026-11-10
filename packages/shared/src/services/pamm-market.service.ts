@@ -3,14 +3,10 @@ import { USDC_DECIMALS, USDC_SYMBOL } from '@/lib/near/config';
 import { listNearMarkets } from '@/lib/near/market-list';
 import { positionRows, toPammMarket } from '@/lib/near/map';
 import { useNearWallet } from '@/store/near-wallet.store';
-import type { InfinityPaginationResponse, MarketRules } from './market.service';
+import type { MarketRules } from './market.service';
 import type { Category } from './categories.service';
 import type { PammMarketVersion, PammPositionModel } from './pamm/market-be';
 import type { PublicResolution } from '@/types/resolution';
-import type {
-  HighlightSection,
-  HighlightSectionResponse,
-} from '@/lib/pamm/highlight-section';
 
 export type PammMarketStatus =
   | 'pending'
@@ -262,14 +258,6 @@ export interface PammMarketTrade {
   market?: PammMarket | null;
 }
 
-export interface PammMarketStream {
-  marketId: string;
-  roomName: string;
-  chatEnabled: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface ListPammMarketsParams {
   status?: PammMarketStatus;
   search?: string;
@@ -332,26 +320,6 @@ export interface ListPammMarketsResponse {
   total: number;
 }
 
-/**
- * Accepts both the wrapped and the older bare-market listing shape, so the
- * client works against a backend on either side of that change. Without this
- * every field read downstream (`id`, `question`, `expiryTs`) is `undefined` —
- * which surfaces as duplicate `pamm-undefined` React keys and an
- * `Invalid time value` crash rather than anything that points at the cause.
- */
-export function unwrapMarketListItems(
-  data: (PammMarket | PammMarketListItem)[] | undefined,
-): PammMarket[] {
-  if (!Array.isArray(data)) return [];
-  return data.flatMap((entry) => {
-    if (entry && typeof entry === 'object' && 'kind' in entry) {
-      const item = entry as PammMarketListItem;
-      return item.kind === 'market' && item.market ? [item.market] : [];
-    }
-    return [entry as PammMarket];
-  });
-}
-
 export interface ListPammTradesParams {
   page?: number;
   limit?: number;
@@ -375,47 +343,6 @@ export interface PammMarketRealtime {
   isPaused?: boolean;
 }
 
-export interface PammViewerTokenResponse {
-  token: string;
-}
-
-/**
- * Trade `side` for the record-trade request. Backend uses the lowercase enum
- * (`buy_yes` | `buy_no` | `sell_yes` | `sell_no`); `seed` is server-only.
- */
-export type RecordPammTradeSide = Exclude<PammTradeSide, 'seed'>;
-
-export interface RecordPammTradeDto {
-  txSig: string;
-  side: RecordPammTradeSide;
-  /** Raw token units as a string (e.g. 1 USDC at 6 decimals → "1000000"). */
-  amountIn: string;
-  /** Raw token units as a string. */
-  amountOut: string;
-  /** XP volume for the trade as a JSON number (USDC notional). */
-  volumePxpEquivalent: number;
-  /** Trader wallet pubkey. */
-  traderAddress: string;
-  // V2 omits priceYes / yesReserveAfter / noReserveAfter — the backend
-  // derives those from on-chain pool state.
-}
-
-/**
- * Tolerates a backend still on the old flat-array shape (`PammMarket[]`,
- * no `kind` wrapper) — e.g. during a rollout/rollback mismatch — by
- * treating any item missing `kind` as a plain market. Without this, reading
- * `.market.id` off an unwrapped item throws (`Cannot read properties of
- * undefined`).
- */
-export function normalizePammListItem(
-  item: PammMarketListItem | PammMarket,
-): PammMarketListItem {
-  if (item && typeof item === 'object' && 'kind' in item) {
-    return item;
-  }
-  return { kind: 'market', market: item as PammMarket };
-}
-
 /** Every side of every position the connected account holds, newest market first. */
 const myNearPositionRows = async (): Promise<PammMarketTrade[]> => {
   const accountId = useNearWallet.getState().accountId;
@@ -426,10 +353,6 @@ const myNearPositionRows = async (): Promise<PammMarketTrade[]> => {
 
 export const getPammMarkets = (params?: ListPammMarketsParams): Promise<ListPammMarketsResponse> =>
   listNearMarkets(params);
-
-
-/** The /markets Highlight section, picked by the BE in one request. */
-export const getPammHighlight = async (): Promise<HighlightSection | null> => null;
 
 export const getPammMarketById = async (id: string): Promise<PammMarket> => {
   const market = await getNearMarket(id);
@@ -464,39 +387,6 @@ export const getPammMarketTrades = async (
   _id: string,
   _params?: ListPammTradesParams,
 ): Promise<ListPammTradesResponse> => ({ data: [], hasNextPage: false, total: 0 });
-
-
-
-
-
-
-
-// ─── Early resolution (trader-driven) ────────────────────────────────────────
-
-export interface PammEarlyResolveStatus {
-  /** How many distinct traders have asked for an early resolve. */
-  requested: number;
-  /** Denominator — unique traders of this market (seed pool excluded). */
-  totalTraders: number;
-  /**
-   * Percentage of traders needed to trigger. Server-configured
-   * (PAMM_EARLY_RESOLVE_REQUEST_PCT) — read it from here, never hardcode 30.
-   */
-  thresholdPct: number;
-  /** Whether the caller already requested. Always false when logged out. */
-  hasRequested: boolean;
-  triggeredAt: string | null;
-  /** `'creator'` or `'traders:3/10'`. */
-  triggeredBy: string | null;
-}
-
-export interface RequestPammEarlyResolveResponse {
-  requested: number;
-  totalTraders: number;
-  thresholdPct: number;
-  /** True when *this* request is the one that crossed the threshold. */
-  triggered: boolean;
-}
 
 /**
  * Progress of the "resolve this early" petition. Auth is optional — without a
@@ -588,48 +478,6 @@ export const getMyPammSummary = async (): Promise<PammMarketSummary> => {
     hasPendingData: false,
   };
 };
-
-
-/**
- * Whether the current user (by JWT; optional) may open fiat (non-mintable
- * collateral, e.g. USDC) positions. Empty/unset whitelist on the BE → allowed
- * for everyone. Used to gate access to fiat market pages.
- */
-export const getPammFiatAccess = async (): Promise<{ allowed: boolean }> => ({ allowed: true });
-
-
-/**
- * One pool where the caller's wallet currently holds LP tokens/shares.
- * `lpBalance` is a raw on-chain amount (string, base units) — purely for
- * display in the list; the withdraw form re-reads the live balance on-chain
- * before submitting. Only `active` and `resolved` markets are returned —
- * other statuses (expired, pending_resolution, pending_resolve_review,
- * cancelled) aren't withdrawable/redeemable yet, so the backend filters
- * them out of the query entirely.
- */
-export interface PammLiquidityPosition {
-  poolAddress: string;
-  marketVersion: PammMarketVersion;
-  marketId: string;
-  question: string;
-  imageUrl?: string | null;
-  status: PammMarketStatus;
-  lpBalance: string;
-  lpMint?: string | null;
-  collateralSymbol?: string;
-  collateralDecimals?: number;
-  /** `active` markets only — 70% of `lpBalance` (raw base units) — the
-   * amount the "Max" button should fill in the withdraw form. */
-  maxWithdrawableLp?: string;
-  /** `resolved` markets only — unix ms when the 24h claim delay lifts
-   * (`resolvedAt` + 24h). */
-  redeemableAt?: number;
-}
-
-export interface MyPammLiquidityParams {
-  page?: number;
-  limit?: number;
-}
 
 
 export const pammMarketService = {

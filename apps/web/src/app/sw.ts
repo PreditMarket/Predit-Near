@@ -38,11 +38,9 @@
 
 import { Serwist, type PrecacheEntry, type SerwistGlobalConfig } from 'serwist';
 import { originsOf } from '@/lib/pwa/sw-routes';
-import { SOLANA_RPC_URLS } from '@/lib/solana/rpc';
+import { NEAR_RPC_URLS } from '@/lib/near/config';
 import { runtimeCaching } from './sw/routes';
-import { addActivateHandlers, addMessageHandlers } from './sw/messages';
-import { addPushHandlers } from './sw/push';
-import { addOutboxHandlers } from './sw/outbox';
+import { addActivateHandlers } from './sw/messages';
 
 declare global {
   interface WorkerGlobalScope extends SerwistGlobalConfig {
@@ -53,26 +51,7 @@ declare global {
 
 declare const self: ServiceWorkerGlobalScope;
 
-// Mirrors lib/axios.ts and lib/v2/api-client.ts — written out as literal
-// `process.env.X` so the build inlines them here too.
-const apiOrigins = originsOf([
-  process.env.NEXT_PUBLIC_API_BASE_URL,
-  process.env.NEXT_PUBLIC_API_V2_BASE_URL,
-  process.env.NEXT_PUBLIC_API_BASE_URL ? undefined : 'https://deor-be-production.up.railway.app',
-]);
-
-// Mirrors v2ApiBaseUrl in lib/v2/api-client.ts.
-const apiV2BaseUrl =
-  process.env.NEXT_PUBLIC_API_V2_BASE_URL?.trim() ||
-  (
-    process.env.NEXT_PUBLIC_API_BASE_URL?.trim() ||
-    'https://deor-be-production.up.railway.app/api/v1'
-  ).replace(/\/v1\/?$/, '/v2');
-
-addMessageHandlers();
 addActivateHandlers();
-addPushHandlers({ configUrl: `${apiV2BaseUrl}/push/config` });
-addOutboxHandlers();
 
 const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,
@@ -81,8 +60,7 @@ const serwist = new Serwist({
   navigationPreload: true,
   runtimeCaching: runtimeCaching({
     appOrigin: self.location.origin,
-    apiOrigins,
-    rpcOrigins: originsOf(SOLANA_RPC_URLS),
+    rpcOrigins: originsOf(NEAR_RPC_URLS),
   }),
   fallbacks: {
     entries: [

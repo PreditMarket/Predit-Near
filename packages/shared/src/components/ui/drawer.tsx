@@ -78,8 +78,8 @@ function DrawerContent({
       <DrawerOverlay />
       <DrawerPrimitive.Content
         data-slot="drawer-content"
-        // Same as DialogContent: a click in the wallet / Privy modal (e.g.
-        // its transaction confirmation) must not close the drawer under it.
+        // Same as DialogContent: a click in the NEAR wallet selector must not
+        // close the drawer under it.
         onPointerDownOutside={(e) => {
           if (isClickInsideWalletModal(e.detail.originalEvent)) {
             e.preventDefault();

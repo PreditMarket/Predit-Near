@@ -524,22 +524,11 @@ html {
 .wallet-adapter-modal {
   z-index: 9999 !important;
 }
-.wallet-adapter-modal-wrapper {
-  z-index: 10000 !important;
-}
-.wallet-adapter-modal-overlay {
-  z-index: 9998 !important;
-}
-/* Radix Dialog (modal=true) injects pointer-events:none on body when open
- * to trap interactions inside DialogContent. The wallet picker is portaled
- * to body too, so it inherits the lock and becomes visible-but-unclickable
- * when launched from a Dialog (e.g. on-chain QuickTrade). Re-enable here. */
-.wallet-adapter-modal,
-.wallet-adapter-modal *,
-/* Same for Privy's modal (wallet confirmations from inside a Dialog). */
-#privy-dialog,
-#privy-dialog *,
-#privy-dialog-backdrop {
+/* Radix Dialog (modal=true) sets pointer-events:none on body while open. The
+ * NEAR wallet selector is appended to body, so it would be visible but
+ * unclickable when opened from a Dialog (e.g. QuickTrade). Re-enable it. */
+.hot-connector-popup,
+.hot-connector-popup * {
   pointer-events: auto !important;
 }
 
@@ -583,48 +572,6 @@ html {
  * a no-op — this mirrors the lock onto our real scroll container. */
 body[data-scroll-locked] #scroll-root {
   overflow: hidden !important;
-}
-
-/*
- * Privy modal, in the app's style. Privy injects its palette on `:root` at
- * runtime; `:root:root` outranks it without !important. Theme + accent are set
- * in PrivyProviders (`appearance`); these are the tokens it does not expose.
- */
-:root:root {
-  --privy-color-background: var(--card);
-  --privy-color-background-2: var(--secondary);
-  --privy-color-background-hover: var(--accent);
-  --privy-color-background-clicked: var(--accent);
-  --privy-color-foreground: var(--foreground);
-  --privy-color-foreground-2: var(--muted-foreground);
-  --privy-color-foreground-3: var(--muted-foreground);
-  --privy-color-foreground-4: var(--border);
-  --privy-color-border-default: var(--border);
-  --privy-color-accent: var(--brand-turq);
-  --privy-color-accent-light: color-mix(in srgb, var(--brand-turq) 70%, white);
-  --privy-color-accent-dark: color-mix(in srgb, var(--brand-turq) 80%, black);
-  --privy-color-foreground-accent: var(--brand-bg);
-  --privy-color-error: var(--destructive);
-  --privy-border-radius-xs: 4px;
-  --privy-border-radius-sm: 6px;
-  --privy-border-radius-md: 8px;
-  --privy-border-radius-mdlg: 10px;
-  --privy-border-radius-lg: 12px;
-}
-
-#privy-modal-content {
-  border: 1px solid var(--border);
-}
-
-#privy-modal-content,
-#privy-modal-content * {
-  font-family: var(--font-mono);
-}
-
-/* The mark is a viewBox-only SVG: without a size Privy renders it at 0×0. */
-#privy-modal-content img[src$='logo-MarkWhite.svg'] {
-  width: 36px;
-  height: auto;
 }
 
 /* Connect AI in the nav: a shine sweeping across, as on

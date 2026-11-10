@@ -3,52 +3,28 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { Plus } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-is-mobile';
-import { usePammAccess } from '@/hooks/use-pamm-access';
-import { OFFCHAIN_MARKETS_ENABLED } from '@/lib/feature-flags';
-import { loadPersistedMarketFilters } from '@/lib/market-filters-storage';
-import useAuthStore from '@/store/auth.store';
-import { canCloneMarket } from '@/utils/is-admin';
+import { useNearWallet } from '@/store/near-wallet.store';
 import { getCurrentPage } from './nav-helpers';
 
-/**
- * Nav pages that show prediction markets: the Predictions section
- * (`/markets`, `/market/*`, `/pamm/*`) and home (`/`), whose Market column
- * opens on trending predictions.
- */
+/** Nav pages that show prediction markets: `/markets`, `/market/*` and home. */
 const PREDICTION_PAGES = new Set(['home', 'markets', 'pamm']);
-const CREATE_PATHS = ['/market/create', '/pamm/create'];
-
-/**
- * The PAMM creator when PAMM is on and the list's Onchain filter is the one
- * picked (the only type when off-chain is disabled) — else the standard
- * creator, which handles every type. Read at click time: the filter lives in
- * the list's localStorage, not in any store the nav can see.
- */
-function createMarketHref(pammAccess: boolean): string {
-  const onchain =
-    !OFFCHAIN_MARKETS_ENABLED ||
-    loadPersistedMarketFilters()?.marketTypeFilter === 'onchain';
-  return pammAccess && onchain ? '/pamm/create' : '/market/create';
-}
+const CREATE_PATH = '/market/create';
 
 /**
  * "Create market", in the nav while prediction markets are on screen, so it
- * stays put however far the list scrolls. Signed-in only (anyone signed in
- * may clone a market). "+ Market" alone below xl, where the nav items already
+ * stays put however far the list scrolls. Shown once a wallet is connected. "+ Market" alone below xl, where the nav items already
  * fill most of the bar; a square "+" below lg, where the bar has room for
  * little more than the logo and the balance.
  */
 export function CreateMarketButton() {
   const pathname = usePathname();
   const router = useRouter();
-  const user = useAuthStore((s) => s.user);
-  const pammAccess = usePammAccess();
+  const accountId = useNearWallet((s) => s.accountId);
   const compact = useIsMobile(1024);
 
-  if (!canCloneMarket(user) || !PREDICTION_PAGES.has(getCurrentPage(pathname)))
-    return null;
-  // Already on a creator — the CTA would only reload it.
-  if (CREATE_PATHS.some((p) => pathname?.startsWith(p))) return null;
+  if (!accountId || !PREDICTION_PAGES.has(getCurrentPage(pathname))) return null;
+  // Already on the creator: the CTA would only reload it.
+  if (pathname?.startsWith(CREATE_PATH)) return null;
 
   return (
     <div className="flex items-center gap-2">
@@ -57,7 +33,7 @@ export function CreateMarketButton() {
           target if both sat on one element. */}
       <button
         type="button"
-        onClick={() => router.push(createMarketHref(pammAccess))}
+        onClick={() => router.push(CREATE_PATH)}
         title="Create market"
         aria-label="Create market"
         className="group touch-hit inline-flex"

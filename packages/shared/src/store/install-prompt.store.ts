@@ -115,9 +115,6 @@ export const useInstallPromptStore = create<InstallPromptState>((set, get) => ({
   },
 }));
 
-/** Call after a trade confirms; the first one may surface the install banner. */
-export const markFirstTrade = () => useInstallPromptStore.getState().markFirstTrade();
-
 // Listening from module load, not from a component: Chrome can fire
 // `beforeinstallprompt` before React has mounted anything.
 if (typeof window !== 'undefined') {

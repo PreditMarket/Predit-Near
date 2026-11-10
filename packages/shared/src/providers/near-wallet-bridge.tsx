@@ -3,28 +3,16 @@
 import { useEffect } from 'react';
 import { toast } from 'sonner';
 
-import { useAppShellStore } from '@/store/app-shell-store';
 import { useNearWallet } from '@/store/near-wallet.store';
-import { useV2AuthStore } from '@/store/v2-auth-store';
 
-/** Restores the wallet session and answers every "please sign in" prompt with the wallet. */
+/** Restores the wallet session and tops up a new account's gas. */
 export function NearWalletBridge() {
   const accountId = useNearWallet((s) => s.accountId);
   const hydrate = useNearWallet((s) => s.hydrate);
-  const connect = useNearWallet((s) => s.connect);
-  const walletPrompt = useAppShellStore((s) => s.walletConnectOpen);
-  const signInPrompt = useV2AuthStore((s) => s.signInOpen);
 
   useEffect(() => {
     void hydrate();
   }, [hydrate]);
-
-  useEffect(() => {
-    if (!walletPrompt && !signInPrompt) return;
-    useAppShellStore.getState().setOpen('walletConnectOpen', false);
-    useV2AuthStore.getState().setSignInOpen(false);
-    void connect();
-  }, [walletPrompt, signInPrompt, connect]);
 
   // New accounts get a little testnet NEAR, so their first signature can pay gas.
   useEffect(() => {

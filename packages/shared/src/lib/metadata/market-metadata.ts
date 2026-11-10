@@ -11,12 +11,9 @@
  * remains for title/description.
  */
 
-import { SERVER_FETCH_HEADERS } from '@/lib/server-api';
 import { getNearMarket } from '@/lib/near/contract';
 import { statusOf } from '@/lib/near/map';
 import { listNearMarkets } from '@/lib/near/market-list';
-
-const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL ?? '').replace(/\/$/, '');
 
 
 export interface MarketMeta {
@@ -46,88 +43,6 @@ function htmlToMetaText(html: string | undefined | null, max = 200): string {
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, max);
-}
-
-async function safeFetch<T>(
-  url: string,
-  init?: { revalidate?: number; tags?: string[] },
-): Promise<T | null> {
-  try {
-    const res = await fetch(url, {
-      headers: SERVER_FETCH_HEADERS,
-      next: {
-        revalidate: init?.revalidate ?? 60,
-        ...(init?.tags ? { tags: init.tags } : {}),
-      },
-    });
-    if (!res.ok) return null;
-    return (await res.json()) as T;
-  } catch {
-    return null;
-  }
-}
-
-interface RawMarket {
-  question?: string;
-  description?: string;
-}
-
-/**
- * Server-side list fetcher for the markets index page. Pre-fetches the
- * first page so SSR HTML contains the market cards + internal links to
- * each market detail page — crawlers can index the list and discover
- * individual markets.
- *
- * Defaults match the client `MarketList` initial state (status=open,
- * sort=volume desc) so the SSR snapshot lines up with what a fresh
- * visitor would see before any filter changes.
- */
-export interface ListedMarket {
-  id: string;
-  slug?: string;
-  shortCode?: string;
-  question: string;
-  description?: string;
-  image?: { path?: string } | null;
-  imageUrl?: string;
-  yesPool?: number;
-  noPool?: number;
-  closeAt?: string;
-  status?: string;
-}
-
-export interface MarketListResult {
-  data: ListedMarket[];
-  hasNextPage: boolean;
-}
-
-export async function fetchMarketList(
-  limit = 12,
-): Promise<MarketListResult> {
-  try {
-    const params = new URLSearchParams({
-      page: '1',
-      limit: String(limit),
-      status: 'open',
-      sort: 'volume',
-      order: 'desc',
-    });
-    const res = await fetch(`${API_BASE}/market?${params.toString()}`, {
-      headers: SERVER_FETCH_HEADERS,
-      next: { revalidate: 300, tags: ['market-list'] },
-    });
-    if (!res.ok) return { data: [], hasNextPage: false };
-    const raw = (await res.json()) as {
-      data?: ListedMarket[];
-      hasNextPage?: boolean;
-    };
-    return {
-      data: raw.data ?? [],
-      hasNextPage: !!raw.hasNextPage,
-    };
-  } catch {
-    return { data: [], hasNextPage: false };
-  }
 }
 
 /** An active PAMM market, as crawlers need it: where it lives and what it asks. */
@@ -185,17 +100,6 @@ export async function fetchPammMarketDetail(id: string): Promise<MarketDetailSna
   };
 }
 
-export async function fetchMarketMeta(id: string): Promise<MarketMeta | null> {
-  const raw = await safeFetch<RawMarket>(`${API_BASE}/market/${id}`);
-  if (!raw) return null;
-  const clean = htmlToMetaText(raw.description);
-  return {
-    title: raw.question ?? 'Market Detail',
-    description: clean || 'View and manage prediction market details on Predit.',
-    image: `${API_BASE}/market/${id}/og-image.png`,
-  };
-}
-
 /**
  * Server-side detail fetcher for the per-market SEO shell. Returns
  * the fields needed to render the SSR header (h1, intro) and the
@@ -211,35 +115,4 @@ export interface MarketDetailSnapshot {
   closeAt?: string;
   status?: string;
   category?: { name?: string } | null;
-}
-
-export async function fetchMarketDetail(
-  id: string,
-): Promise<MarketDetailSnapshot | null> {
-  const raw = await safeFetch<{
-    id?: string;
-    slug?: string;
-    question?: string;
-    description?: string;
-    image?: { path?: string } | null;
-    imageUrl?: string;
-    closeAt?: string;
-    status?: string;
-    category?: { name?: string } | null;
-  }>(`${API_BASE}/market/${id}`);
-  if (!raw || !raw.question) return null;
-  return {
-    id: raw.id ?? id,
-    slug: raw.slug,
-    question: raw.question,
-    description: htmlToMetaText(raw.description, 500),
-    // Pin OG/JSON-LD image to the backend-rendered card so social
-    // shares always show the branded preview (matches whatever the
-    // backend generates for the gated share page). Skip raw asset to
-    // keep one source of truth across surfaces.
-    image: `${API_BASE}/market/${id}/og-image.png`,
-    closeAt: raw.closeAt,
-    status: raw.status,
-    category: raw.category ?? null,
-  };
 }

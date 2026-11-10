@@ -13,9 +13,6 @@ export const pct2 = (p: number): string => `${(p * 100).toFixed(2)}%`;
 /** USD, 2 decimals, no thousands separator (matches mockup e.g. "$38.12"). */
 export const usd2 = (n: number): string => `$${n.toFixed(2)}`;
 
-/** USD rounded to integer with thousands separator (headline payouts). */
-export const usdInt = (n: number): string => `$${Math.round(n).toLocaleString()}`;
-
 /**
  * Headline USD formatter that adapts precision to magnitude so sub-$1 amounts
  * don't collapse to "$0":

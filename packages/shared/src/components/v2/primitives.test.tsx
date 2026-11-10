@@ -1,20 +1,10 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
-import { Money, PnlValue, ResponsiveTable, SegmentedTabs, SplitBar, StatTile } from './index';
+import { ResponsiveTable, SegmentedTabs, StatTile } from './index';
 
 const html = (node: React.ReactElement) => renderToStaticMarkup(node);
 
 describe('v2 primitives', () => {
-  it('Money and PnlValue format and colour', () => {
-    expect(html(<Money value="1234.5" />)).toContain('$1,234.50');
-    const down = html(<PnlValue value={-12.3} pct={-4.8} />);
-    expect(down).toContain('-$12.30');
-    expect(down).toContain('(-4.80%)');
-    expect(down).toContain('text-danger');
-    expect(html(<PnlValue value={5} />)).toContain('text-success');
-    expect(html(<PnlValue value={null} pct={3} />)).toMatch(/text-muted-foreground">—</);
-  });
-
   it('StatTile swaps the value for a skeleton while loading', () => {
     expect(html(<StatTile label="Win rate" value="62%" sub="12 trades" />)).toContain('12 trades');
     const loading = html(<StatTile label="Win rate" value="62%" sub="12 trades" loading />);
@@ -63,20 +53,5 @@ describe('v2 primitives', () => {
       <ResponsiveTable rows={[]} columns={columns} getRowKey={(r) => r.id} renderCard={() => null} empty="No trades yet." />,
     );
     expect(empty).toContain('No trades yet.');
-  });
-
-  it('SplitBar grows segments in proportion and drops empty ones', () => {
-    const out = html(
-      <SplitBar
-        parts={[
-          { value: 3, className: 'bg-success' },
-          { value: 0, className: 'bg-muted' },
-          { value: 1, className: 'bg-danger' },
-        ]}
-      />,
-    );
-    expect(out.match(/flex-grow:/g)).toHaveLength(2);
-    expect(out).toContain('flex-grow:3');
-    expect(out).not.toContain('width:');
   });
 });

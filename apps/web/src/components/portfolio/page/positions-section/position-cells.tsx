@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { Zap } from 'lucide-react';
 import { PammShareButton } from '@/components/pamm/share-button';
 import { cn } from '@/components/ui/utils';
 import { DASH } from '@/lib/format';

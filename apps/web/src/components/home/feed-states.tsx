@@ -1,13 +1,3 @@
-import type { ReactNode } from 'react';
-
-/** A centred message in place of the feed (empty, signed out, failed). */
-export function Notice({ children }: { children: ReactNode }) {
-  return (
-    <div className="px-5 py-16 text-center text-[13px] text-muted-foreground">
-      {children}
-    </div>
-  );
-}
 
 /** Placeholder rows while a feed tab loads; same shape as a post or a fill. */
 export function FeedItemSkeleton({ count = 4 }: { count?: number }) {

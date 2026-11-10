@@ -4,19 +4,11 @@ import type { PammMarketTrade } from '@/services/pamm-market.service';
 import type { MarketSource, UnifiedPosition } from '@/services/unified-market.service';
 
 const SOURCE_STYLE: Record<MarketSource, string> = {
-  predit: 'bg-brand-purple/15 text-brand-purple',
-  polymarket: 'bg-brand-purple/15 text-brand-purple',
-  kalshi: 'bg-primary/15 text-primary',
   pamm: 'bg-brand-purple/15 text-brand-purple',
-  quick: 'bg-warning/15 text-warning',
 };
 
 const SOURCE_LABEL: Record<MarketSource, string> = {
-  predit: 'PREDIT',
-  polymarket: 'POLY',
-  kalshi: 'KALSHI',
   pamm: 'PREDIT',
-  quick: 'QUICK',
 };
 
 function statusStyle(status: string): string {

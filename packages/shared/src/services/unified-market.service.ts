@@ -1,76 +1,16 @@
 import {
-  Market,
-  MarketOrder,
-} from './market.service';
-import {
-  PolymarketMarket,
-  PolymarketTrade,
-} from './polymarket.service';
-import {
-  DflowDataEntity,
-  DflowTradeEntity,
-} from './dflow.service';
-import {
-  getMyPammTrades,
-  getPammMarketById,
-  PammMarket,
-  PammMarketTrade,
+    getMyPammTrades, PammMarket,
+    PammMarketTrade
 } from './pamm-market.service';
 import {
-  getActiveQuickMarkets,
-  QuickMarketResponseDto,
-  quickMarketOutcomeLabels,
-} from './quick-market.service';
-import {
-  buildBinaryOptions,
-  type MarketOptionDescriptor,
-} from '@/lib/market-options';
-import {
-  getCachedCollateral,
-  getCachedCollateralDecimals,
-  resolveCollateralSymbol,
+    getCachedCollateral,
+    getCachedCollateralDecimals,
+    resolveCollateralSymbol,
 } from './pamm/collaterals.service';
 import type { PammMarketVersion } from './pamm/market-be';
 
-export type MarketSource =
-  | 'predit'
-  | 'polymarket'
-  | 'kalshi'
-  | 'pamm'
-  | 'quick';
-
-export interface UnifiedMarket {
-  id: string;
-  source: MarketSource;
-  question: string;
-  imageUrl?: string;
-  /** 0-100 probability percentage */
-  yesPrice: number;
-  noPrice: number;
-  volume: string;
-  endDate: string;
-  /** ISO timestamp when the market was created, if known */
-  createdAt?: string;
-  status: string;
-  tags: string[];
-  /** Parent group id, if this market is one option of a multi-candidate group. */
-  groupId?: string | null;
-  /** Set when this feed entry is a group card (links to the group detail page). */
-  groupSlug?: string;
-  /** Tradable options with (custom) labels — 2 for a binary market. */
-  options?: MarketOptionDescriptor[];
-  /** Distinct trader count, if the source tracks it (currently: quick markets). */
-  participants?: number;
-  /** Creator fee in basis points, if the source tracks it (currently: quick markets). */
-  creatorShareBps?: number;
-  /** Original entity — needed for trade execution */
-  sourceData:
-    | Market
-    | PolymarketMarket
-    | DflowDataEntity
-    | PammMarket
-    | QuickMarketResponseDto;
-}
+/** Every position here comes from the NEAR market contract. */
+export type MarketSource = 'pamm';
 
 export interface UnifiedPosition {
   id: string;
@@ -85,11 +25,7 @@ export interface UnifiedPosition {
   status: string;
   unit?: string;
   createdAt: string;
-  sourceData:
-    | MarketOrder
-    | PolymarketTrade
-    | DflowTradeEntity
-    | PammMarketTrade;
+  sourceData: PammMarketTrade;
   xpValue?: number;
   /**
    * Payout if this side wins. Unset when it can't be known from the row alone —
@@ -106,86 +42,6 @@ export interface UnifiedPosition {
   marketUrl?: string;
   /** PAMM only — drives the v3-specific copy and claim behaviour. */
   marketVersion?: PammMarketVersion;
-}
-
-const QUICK_MARKET_TOKEN_NAME: Record<string, string> = {
-  SOL: 'Solana',
-  BTC: 'Bitcoin',
-  ETH: 'Ethereum',
-};
-
-// Fallback for backends that predate `tokenImageUrl` on
-// `QuickMarketResponseDto` — same trustwallet assets the BE itself stamps
-// onto the mirrored PAMM record's thumbnail.
-const QUICK_MARKET_TOKEN_ICON: Record<string, string> = {
-  SOL: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/solana/info/logo.png',
-  BTC: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/bitcoin/info/logo.png',
-  ETH: 'https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/info/logo.png',
-};
-
-// BE strike prices arrive as decimal strings padded to a fixed scale
-// (e.g. "76.7700000000") — trim that down to a plain, human price.
-function formatStrikePrice(raw: string): string {
-  const n = Number(raw);
-  if (!Number.isFinite(n)) return raw;
-  return n.toLocaleString('en-US', { maximumFractionDigits: 2 });
-}
-
-async function normalizeQuickMarket(
-  m: QuickMarketResponseDto,
-): Promise<UnifiedMarket> {
-  const tokenName = QUICK_MARKET_TOKEN_NAME[m.tokenSymbol] ?? m.tokenSymbol;
-  // A quick market's `poolPubkey` doubles as its ordinary PAMM market id
-  // (see quick-market-api.md "Trade history") — still needed for the live
-  // on-chain price and creator fee, which aren't on QuickMarketResponseDto.
-  // Volume/participants now come straight off `m` (BE added them directly).
-  const pammMarket = await getPammMarketById(m.poolPubkey).catch(() => null);
-  let yesPrice = 50;
-  if (m.resolutionSide === 'yes') yesPrice = 100;
-  else if (m.resolutionSide === 'no') yesPrice = 0;
-  else if (pammMarket && Number.isFinite(pammMarket.latestPriceYes)) {
-    // Live on-chain price only makes sense pre-resolution.
-    yesPrice = pammMarket.latestPriceYes * 100;
-  }
-  const { yesLabel, noLabel } = quickMarketOutcomeLabels(m.direction);
-  return {
-    id: m.id,
-    source: 'quick',
-    // Prefer the mirrored PAMM market's question — it's the same text the
-    // detail/trade page renders (both back onto `poolPubkey`), so this keeps
-    // list and detail from disagreeing when `m.question` lags behind it.
-    question:
-      pammMarket?.question ??
-      m.question ??
-      `${tokenName} ${m.direction} $${formatStrikePrice(m.strikePriceUsd)}?`,
-    imageUrl: m.tokenImageUrl ?? QUICK_MARKET_TOKEN_ICON[m.tokenSymbol],
-    yesPrice,
-    noPrice: 100 - yesPrice,
-    volume: m.totalVolumeUsdc,
-    participants: m.totalParticipants ?? pammMarket?.uniqueTraderCount ?? pammMarket?.tradeCount,
-    creatorShareBps: pammMarket?.creatorShareBps,
-    endDate: new Date(m.expiryTs * 1000).toISOString(),
-    createdAt: m.createdAt,
-    status: m.status,
-    tags: ['crypto', m.tokenSymbol],
-    options: buildBinaryOptions({
-      marketId: m.id,
-      source: 'quick',
-      yesLabel,
-      noLabel,
-      yesPrice,
-    }),
-    sourceData: m,
-  };
-}
-
-/**
- * Currently-tradable quick markets as `UnifiedMarket`s, real pool price
- * included. Shared by the unified feed and by `MarketList`'s standalone
- * on-chain grid — both surfaces render quick markets through this.
- */
-export async function fetchActiveQuickMarkets(): Promise<UnifiedMarket[]> {
-  return [];
 }
 
 function normalizePammTrade(

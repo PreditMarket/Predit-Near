@@ -11,17 +11,13 @@ import { formatDate } from '@/lib/date';
 import type { MarketRules } from '@/services/market.service';
 import BN from 'bn.js';
 import {
-  ChevronDown,
-  Clock,
-  ExternalLink,
-  Gavel,
-  Info,
-  Loader2,
-  TimerReset,
-  TrendingUp,
+    ChevronDown,
+    Clock,
+    ExternalLink,
+    Gavel, TimerReset,
+    TrendingUp
 } from 'lucide-react';
 import { useState } from 'react';
-import { ResolveStatusBanner } from './resolve/resolve-status-banner';
 import { RedeemPanel } from './redeem-panel';
 import { SwapPanel } from './swap-panel';
 
@@ -144,12 +140,6 @@ function formatCompact(value: number) {
   }).format(value);
 }
 
-function formatTokenAmount(raw: bigint, decimals = 6, digits = 2) {
-  return (Number(raw) / 10 ** decimals).toLocaleString('en-US', {
-    maximumFractionDigits: digits,
-  });
-}
-
 function shortAddr(v: string, s = 6, e = 4) {
   return `${v.slice(0, s)}…${v.slice(-e)}`;
 }
@@ -191,16 +181,6 @@ function getStatus(
     label: 'Live',
     cls: 'bg-success/10 text-success border-success/20',
   };
-}
-
-function formatTimeAgo(ts: number, now: number) {
-  const diff = Math.floor(now - ts / 1000);
-  if (diff < 60) return `${Math.max(1, diff)}s`;
-  const m = Math.floor(diff / 60);
-  if (m < 60) return `${m}m`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h`;
-  return `${Math.floor(h / 24)}d`;
 }
 
 // ─── dual-line chart ─────────────────────────────────────────────────────────
@@ -272,128 +252,19 @@ function buildRealChart(
   };
 }
 
-// ─── Bonus XP Awards (admin-only) ────────────────────────────────────────────
-
-function BonusXpAwardsTable({
-  marketId,
-  isResolved,
-  className,
-}: {
-  marketId: string;
-  isResolved: boolean;
-  className?: string;
-}) {
-  const [awards, setAwards] = useState<PammMarketBonusXpAward[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!isResolved) return;
-    setLoading(true);
-    pammMarketAdminService
-      .getBonusXpAwards(marketId)
-      .then(setAwards)
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [marketId, isResolved]);
-
-  return (
-    <div
-      className={`max-lg:order-6 rounded-[10px] border border-border bg-card overflow-hidden${className ? ` ${className}` : ''}`}
-    >
-      <div className="flex items-center gap-2 px-4.5 py-3 border-b border-border">
-        <span className="text-[12.5px] font-semibold">Bonus XP Awards</span>
-        <span className="rounded-[3px] border border-warning/40 bg-warning/10 px-1.5 py-0.5 font-mono text-[8px] font-bold uppercase tracking-widest text-warning">
-          Admin
-        </span>
-      </div>
-      {!isResolved ? (
-        <div className="py-8 text-center font-mono text-[11px] text-muted-foreground">
-          Awards are distributed after the market resolves.
-        </div>
-      ) : loading ? (
-        <div className="flex justify-center py-8">
-          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-        </div>
-      ) : awards.length === 0 ? (
-        <div className="py-8 text-center font-mono text-[11px] text-muted-foreground">
-          No awards recorded yet.
-        </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <div className="min-w-[420px]">
-            <div
-              className="grid gap-x-2 px-4.5 py-2 bg-background border-b border-border font-mono text-[8.5px] font-bold uppercase tracking-[0.12em] text-muted-foreground"
-              style={{ gridTemplateColumns: '1fr 100px 80px 80px' }}
-            >
-              <span>User ID</span>
-              <span className="text-right">Bonus XP</span>
-              <span className="text-right">Volume</span>
-              <span className="text-right">% of Total</span>
-            </div>
-            {awards.map((a) => {
-              const pct =
-                a.totalWinVolume > 0
-                  ? ((a.userVolume / a.totalWinVolume) * 100).toFixed(1)
-                  : '—';
-              return (
-                <div
-                  key={a.id}
-                  className="grid items-center gap-x-2 px-4.5 py-2 border-b border-border last:border-0 font-mono text-[11px]"
-                  style={{ gridTemplateColumns: '1fr 100px 80px 80px' }}
-                >
-                  <span
-                    className="truncate text-muted-foreground"
-                    title={a.userId}
-                  >
-                    {a.userId.slice(0, 8)}…{a.userId.slice(-4)}
-                  </span>
-                  <span className="text-right font-semibold text-warning">
-                    {a.bonusXp.toLocaleString()} XP
-                  </span>
-                  <span className="text-right text-foreground">
-                    {a.userVolume.toFixed(2)}
-                  </span>
-                  <span className="text-right text-muted-foreground">{pct}%</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── component ───────────────────────────────────────────────────────────────
 
 import { useCollateralMap } from '@/hooks/pamm/use-collaterals';
-import { NEAR_MARKET_CONTRACT, nearExplorerAccountUrl, nearExplorerTxUrl } from '@/lib/near/config';
+import { NEAR_MARKET_CONTRACT, nearExplorerAccountUrl } from '@/lib/near/config';
 import { PammMarket, pammMarketService } from '@/services/pamm-market.service';
-import {
-  pammMarketAdminService,
-  type PammMarketBonusXpAward,
-} from '@/services/pamm-market-admin.service';
-import useAuthStore from '@/store/auth.store';
-import { LiveKitRoom } from '@livekit/components-react';
-import {
-  keepPreviousData,
-  useMutation,
-  useQuery,
-  useQueryClient,
-} from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo } from 'react';
-import { toast } from 'sonner';
-import { useHasSession } from '@/hooks/use-has-session';
-import { RoastFeed } from './roast-feed';
 import { PammShareButton } from './share-button';
-import { RequestTrendingButton } from './trending/request-trending-button';
-import { canRequestTrending } from '@/utils/is-admin';
-import { showErrorToast } from '@/components/error/toast-error';
 import {
-  Drawer,
-  DrawerContent,
-  DrawerDescription,
-  DrawerTitle,
+    Drawer,
+    DrawerContent,
+    DrawerDescription,
+    DrawerTitle,
 } from '@/components/ui/drawer';
 
 interface PoolDetailLayoutProps {
@@ -410,7 +281,6 @@ export function PoolDetailLayout({
   const { pool } = poolState;
   const { data: pammConfig } = useConfig();
   const bannedFromTrading = useTradingBan(poolAddress);
-  const [sessionKey, setSessionKey] = useState(0);
   const [howOpen, setHowOpen] = useState(false);
   const [now, setNow] = useState<number | null>(null);
   const [tradeOpen, setTradeOpen] = useState(false);
@@ -441,59 +311,6 @@ export function PoolDetailLayout({
     queryFn: () => pammMarketService.getRealtime(poolAddress),
     refetchInterval: 5000,
   });
-
-  // Paginated trade history (separate from the realtime feed that drives the
-  // chart). keepPreviousData avoids a flash of "no trades" while paging.
-  const TRADES_PER_PAGE = 10;
-  const [tradePage, setTradePage] = useState(1);
-  const { data: tradesPage } = useQuery({
-    queryKey: ['pamm', 'market', poolAddress, 'trades', tradePage],
-    queryFn: () =>
-      pammMarketService.getTrades(poolAddress, {
-        page: tradePage,
-        limit: TRADES_PER_PAGE,
-      }),
-    placeholderData: keepPreviousData,
-    refetchInterval: 5000,
-  });
-
-  const user = useAuthStore((s) => s.user);
-
-  const isCreator = useMemo(() => {
-    if (!user || !market) return false;
-    return market.creatorId === user.id;
-  }, [user, market]);
-
-  const isAdminOnly = useMemo(() => {
-    if (!user || !market) return false;
-    return !!user.isAdmin && market.creatorId !== user.id;
-  }, [user, market]);
-
-  const canRequestTrendingForMarket =
-    isCreator &&
-    canRequestTrending(user) &&
-    !market.isTrending &&
-    market.status === 'active';
-
-  const qcAdmin = useQueryClient();
-  const disputeAutoResolveMutation = useMutation({
-    mutationFn: () => pammMarketAdminService.disputeAutoResolve(market.id),
-    onSuccess: () => {
-      toast.success('Marked as disputed.');
-      qcAdmin.invalidateQueries({ queryKey: ['pamm', 'market', poolAddress] });
-    },
-    onError: (err) => showErrorToast(err),
-  });
-  // Only shown to admins on a market this backend auto-resolved from its
-  // source (e.g. Polymarket) — the button just flags `autoResolveDisputed`,
-  // it does NOT reverse the on-chain outcome (manual dev/ops follow-up
-  // needed after this, per market-clone.md §4).
-  const canDisputeAutoResolve =
-    isAdminOnly &&
-    !!market.autoResolvedAt &&
-    !market.autoResolveDisputed &&
-    (!market.autoResolveDisputeUntil ||
-      new Date(market.autoResolveDisputeUntil).getTime() > Date.now());
 
   const collateralMap = useCollateralMap();
   const collateralToken = collateralMap.get(pool.collateralMint.toBase58());
@@ -589,38 +406,6 @@ export function PoolDetailLayout({
   const collateralUSD =
     Number(poolState.collateralVaultBalance) / collateralScale;
 
-  const trades =
-    tradesPage?.data
-      ?.filter((t) => t.side !== 'seed')
-      .map((t) => {
-        const isBuy = t.side.startsWith('buy_');
-        const isYes = t.side.includes('yes');
-        return {
-          time:
-            now !== null
-              ? formatTimeAgo(new Date(t.createdAt).getTime(), now)
-              : '',
-          handle: shortAddr(t.traderAddress, 4, 4),
-          tier: '—',
-          tCls: 'bg-muted text-muted-foreground',
-          action: isBuy ? 'BUY' : 'SELL',
-          outcome: (isYes ? yesLabel : noLabel).toUpperCase(),
-          isBuy,
-          isYes,
-          shares: (Number(t.amountOut) / collateralScale).toLocaleString(
-            undefined,
-            {
-              maximumFractionDigits: 0,
-            },
-          ),
-          price: isYes ? pctPair(t.priceYes).yes : pctPair(t.priceYes).no,
-          txSig: t.txSig,
-          txShort: shortAddr(t.txSig, 4, 4),
-          solscanUrl: nearExplorerTxUrl(t.txSig),
-        };
-      }) || [];
-  const tradesHasNext = tradesPage?.hasNextPage ?? false;
-
   // resolver is now global (on Config), not per-pool.
   const resolverShort = pammConfig?.resolver
     ? shortAddr(pammConfig.resolver.toBase58(), 4, 4)
@@ -660,23 +445,7 @@ export function PoolDetailLayout({
                   Trending
                 </span>
               )}
-              {market.sourceProvider && (
-                <a
-                  href={market.sourceUrl || undefined}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="touch-hit rounded-[3px] border border-primary/40 bg-primary/10 px-1.75 py-0.5 font-mono text-[8.5px] font-bold uppercase tracking-widest text-primary hover:brightness-110"
-                >
-                  {market.sourceProvider === 'kalshi' ? 'Kalshi' : 'Polymarket'}
-                </a>
-              )}
               <span className="flex-1" />
-              {canRequestTrendingForMarket && (
-                <>
-                  <RequestTrendingButton marketId={market.id} />
-                  <span className="h-3.5 w-px bg-border" />
-                </>
-              )}
               <span className="flex items-center gap-1.5 font-bold text-warning">
                 <TimerReset className="h-3.5 w-3.5" />
                 <span className="font-mono text-[8.5px] font-semibold text-warning/70 uppercase tracking-[0.08em]">
@@ -733,15 +502,6 @@ export function PoolDetailLayout({
                 </div>
               </div>
             </div>
-
-            {/* AI-resolve status — provisional result + dispute window */}
-            <ResolveStatusBanner
-              market={market}
-              poolAddress={poolAddress}
-              yesLabel={yesLabel}
-              noLabel={noLabel}
-              isCreator={isCreator}
-            />
 
             {/* Stats strip */}
             <div className="flex border-b border-border overflow-x-auto">
@@ -824,26 +584,6 @@ export function PoolDetailLayout({
                     <span className="rounded-[3px] border border-danger/40 bg-danger/10 px-1.75 py-0.5 font-mono text-[9px] font-bold uppercase tracking-widest text-danger">
                       Disputed
                     </span>
-                  )}
-                  {canDisputeAutoResolve && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (
-                          window.confirm(
-                            'Flag this auto-resolve as disputed? This only marks it for review — it does NOT reverse the on-chain outcome. Manual dev/ops follow-up is required afterward.',
-                          )
-                        ) {
-                          disputeAutoResolveMutation.mutate();
-                        }
-                      }}
-                      disabled={disputeAutoResolveMutation.isPending}
-                      className="touch-hit rounded-[3px] border border-danger/40 px-1.75 py-0.5 font-mono text-[9px] font-bold uppercase tracking-widest text-danger transition-colors hover:bg-danger/10 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {disputeAutoResolveMutation.isPending
-                        ? 'Disputing…'
-                        : 'Dispute'}
-                    </button>
                   )}
                 </div>
               </div>

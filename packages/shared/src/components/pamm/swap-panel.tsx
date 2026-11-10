@@ -8,9 +8,9 @@ import { useRouter } from 'next/navigation';
 import { useWalletGate } from '@/hooks/use-wallet-gate';
 import { useGlobalPause } from '@/hooks/pamm/use-global-pause';
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useBuyQuote } from '@/hooks/pamm/use-buy-quote';
 import { useBuyOutcome } from '@/hooks/pamm/use-buy-outcome';
@@ -39,8 +39,8 @@ import { ResultPanel } from './trade-card/result-panel';
 import { AdvanceToggle } from './trade-card/advance-toggle';
 import { AdvancePanel } from './trade-card/advance-panel';
 import {
-  SettingsPopover,
-  type TradeDetail,
+    SettingsPopover,
+    type TradeDetail,
 } from './trade-card/settings-popover';
 import { WarningBanner } from './trade-card/warning-banner';
 import { pickTopWarning } from './trade-card/pick-top-warning';
@@ -49,12 +49,10 @@ import { deriveAdvanceData } from './trade-card/derive-advance-data';
 import { deriveResultTexts } from './trade-card/derive-result-panel';
 import { useBuyPreview, useSellPreview } from './trade-card/use-trade-preview';
 import {
-  pct2,
-  fmtTokenAmount,
-  rawToUnits,
-  usd2,
-  usdInt,
-  usdSmart,
+    pct2,
+    fmtTokenAmount,
+    rawToUnits,
+    usd2, usdSmart
 } from './trade-card/formatters';
 
 const IMPACT_WARN = 0.05;

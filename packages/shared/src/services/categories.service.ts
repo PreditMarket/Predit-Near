@@ -1,5 +1,4 @@
 
-export const CATEGORIES_LIST_KEY = ['categories', 'list'] as const;
 
 export interface Category {
   id: string;

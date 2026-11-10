@@ -1,24 +1,15 @@
 'use client';
 
 /**
- * Horizontal navigation bar — experimental replacement for the desktop
- * sidebar. Reuses the same nav-item taxonomy (trade / discover / kol /
- * admin) but lays them out inline along the top of the viewport. On
- * mobile widths a hamburger opens a slide-out drawer rendering the
- * same items vertically.
- *
- * On the right: the balance pill (spot plus perps, opening every way to move
- * money) and the account menu. Predictions navigates straight to /chat —
- * the recent chats list now lives in a left-side panel inside the chat
- * route.
+ * The top navigation bar: the sections on the left, the NEAR account on
+ * the right. On mobile widths a hamburger opens a drawer with the same items.
  */
 
 import { Menu } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { useIsMobile } from '@/hooks/use-is-mobile';
-import { useAppShellStore } from '@/store/app-shell-store';
-import useAuthStore from '@/store/auth.store';
+import { useNearWallet } from '@/store/near-wallet.store';
 import { BrandMark } from '@/components/nav/brand-mark';
 import { ScreenSwitcher } from '@/components/nav/screen-switcher';
 import { MobileDrawer } from '@/components/nav/mobile-drawer';
@@ -31,8 +22,8 @@ import { getCurrentPage } from '@/components/nav/nav-helpers';
 
 export function TopNav() {
   const pathname = usePathname();
-  const user = useAuthStore((s) => s.user);
-  const setOpen = useAppShellStore((s) => s.setOpen);
+  const accountId = useNearWallet((s) => s.accountId);
+  const connect = useNearWallet((s) => s.connect);
 
   const isMobile = useIsMobile(1024);
 
@@ -90,8 +81,8 @@ export function TopNav() {
    * Used by NavButton onClick handlers — caller does `e.preventDefault()` on false.
    */
   const canNavigate = (_id: string, requiresAuth: boolean): boolean => {
-    if (requiresAuth && !user) {
-      setOpen('walletConnectOpen', true);
+    if (requiresAuth && !accountId) {
+      void connect();
       return false;
     }
     return true;

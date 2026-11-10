@@ -10,7 +10,7 @@ interface PayWithRowProps {
   decimals: number;
 }
 
-/** Coin dot 14×14. Renders Jupiter's icon when present; falls back to a
+/** Coin dot 14×14. Renders the token's icon when present; falls back to a
  * lettered avatar only if the icon URL 404s or was never supplied. Error
  * flag resets when the icon URL flips (enrichment lands after first paint). */
 function CoinBadge({ symbol, size = 14 }: { symbol: string; size?: number }) {

@@ -7,25 +7,13 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { ColumnBar, ColumnTitle } from '@/components/app-shell/column-bar';
 
 import { getCategories, type Category } from '@/services/categories.service';
-import MarketList from '@/components/market/market-list';
-import type { PammMarketListItem } from '@/services/pamm-market.service';
-
-/** Sticky header over the scrolling list: the page background, slightly see-through. */
-const HEADER_BG = 'color-mix(in srgb, var(--background) 85%, transparent)';
+import { NearMarketList } from '@/components/markets/near-market-list';
 
 /**
- * Predictions page (v2) — category rail and the market list.
- * Item list is the unchanged origin `MarketList`. The rail collapses; its
+ * Markets page: category rail and the market list. The rail collapses; its
  * expand anchor lives in the center sticky topbar (mirrors the Home (`/`) pattern).
  */
-export default function PredictionsPageV2({
-  initialPammItems,
-  initialPammHasMore,
-}: {
-  /** The server's first page of the default on-chain list — see MarketList. */
-  initialPammItems?: PammMarketListItem[];
-  initialPammHasMore?: boolean;
-} = {}) {
+export default function PredictionsPageV2() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const activeSlug = searchParams?.get('category') ?? null;
@@ -68,33 +56,10 @@ export default function PredictionsPageV2({
           />
         )}
 
-        {/* Center — origin MarketList's own sticky tab strip becomes the
-            center menu. CSS vars pin it to the top of this column (its own
-            scroller) and dress it in /markets v2 glass tokens. `bare` mode on MarketPageLayout
-            (see MarketList `hideCategoryTabs` prop) drops the outer
-            content chrome + max-width wrap so the tabs sit flush inside
-            the 3-col shell. */}
         <main
           className={[
             'min-w-0 min-h-0 overflow-y-auto flex flex-col relative',
-            '[&_.card-order]:!rounded-[10px]',
-            // Tighter grid gap (mockup uses 12px, fe defaults 16px)
-            '[&_.grid.gap-4]:!gap-3',
           ].join(' ')}
-          style={{
-            // MarketSubHeader (uses these vars) is not the active header
-            // here — MarketList renders MarketPageLayout instead — but the
-            // vars are cheap and harmless.
-            ['--sub-header-top' as string]: '0px',
-            ['--sub-header-bg' as string]: HEADER_BG,
-            ['--sub-header-border' as string]: 'var(--border)',
-            // MarketPageLayout sticky header — pinned to the top of this
-            // column, which scrolls on its own (fallback 4rem is for the
-            // standalone full-page layout).
-            ['--mpl-header-top' as string]: '0px',
-            ['--mpl-header-bg' as string]: HEADER_BG,
-            ['--mpl-header-border' as string]: 'var(--border)',
-          }}
         >
           {/* The category rail is hidden below md — filter from a chip strip. */}
           <MobileCategoryStrip
@@ -102,11 +67,7 @@ export default function PredictionsPageV2({
             activeSlug={activeSlug}
             onChange={setCategorySlug}
           />
-          <MarketList
-            isFromMarketPage
-            initialPammItems={initialPammItems}
-            initialPammHasMore={initialPammHasMore}
-            hideCategoryTabs
+          <NearMarketList
             categorySlug={activeSlug}
             gridColsClassName={
               leftCollapsed
@@ -115,11 +76,7 @@ export default function PredictionsPageV2({
             }
             headerLeadingSlot={
               leftCollapsed ? (
-                <RailExpandChip
-                  side="left"
-                  label="Categories"
-                  onClick={() => setLeftCollapsed(false)}
-                />
+                <RailExpandChip side="left" label="Categories" onClick={() => setLeftCollapsed(false)} />
               ) : null
             }
           />

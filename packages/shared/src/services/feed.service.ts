@@ -42,11 +42,6 @@ export interface PostDto {
   feedAt?: string;
 }
 
-interface ListResponse {
-  items: PostDto[];
-  nextCursor?: string | null;
-}
-
 /** Map raw BE dto to the FeedItem union expected by <FeedPost>. */
 export function postDtoToFeedItem(p: PostDto): Extract<FeedItem, { kind: 'post' }> {
   return {

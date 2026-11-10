@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-import { cents, fmtTokenAmount, usd2, usdInt, usdSmart } from './formatters';
+import { cents, fmtTokenAmount, usd2, usdSmart } from './formatters';
 import type { BuyPreview, SellPreview } from './use-trade-preview';
 
 export interface ResultTextArgs {

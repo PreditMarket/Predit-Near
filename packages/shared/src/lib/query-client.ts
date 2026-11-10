@@ -1,7 +1,5 @@
 import { QueryClient } from '@tanstack/react-query';
-import { isAxiosError } from 'axios';
 import { ApiError } from '@/lib/api-error';
-import { tripPerpsBackoffOnRateLimit } from '@/store/perps-backoff.store';
 
 /** Attempts after the first, by kind of failure. */
 const RATE_LIMITED_RETRIES = 2;
@@ -13,9 +11,8 @@ const MAX_RETRY_AFTER_MS = 10_000;
 /** HTTP status of a failed query, 0 when there was no response. */
 function statusOf(error: unknown): number {
   if (error instanceof ApiError) {
-    return error.code === 'PHOENIX_RATE_LIMITED' ? 429 : error.status;
+    return error.status;
   }
-  if (isAxiosError(error)) return error.response?.status ?? 0;
   return 0;
 }
 
@@ -33,16 +30,6 @@ export function shouldRetryQuery(failureCount: number, error: unknown) {
   if (status === 429) return failureCount < RATE_LIMITED_RETRIES;
   if (status >= 400 && status < 500) return false;
   return failureCount < TRANSIENT_RETRIES;
-}
-
-/**
- * A failure that asking again won't fix: a 4xx other than a rate limit
- * (401 signed out, 403, 404…). Polling a query that failed like this only
- * repeats the same answer.
- */
-export function isPermanentQueryError(error: unknown) {
-  const status = statusOf(error);
-  return status >= 400 && status < 500 && status !== 429;
 }
 
 export function queryRetryDelay(failureCount: number, error: unknown) {
@@ -72,6 +59,3 @@ export const queryClient = new QueryClient({
     },
   },
 });
-
-// A rate-limited Phoenix read pauses every Phoenix poll (see the store).
-queryClient.getQueryCache().subscribe(tripPerpsBackoffOnRateLimit);

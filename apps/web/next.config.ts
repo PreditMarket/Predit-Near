@@ -24,42 +24,8 @@ const LEGACY_ICON_REDIRECTS: Array<[string, string]> = [
   ['/manifest.json', '/manifest.webmanifest'],
 ];
 
-// The @solana/wallet-adapter-* family holds React context and MUST be a single
-// instance across this app and the shared package (packages/shared). Because
-// shared source is compiled here via the tsconfig alias, pnpm's peer resolution
-// leaves TWO physical copies of these (verified in the store), which yields a
-// second WalletContext and the "read publicKey on a WalletContext without
-// providing one" error. Force every import to this app's single copy.
-// (react / react-query are already deduped to one copy, so they're left alone —
-// aliasing React can conflict with Next's own handling.)
-const SINGLETONS = [
-  '@solana/wallet-adapter-react',
-  '@solana/wallet-adapter-react-ui',
-];
-const singletonAlias: Record<string, string> = {};
-for (const pkg of SINGLETONS) {
-  // Alias to this app's node_modules dir directly. `require.resolve` fails on
-  // these packages (their `exports` blocks "./package.json"), so resolve by
-  // path — webpack follows the symlink to a single store copy.
-  const dir = path.join(appDir, 'node_modules', pkg);
-  if (existsSync(dir)) singletonAlias[pkg] = dir;
-}
-
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  // Share buttons attach the sharer's referral code to outgoing links. Opt-in
-  // per app and declared here rather than in Railway env so it can't be lost
-  // at deploy time; apps/admin deliberately omits it (see referral-link.ts).
-  env: {
-    NEXT_PUBLIC_REFERRAL_LINKS: 'on',
-  },
-  transpilePackages: [
-    '@solana/web3.js',
-    '@solana/spl-token',
-    '@solana/wallet-adapter-react',
-    '@solana/wallet-adapter-react-ui',
-    '@solana/wallet-adapter-base',
-  ],
   // isomorphic-dompurify pulls jsdom into the server bundle for SSR sanitize.
   // Mark as external so webpack stops bundling it, and include jsdom's
   // runtime assets (default-stylesheet.css, etc.) in the output trace so
@@ -68,7 +34,7 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     '/**': ['./node_modules/jsdom/**/*'],
   },
-  webpack: (config, { isServer }) => {
+  webpack: (config) => {
     config.resolve.fallback = {
       ...config.resolve.fallback,
       fs: false,
@@ -76,19 +42,9 @@ const nextConfig: NextConfig = {
       tls: false,
       crypto: false,
     };
-    // Pin context libraries to a single physical copy (see SINGLETONS above).
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      ...singletonAlias,
-    };
     config.plugins.push(
       new webpack.ProvidePlugin({ Buffer: ['buffer', 'Buffer'] }),
     );
-    // react-joyride uses React 17 APIs (unmountComponentAtNode) incompatible with React 18.
-    // Mark as external for SSR so webpack doesn't attempt to bundle/analyze it server-side.
-    if (isServer) {
-      config.externals = [...(config.externals || []), 'react-joyride'];
-    }
     return config;
   },
   images: {
@@ -97,6 +53,8 @@ const nextConfig: NextConfig = {
     remotePatterns: [{ protocol: 'https', hostname: '**' }],
   },
   experimental: {
+    // packages/shared is compiled here as source, through the tsconfig alias.
+    externalDir: true,
     serverActions: {
       bodySizeLimit: '2mb',
     },
@@ -105,7 +63,6 @@ const nextConfig: NextConfig = {
       '@tanstack/react-query',
       'zustand',
       '@radix-ui/react-popover',
-      'react-hook-form',
     ],
   },
   // The service worker must never be cached by the browser or a proxy, or a

@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from 'next';
 import Script from 'next/script';
 import { JetBrains_Mono, Space_Grotesk } from 'next/font/google';
 import './globals.css';
-import './raffle-draw.css';
 import { Providers } from './providers';
 import { SITE_URL } from '@/lib/site-url';
 import { ErrorBoundary } from '@/components/error/error-boundary';
@@ -26,39 +25,28 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: 'AI-Powered Market Predictions | Predit Market AI Oracles Platform',
-    template: '%s | Predit Market AI',
+    default: 'Predit: predictions from the posts you read',
+    template: '%s | Predit',
   },
   description:
-    'Predit — Permissionless Social Prediction Markets on Solana Social permissionless prediction market on Solana. Create a market on any question in 60 seconds, trade on outcomes, and earn as a creator. Resolved by AI with a human council. Crypto, sports, politics, and culture.',
-  keywords: [
-    'AI-powered predictions',
-    'AI oracles',
-    'market predictions',
-    'cryptocurrency predictions',
-    'tech predictions',
-    'sports predictions',
-    'AI agents',
-    'financial market analysis',
-    'oracle predictions',
-    'expert AI predictions',
-  ],
-  authors: [{ name: 'Predit Market AI' }],
+    'Turn a post into a prediction market. Rules are locked on NEAR, bets are in USDC, NEAR AI reads the result and a person confirms it, open to challenge.',
+  keywords: ['prediction markets', 'NEAR', 'NEAR AI', 'social predictions', 'forecasting record'],
+  authors: [{ name: 'Predit' }],
   robots: { index: true, follow: true },
   openGraph: {
     type: 'website',
-    siteName: 'Predit Market AI Oracles',
-    title: 'AI-Powered Market Predictions | Predit Market AI Oracles Platform',
+    siteName: 'Predit',
+    title: 'Predit: predictions from the posts you read',
     description:
-      'Predit — Permissionless Social Prediction Markets on Solana Social permissionless prediction market on Solana. Create a market on any question in 60 seconds, trade on outcomes, and earn as a creator. Resolved by AI with a human council. Crypto, sports, politics, and culture.',
+      'Turn a post into a prediction market. Rules are locked on NEAR, bets are in USDC, NEAR AI reads the result and a person confirms it, open to challenge.',
     images: ['/prediction-default.jpg'],
     locale: 'en_US',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'AI-Powered Market Predictions | Predit Market AI Oracles Platform',
+    title: 'Predit: predictions from the posts you read',
     description:
-      'Predit — Permissionless Social Prediction Markets on Solana Social permissionless prediction market on Solana. Create a market on any question in 60 seconds, trade on outcomes, and earn as a creator. Resolved by AI with a human council. Crypto, sports, politics, and culture.',
+      'Turn a post into a prediction market. Rules are locked on NEAR, bets are in USDC, NEAR AI reads the result and a person confirms it, open to challenge.',
     images: ['/prediction-default.jpg'],
   },
   // The web app manifest is app/manifest.ts — Next links it on its own.
@@ -98,7 +86,6 @@ const organizationJsonLd = {
   '@type': 'Organization',
   '@id': `${SITE_URL}/#organization`,
   name: 'Predit Market',
-  alternateName: 'Predit Market AI Oracles',
   url: SITE_URL,
   logo: {
     '@type': 'ImageObject',
@@ -120,7 +107,7 @@ const websiteJsonLd = {
     '@type': 'SearchAction',
     target: {
       '@type': 'EntryPoint',
-      urlTemplate: `${SITE_URL}/market?search={search_term_string}`,
+      urlTemplate: `${SITE_URL}/markets?search={search_term_string}`,
     },
     'query-input': 'required name=search_term_string',
   },
@@ -130,8 +117,8 @@ const websiteJsonLd = {
 const webAppJsonLd = {
   '@context': 'https://schema.org',
   '@type': 'WebApplication',
-  name: 'Predit Market AI Oracles',
-  description: 'AI-powered market predictions and analysis platform with specialized oracle agents',
+  name: 'Predit',
+  description: 'Prediction markets created from social posts, settled on NEAR.',
   url: SITE_URL,
   applicationCategory: 'FinanceApplication',
   publisher: { '@id': `${SITE_URL}/#organization` },

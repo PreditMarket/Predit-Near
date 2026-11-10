@@ -1,7 +1,7 @@
 /**
  * The one place a displayable figure gets turned into a `number`.
  *
- * Amounts reach the UI as numbers, decimal strings (Phoenix, the API) and
+ * Amounts reach the UI as numbers, decimal strings (contract views) and
  * bigints (on-chain base units). Every formatter in `lib/format` goes through
  * `toNumber`, so a missing or unreadable value is `null` — rendered as an em
  * dash — rather than `NaN` or a confident `0`.

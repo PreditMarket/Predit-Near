@@ -50,16 +50,14 @@ const DialogOverlay = React.forwardRef<
 DialogOverlay.displayName = 'DialogOverlay';
 
 // Radix Dialog fires onInteractOutside/onPointerDownOutside whenever a
-// click (or focus) lands outside DialogContent — but the Solana wallet
-// selector modal and Privy's modal (its transaction confirmation, say) are
-// *also* portaled to body, so opening or clicking them would close the
-// parent dialog (QuickTrade, withdraw, claim/deposit modals, etc.). Ignore
-// those events so the parent stays open while the user finishes there.
+// click (or focus) lands outside DialogContent, but the NEAR wallet selector
+// (near-connect) is appended to body too, so using it would close the parent
+// dialog (QuickTrade, say). Ignore those events so the parent stays open.
 export function isClickInsideWalletModal(event: Event): boolean {
   const target = event.target;
   return (
     target instanceof Element &&
-    !!target.closest('.wallet-adapter-modal, #privy-dialog, #privy-dialog-backdrop')
+    !!target.closest('.hot-connector-popup')
   );
 }
 

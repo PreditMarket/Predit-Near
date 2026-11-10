@@ -6,7 +6,7 @@ import { cn } from '@/components/ui/utils';
 export interface UserAvatarProps {
   /** Seeds the generated avatar shown when there is no (loadable) photo. */
   address: string;
-  /** Profile photo (X via Privy, or an upload). Falls back on load error. */
+  /** Profile photo (the X avatar, for feed authors). Falls back on load error. */
   photoUrl?: string | null;
   /** Accessible name; the avatar is decorative without it. */
   name?: string | null;

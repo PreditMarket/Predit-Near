@@ -3,9 +3,6 @@
 import { create } from 'zustand';
 import type { NearConnector } from '@hot-labs/near-connect';
 import { NEAR_NETWORK } from '@/lib/near/config';
-import useAuthStore from '@/store/auth.store';
-import { useV2AuthStore } from '@/store/v2-auth-store';
-import type { User } from '@/lib/types';
 
 export interface NearFunctionCall {
   receiverId: string;
@@ -60,19 +57,9 @@ const getConnector = () => {
   return connector;
 };
 
-/**
- * The account is the session: there is no backend login. The screens this app
- * reuses read the signed-in user from two stores, so both follow the wallet.
- */
+/** The account is the session: there is no backend login. */
 function setAccount(accountId: string | null) {
   useNearWallet.setState({ accountId, status: accountId ? 'connected' : 'disconnected' });
-  useAuthStore.setState({
-    user: accountId ? ({ id: accountId, username: accountId } as unknown as User) : null,
-  });
-  useV2AuthStore.setState({
-    status: accountId ? 'authenticated' : 'anonymous',
-    user: accountId ? ({ id: accountId } as never) : null,
-  });
 }
 
 export const useNearWallet = create<NearWalletState>((_, get) => ({

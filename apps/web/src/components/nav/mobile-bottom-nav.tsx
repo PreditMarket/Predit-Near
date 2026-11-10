@@ -3,9 +3,7 @@
 import { HoverPrefetchLink } from './hover-prefetch-link';
 import { usePathname } from 'next/navigation';
 import { House, PieChart, TrendingUp, Wallet } from 'lucide-react';
-import { useAppShellStore } from '@/store/app-shell-store';
-import useAuthStore from '@/store/auth.store';
-import { useV2AuthStore } from '@/store/v2-auth-store';
+import { useNearWallet } from '@/store/near-wallet.store';
 import { getCurrentPage, hrefFor } from './nav-helpers';
 
 interface Tab {
@@ -29,11 +27,10 @@ const TABS: Tab[] = [
  */
 export function MobileBottomNav() {
   const pathname = usePathname();
-  const user = useAuthStore((s) => s.user);
-  const v2User = useV2AuthStore((s) => s.user);
-  const setOpen = useAppShellStore((s) => s.setOpen);
+  const accountId = useNearWallet((s) => s.accountId);
+  const connect = useNearWallet((s) => s.connect);
   const current = getCurrentPage(pathname);
-  const signedIn = !!(user || v2User);
+  const signedIn = !!accountId;
 
   return (
     <nav
@@ -52,7 +49,7 @@ export function MobileBottomNav() {
                 onClick={(e) => {
                   if (requiresAuth && !signedIn) {
                     e.preventDefault();
-                    setOpen('walletConnectOpen', true);
+                    void connect();
                   }
                 }}
                 className={`flex h-full flex-col items-center justify-center gap-1 text-[10px] font-medium transition-colors ${

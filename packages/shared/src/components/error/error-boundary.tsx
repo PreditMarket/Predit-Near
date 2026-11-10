@@ -4,7 +4,6 @@ import * as React from 'react';
 import * as Sentry from '@sentry/nextjs';
 import { Button } from '@/components/ui/button';
 import { ApiError } from '@/lib/api-error';
-import { useReportDialogStore } from '@/store/report-dialog.store';
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -44,14 +43,6 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     window.location.reload();
   };
 
-  handleReport = () => {
-    const { errorId, eventId } = this.state;
-    const reportId = errorId ?? eventId;
-    if (reportId) {
-      useReportDialogStore.getState().open(reportId);
-    }
-  };
-
   render() {
     if (!this.state.hasError) {
       return this.props.children;
@@ -79,9 +70,6 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
         </div>
 
         <div className="flex gap-3">
-          <Button variant="outline" onClick={this.handleReport}>
-            Report
-          </Button>
           <Button onClick={this.handleReload}>
             Reload page
           </Button>
