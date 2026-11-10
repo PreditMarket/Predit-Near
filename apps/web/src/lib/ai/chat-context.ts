@@ -3,7 +3,7 @@ import { getAllNearMarkets } from '@/lib/near/contract';
 import { outcomeLabel, phaseLabel } from '@/lib/near/map';
 import type { NearMarket } from '@/lib/near/types';
 
-const POSTS = 20;
+const POSTS = 40;
 const SETTLED = 10;
 const clip = (text: string, max: number) => {
   const flat = text.replace(/\s+/g, ' ').trim();
