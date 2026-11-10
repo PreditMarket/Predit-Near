@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import { MarketDetailRouter } from '@/components/market/market-detail-router';
 import { buildMetadata } from '@/lib/metadata/build-metadata';
 import {
@@ -37,6 +38,8 @@ export default async function Page({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  // Market ids are the contract's sequence numbers.
+  if (!/^\d+$/.test(id)) notFound();
   const market = await fetchPammMarketDetail(id);
   const pagePath = `/market/${market?.slug || id}`;
   const pageUrl = `${SITE_URL}${pagePath}`;

@@ -47,6 +47,22 @@ test.describe('social feed', () => {
     await expect(post.getByRole('link', { name: 'Receipt' })).toHaveAttribute('href', `/market/${fed.id}#receipt`);
   });
 
+  test('tapping a question opens a bet with the amount filled in', async ({ page }) => {
+    const calls = await injectWallet(page, 'predit-markets-alice.testnet');
+    const [btc] = await marketsFor('sample-btc-q1');
+    test.skip(btc?.status !== 'open', 'the demo market is closed');
+    await page.goto('/');
+    await expect(page.getByTestId('near-account')).toBeVisible();
+    const post = page.locator('article', { hasText: 'BTC closes above $150k' });
+    await post.getByTestId('post-market-question').first().click();
+    await expect(page.getByTestId('amount-input').first()).toHaveValue('5');
+    await page.getByTestId('submit-trade-btn').first().click();
+    await expect.poll(() => calls.length).toBeGreaterThan(0);
+    expect(calls[0].args.amount).toBe('5000000');
+    expect(new URL(page.url()).pathname).toBe('/');
+    await expect(post.getByTestId('post-market-details').first()).toHaveAttribute('href', `/market/${btc.id}`);
+  });
+
   test('predicting under a post asks the wallet for a USDC bet', async ({ page }) => {
     const calls = await injectWallet(page, 'predit-markets-alice.testnet');
     const [btc] = await marketsFor('sample-btc-q1');

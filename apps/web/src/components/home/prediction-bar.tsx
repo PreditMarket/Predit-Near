@@ -2,9 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { Loader2, Plus, Sparkles } from 'lucide-react';
+import { ArrowUpRight, Loader2, Plus, Sparkles } from 'lucide-react';
 import { QuickTradeDialog } from '@/components/pamm/quick-trade-dialog';
 import { usePortfolioRedeem } from '@/hooks/pamm/use-portfolio-redeem';
 import { useV3Refund } from '@/hooks/pamm/use-v3-refund';
@@ -12,9 +11,11 @@ import { useWalletGate } from '@/hooks/use-wallet-gate';
 import { getNearPosition } from '@/lib/near/contract';
 import { isTradable, outcomeLabel, phaseLabel, safeHttpUrl, toPammMarket, winnerOf } from '@/lib/near/map';
 import type { NearMarket, NearPosition, NearSide } from '@/lib/near/types';
+import { useCreateMarketDialog } from '@/store/create-market-dialog.store';
 import { useNearWallet } from '@/store/near-wallet.store';
 
 const MAX_SHOWN = 5;
+const QUICK_BET = 5;
 const SIDE_BUTTON =
   'flex items-center justify-between gap-2 rounded-md border px-3 py-1.5 font-mono text-[12px] font-bold transition-colors';
 const CLAIM_BUTTON =
@@ -111,13 +112,26 @@ function PostMarket({ market }: { market: NearMarket }) {
 
   return (
     <div className="rounded-lg border border-border bg-background/40 px-3 py-2.5" data-testid="post-market">
-      <Link
-        prefetch={false}
-        href={`/market/${market.id}`}
-        className="text-[13px] font-semibold text-foreground hover:underline"
-      >
-        {market.rules.question}
-      </Link>
+      <div className="flex items-start justify-between gap-2">
+        <button
+          type="button"
+          data-testid="post-market-question"
+          onClick={() => isTradable(market) && setSide('yes')}
+          className="text-left text-[13px] font-semibold text-foreground hover:underline"
+        >
+          {market.rules.question}
+        </button>
+        <Link
+          prefetch={false}
+          href={`/market/${market.id}`}
+          aria-label="Market details"
+          title="Market details, rules and receipt"
+          data-testid="post-market-details"
+          className="shrink-0 text-muted-foreground hover:text-foreground"
+        >
+          <ArrowUpRight className="h-4 w-4" />
+        </Link>
+      </div>
       {isTradable(market) ? (
         <div className="mt-2 grid grid-cols-2 gap-2">
           <button
@@ -149,6 +163,8 @@ function PostMarket({ market }: { market: NearMarket }) {
           market={toPammMarket(market)}
           open
           initialSide={side}
+          // One tap to bet: the amount is filled in, and the chips change it.
+          preset={{ amountUsd: QUICK_BET }}
           onOpenChange={(open) => !open && setSide(null)}
         />
       )}
@@ -158,7 +174,7 @@ function PostMarket({ market }: { market: NearMarket }) {
 
 /** Creating needs a wallet, so a signed-out visitor connects one first. */
 function CreateMarketButton({ postId, detectedClaim }: { postId: string; detectedClaim?: string }) {
-  const router = useRouter();
+  const openCreate = useCreateMarketDialog((s) => s.openFor);
   const gate = useWalletGate();
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -166,7 +182,7 @@ function CreateMarketButton({ postId, detectedClaim }: { postId: string; detecte
         type="button"
         data-testid="post-create-market"
         disabled={gate.connecting}
-        onClick={gate.handleAction(() => router.push(`/market/create?post=${encodeURIComponent(postId)}`))}
+        onClick={gate.handleAction(() => openCreate(postId))}
         className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 font-mono text-[11.5px] font-semibold text-foreground hover:bg-muted disabled:opacity-50"
       >
         <Plus className="h-3.5 w-3.5" />

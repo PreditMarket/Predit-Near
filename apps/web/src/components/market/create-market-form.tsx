@@ -1,12 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Loader2, Sparkles } from 'lucide-react';
-import { MarketCreatedCard } from '@/components/market/create/market-created-card';
+import { ChevronDown, Loader2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { createMarketOnNear, CREATE_MARKET_MARGIN, getNearCreationBond } from '@/lib/near/contract';
 import { fitBytes, MAX_LABEL, MAX_LONG, MAX_SHORT, textBytes as bytes, type MarketDraft } from '@/lib/near/market-draft';
 import { safeHttpUrl } from '@/lib/near/map';
@@ -38,15 +35,7 @@ function Field({ label, hint, children }: { label: string; hint?: ReactNode; chi
   );
 }
 
-function CenteredNote({ children }: { children: ReactNode }) {
-  return (
-    <div className="flex flex-col items-center gap-3 py-16 text-center text-[13px] text-muted-foreground">
-      {children}
-    </div>
-  );
-}
-
-async function fetchPost(id: string): Promise<PostDto | null> {
+export async function fetchPost(id: string): Promise<PostDto | null> {
   const res = await fetch(`/api/feed?id=${encodeURIComponent(id)}`);
   if (res.status === 404) return null;
   if (!res.ok) throw new Error('Could not load the post');
@@ -74,7 +63,17 @@ function AiNote({ drafting, failed }: { drafting: boolean; failed: boolean }) {
   );
 }
 
-function CreateForm({ post }: { post: PostDto }) {
+/**
+ * Creating a market from one post: NEAR AI drafts it, the creator checks it,
+ * and one transaction locks the rules and places the bond.
+ */
+export function CreateMarketForm({
+  post,
+  onCreated,
+}: {
+  post: PostDto;
+  onCreated: (market: { id: string; question: string }) => void;
+}) {
   const accountId = useNearWallet((s) => s.accountId) as string;
   const queryClient = useQueryClient();
   const firstImage = post.media?.find((m) => m.url.startsWith('https://'))?.url ?? '';
@@ -118,9 +117,9 @@ function CreateForm({ post }: { post: PostDto }) {
     setForm((f) => ({ ...f, ...Object.fromEntries(unedited) }));
   }, [ai]);
 
-  const [phase, setPhase] = useState<'idle' | 'signing' | 'done'>('idle');
-  const [created, setCreated] = useState<string | null>(null);
+  const [signing, setSigning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   const { data: categories = [] } = useQuery({ queryKey: ['categories-list'], queryFn: getCategories });
   const { data: bond } = useQuery({ queryKey: ['near', 'creation-bond'], queryFn: getNearCreationBond });
@@ -159,7 +158,7 @@ function CreateForm({ post }: { post: PostDto }) {
   const submit = async () => {
     if (bond === undefined) return;
     setError(null);
-    setPhase('signing');
+    setSigning(true);
     try {
       const handle = post.author.handle ?? post.author.id;
       const { marketId } = await createMarketOnNear(
@@ -188,24 +187,25 @@ function CreateForm({ post }: { post: PostDto }) {
         },
         bond,
       );
-      setCreated(marketId);
-      setPhase('done');
       void queryClient.invalidateQueries({ queryKey: ['near'] });
+      onCreated({ id: marketId, question: form.question.trim() });
     } catch (err) {
       setError((err as Error).message);
-      setPhase('idle');
+    } finally {
+      setSigning(false);
     }
   };
 
   const bondNear = bond === undefined ? '…' : String(Number(bond) / 1e24);
 
+  // A problem in a field kept under "More options" opens it.
+  const hiddenProblem = !!problem && /label|invalid|image|texts/i.test(problem);
+
   return (
-    <div className="flex flex-col gap-5" data-testid="create-market-form">
-      <section className="rounded-lg border border-border bg-card px-4 py-3" data-testid="create-source-post">
-        <div className="mb-1 font-mono text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-          From @{post.author.handle}
-        </div>
-        <p className="whitespace-pre-wrap break-words text-[13px] text-foreground">{post.content}</p>
+    <div className="flex flex-col gap-4" data-testid="create-market-form">
+      <section className="rounded-lg border border-border bg-card px-3 py-2" data-testid="create-source-post">
+        <div className="font-mono text-[10px] font-bold uppercase tracking-wider text-muted-foreground">From @{post.author.handle}</div>
+        <p className="line-clamp-3 whitespace-pre-wrap break-words text-[12.5px] text-foreground">{post.content}</p>
       </section>
 
       <AiNote drafting={drafting} failed={draftFailed} />
@@ -213,26 +213,14 @@ function CreateForm({ post }: { post: PostDto }) {
       <Field label="Question">
         <input data-testid="create-question" className={INPUT} value={form.question} onChange={(e) => set('question', e.target.value)} />
       </Field>
-      <Field label="Description (optional)">
-        <textarea className={INPUT} rows={2} value={form.description} onChange={(e) => set('description', e.target.value)} />
-      </Field>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="First outcome label">
-          <input className={INPUT} value={form.yesLabel} onChange={(e) => set('yesLabel', e.target.value)} />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <Field label={`${form.yesLabel || 'Yes'} if`}>
+          <textarea data-testid="create-yes-condition" className={INPUT} rows={2} value={form.yesCondition} onChange={(e) => set('yesCondition', e.target.value)} />
         </Field>
-        <Field label="Second outcome label">
-          <input className={INPUT} value={form.noLabel} onChange={(e) => set('noLabel', e.target.value)} />
+        <Field label={`${form.noLabel || 'No'} if`}>
+          <textarea data-testid="create-no-condition" className={INPUT} rows={2} value={form.noCondition} onChange={(e) => set('noCondition', e.target.value)} />
         </Field>
       </div>
-      <Field label={`${form.yesLabel || 'First outcome'} if`}>
-        <textarea data-testid="create-yes-condition" className={INPUT} rows={2} value={form.yesCondition} onChange={(e) => set('yesCondition', e.target.value)} />
-      </Field>
-      <Field label={`${form.noLabel || 'Second outcome'} if`}>
-        <textarea data-testid="create-no-condition" className={INPUT} rows={2} value={form.noCondition} onChange={(e) => set('noCondition', e.target.value)} />
-      </Field>
-      <Field label="Invalid if">
-        <textarea className={INPUT} rows={2} value={form.invalidConditions} onChange={(e) => set('invalidConditions', e.target.value)} />
-      </Field>
       <Field
         label="Source"
         hint={
@@ -251,29 +239,61 @@ function CreateForm({ post }: { post: PostDto }) {
       >
         <input data-testid="create-source" className={INPUT} placeholder="https://" value={form.source} onChange={(e) => set('source', e.target.value)} />
       </Field>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label="Deadline">
           <input data-testid="create-deadline" type="datetime-local" className={INPUT} value={form.deadline} onChange={(e) => set('deadline', e.target.value)} />
         </Field>
-        <Field label="Category">
-          <select className={INPUT} value={form.category} onChange={(e) => set('category', e.target.value)}>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </Field>
         <Field label="The author's side">
           <select data-testid="create-claim-side" className={INPUT} value={form.claimSide} onChange={(e) => set('claimSide', e.target.value as NearSide)}>
-            <option value="yes">{form.yesLabel || 'First outcome'}</option>
-            <option value="no">{form.noLabel || 'Second outcome'}</option>
+            <option value="yes">{form.yesLabel || 'Yes'}</option>
+            <option value="no">{form.noLabel || 'No'}</option>
           </select>
         </Field>
       </div>
-      <Field label="Image link (optional)">
-        <input className={INPUT} placeholder="https://" value={form.imageUrl} onChange={(e) => set('imageUrl', e.target.value)} />
-      </Field>
+
+      <div className="rounded-lg border border-border">
+        <button
+          type="button"
+          data-testid="create-more"
+          onClick={() => setMoreOpen((v) => !v)}
+          className="flex w-full items-center justify-between px-3 py-2 font-mono text-[10.5px] font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground"
+        >
+          More options: labels, invalid rule, description, category, image
+          <ChevronDown className={`h-3.5 w-3.5 transition-transform ${moreOpen || hiddenProblem ? 'rotate-180' : ''}`} />
+        </button>
+        {(moreOpen || hiddenProblem) && (
+          <div className="flex flex-col gap-3 border-t border-border p-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Field label="First outcome label">
+                <input className={INPUT} value={form.yesLabel} onChange={(e) => set('yesLabel', e.target.value)} />
+              </Field>
+              <Field label="Second outcome label">
+                <input className={INPUT} value={form.noLabel} onChange={(e) => set('noLabel', e.target.value)} />
+              </Field>
+            </div>
+            <Field label="Invalid if">
+              <textarea className={INPUT} rows={2} value={form.invalidConditions} onChange={(e) => set('invalidConditions', e.target.value)} />
+            </Field>
+            <Field label="Description (optional)">
+              <textarea className={INPUT} rows={2} value={form.description} onChange={(e) => set('description', e.target.value)} />
+            </Field>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <Field label="Category">
+                <select className={INPUT} value={form.category} onChange={(e) => set('category', e.target.value)}>
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Image link (optional)">
+                <input className={INPUT} placeholder="https://" value={form.imageUrl} onChange={(e) => set('imageUrl', e.target.value)} />
+              </Field>
+            </div>
+          </div>
+        )}
+      </div>
 
       {shortOfNear && (
         <p data-testid="create-short-of-near" className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-[12px] text-warning">
@@ -284,82 +304,16 @@ function CreateForm({ post }: { post: PostDto }) {
       {problem && <p data-testid="create-problem" className="text-[12px] text-muted-foreground">{problem}</p>}
       {error && <p data-testid="create-error" className="text-[12px] text-danger">{error}</p>}
 
-      <Button data-testid="create-submit" disabled={!!problem || drafting || shortOfNear || bond === undefined || phase !== 'idle'} onClick={() => void submit()}>
-        Lock rules and create · {bondNear} NEAR bond
+      <Button data-testid="create-submit" disabled={!!problem || drafting || shortOfNear || bond === undefined || signing} onClick={() => void submit()}>
+        {signing ? (
+          <>
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Confirm in your wallet…
+          </>
+        ) : (
+          `Lock rules and create · ${bondNear} NEAR bond`
+        )}
       </Button>
-
-      <Dialog open={phase !== 'idle'}>
-        <DialogContent className="max-w-md border-0 bg-transparent p-0 shadow-none" showCloseButton={false}>
-          <DialogTitle className="sr-only">Creating market</DialogTitle>
-          {phase === 'done' && created ? (
-            <MarketCreatedCard
-              itemLabel="Your Market"
-              itemTitle={form.question.trim()}
-              url={`/market/${created}`}
-              onDismiss={() => setPhase('idle')}
-            />
-          ) : (
-            <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-card p-8 text-center text-[13px]">
-              <Loader2 className="h-5 w-5 animate-spin text-primary" />
-              Confirm in your wallet. This locks the rules on NEAR and places the bond.
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
-  );
-}
-
-/** Create a market from one post: its rules are locked on chain in a single transaction. */
-export function CreateFromPost({ postId }: { postId: string | null }) {
-  const accountId = useNearWallet((s) => s.accountId);
-  const status = useNearWallet((s) => s.status);
-  const connect = useNearWallet((s) => s.connect);
-  const { data: post, isLoading, isError } = useQuery({
-    queryKey: ['feed-post', postId],
-    queryFn: () => fetchPost(postId as string),
-    enabled: !!postId,
-    staleTime: Infinity,
-  });
-
-  let body: ReactNode;
-  if (!postId) {
-    body = (
-      <CenteredNote>
-        <p>Markets are created from a post. Pick one in the feed.</p>
-        <Button asChild>
-          <Link href="/">Go to the feed</Link>
-        </Button>
-      </CenteredNote>
-    );
-  } else if (!accountId) {
-    body = (
-      <CenteredNote>
-        <p>Connect a NEAR wallet to create a market.</p>
-        <Button disabled={status === 'loading'} onClick={() => void connect()}>
-          {status === 'loading' ? 'Connecting…' : 'Connect wallet'}
-        </Button>
-      </CenteredNote>
-    );
-  } else if (isLoading) {
-    body = <div className="h-40 animate-pulse rounded-lg bg-muted/40" aria-hidden />;
-  } else if (isError || !post) {
-    body = (
-      <CenteredNote>
-        <p>This post is no longer in the feed.</p>
-        <Button asChild>
-          <Link href="/">Back to the feed</Link>
-        </Button>
-      </CenteredNote>
-    );
-  } else {
-    body = <CreateForm post={post} />;
-  }
-
-  return (
-    <main className="mx-auto w-full max-w-2xl px-4 py-6 sm:px-6">
-      <h1 className="mb-4 text-[18px] font-bold">Create a market</h1>
-      {body}
-    </main>
   );
 }

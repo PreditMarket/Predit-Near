@@ -91,5 +91,6 @@ test.describe('balance, deposit and withdraw', () => {
   test('the old deposit page is gone', async ({ page }) => {
     const res = await page.goto('/deposit');
     expect(res?.status()).toBe(404);
+    await expect(page.getByTestId('not-found')).toBeVisible();
   });
 });

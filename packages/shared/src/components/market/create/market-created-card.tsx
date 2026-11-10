@@ -29,6 +29,10 @@ interface MarketCreatedCardProps {
   /** Closes the modal. No standalone close (X) button — "Skip for now" and
    * "My markets" are the only two ways out, and both call this before navigating. */
   onDismiss: () => void;
+  /** Replaces "My markets →", e.g. to bet on the new market without leaving the page. */
+  primaryAction?: { label: string; onClick: () => void };
+  /** Replaces "Skip for now", which otherwise opens the market's page. */
+  skipAction?: { label: string; onClick: () => void };
 }
 
 /**
@@ -44,6 +48,8 @@ export function MarketCreatedCard({
   url,
   needsApproval,
   onDismiss,
+  primaryAction,
+  skipAction,
 }: MarketCreatedCardProps) {
   const router = useRouter();
 
@@ -170,18 +176,20 @@ export function MarketCreatedCard({
           </button>
           <button
             type="button"
-            onClick={handleViewMyMarkets}
+            data-testid="created-primary"
+            onClick={primaryAction?.onClick ?? handleViewMyMarkets}
             className="rounded-xl bg-primary py-2.5 text-[11px] font-bold uppercase tracking-widest text-primary-foreground transition-all hover:brightness-110"
           >
-            My markets →
+            {primaryAction?.label ?? 'My markets →'}
           </button>
         </div>
         <button
           type="button"
-          onClick={handleSkip}
+          data-testid="created-skip"
+          onClick={skipAction?.onClick ?? handleSkip}
           className="w-full text-center text-[11px] text-white/40 transition-colors hover:text-white/60"
         >
-          Skip for now
+          {skipAction?.label ?? 'Skip for now'}
         </button>
       </div>
     </div>

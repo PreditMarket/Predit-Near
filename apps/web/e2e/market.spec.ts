@@ -28,7 +28,9 @@ test.describe('market page', () => {
     expect(calls[0].methodName).toBe('ft_transfer_call');
   });
 
-  test('an unknown market says so', async ({ page }) => {
+  test('an unknown market says so, and a name that is not an id is not found', async ({ page }) => {
+    await page.goto('/market/not-a-number');
+    await expect(page.getByTestId('not-found')).toBeVisible();
     await page.goto('/market/999999');
     await expect(page.getByText('Could not load this market. It may not exist.').first()).toBeVisible();
   });

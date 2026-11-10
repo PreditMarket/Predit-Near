@@ -11,7 +11,16 @@ export type WalletMode = 'dry' | 'live';
 export async function injectWallet(
   page: Page,
   accountId: string,
-  { mode = 'dry', connected = true }: { mode?: WalletMode; connected?: boolean } = {},
+  {
+    mode = 'dry',
+    connected = true,
+    answer,
+  }: {
+    mode?: WalletMode;
+    connected?: boolean;
+    /** Dry mode: a transaction outcome to hand back instead of refusing, e.g. a contract's return value. */
+    answer?: (calls: FunctionCall[]) => unknown;
+  } = {},
 ): Promise<FunctionCall[]> {
   const calls: FunctionCall[] = [];
   const signer = mode === 'live' ? await signerFor(accountId) : null;
@@ -28,6 +37,7 @@ export async function injectWallet(
       };
     });
     calls.push(...batch);
+    if (!signer && answer) return answer(batch);
     if (!signer) throw new Error('Rejected by the test wallet');
     let last: unknown;
     for (const call of batch) last = await send(signer, call);

@@ -1,14 +1,14 @@
 'use client';
 
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { Plus } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-is-mobile';
+import { useCreateMarketDialog } from '@/store/create-market-dialog.store';
 import { useNearWallet } from '@/store/near-wallet.store';
 import { getCurrentPage } from './nav-helpers';
 
 /** Nav pages that show prediction markets: `/markets`, `/market/*` and home. */
 const PREDICTION_PAGES = new Set(['home', 'markets', 'pamm']);
-const CREATE_PATH = '/market/create';
 
 /**
  * "Create market", in the nav while prediction markets are on screen, so it
@@ -18,13 +18,11 @@ const CREATE_PATH = '/market/create';
  */
 export function CreateMarketButton() {
   const pathname = usePathname();
-  const router = useRouter();
+  const openCreate = useCreateMarketDialog((s) => s.openFor);
   const accountId = useNearWallet((s) => s.accountId);
   const compact = useIsMobile(1024);
 
   if (!accountId || !PREDICTION_PAGES.has(getCurrentPage(pathname))) return null;
-  // Already on the creator: the CTA would only reload it.
-  if (pathname?.startsWith(CREATE_PATH)) return null;
 
   return (
     <div className="flex items-center gap-2">
@@ -33,7 +31,7 @@ export function CreateMarketButton() {
           target if both sat on one element. */}
       <button
         type="button"
-        onClick={() => router.push(CREATE_PATH)}
+        onClick={() => openCreate(null)}
         title="Create market"
         aria-label="Create market"
         className="group touch-hit inline-flex"
