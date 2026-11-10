@@ -88,7 +88,8 @@ function normalizePammTrade(
   // cancel. Holders sell back to the pool to reclaim collateral (see
   // PoolDetailLayout sell-only mode). Checked outside the `!trade.status` guard
   // precisely because trade.status is usually 'open' (truthy) here.
-  if (market.status === 'cancelled') {
+  // A refund already paid stays claimed: it is history, not something to act on.
+  if (market.status === 'cancelled' && trade.status !== 'claimed') {
     status = 'cancelled';
   } else if (!trade.status) {
     if (

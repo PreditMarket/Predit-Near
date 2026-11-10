@@ -96,6 +96,14 @@ export interface NearPosition {
   no_cost: string;
 }
 
+/** A payout taken from a market, with the position held just before it. */
+export interface NearClaim {
+  kind: 'redeem' | 'refund';
+  position: NearPosition;
+  payout: string;
+  at_sec: string;
+}
+
 export interface NearForecastRecord {
   correct: number;
   wrong: number;

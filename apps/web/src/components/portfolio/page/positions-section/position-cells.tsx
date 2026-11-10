@@ -131,7 +131,12 @@ export function PayoutCell({ view }: { view: PositionView }) {
       return <span className={cn(PILL, 'bg-(--brand-danger-soft) text-danger')}>Wrong</span>;
     case 'claimed':
       return (
-        <span className={cn(PILL, 'bg-(--brand-success-soft) text-success')}>Claimed</span>
+        <div className="flex flex-col items-end gap-0.5">
+          {payout.amount !== null && (
+            <span className="text-[12px] font-bold font-mono text-success">{formatAmount(payout.amount, unit)}</span>
+          )}
+          <span className={cn(PILL, 'bg-(--brand-success-soft) text-success')}>Claimed</span>
+        </div>
       );
     case 'to-win':
       return (

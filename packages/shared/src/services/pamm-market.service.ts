@@ -1,7 +1,7 @@
-import { getNearMarket, getNearPaused, getNearUserMarkets } from '@/lib/near/contract';
+import { getNearMarket, getNearPaused, getNearUserClaims, getNearUserMarkets } from '@/lib/near/contract';
 import { USDC_DECIMALS, USDC_SYMBOL } from '@/lib/near/config';
 import { listNearMarkets } from '@/lib/near/market-list';
-import { positionRows, toPammMarket } from '@/lib/near/map';
+import { claimRows, positionRows, toPammMarket } from '@/lib/near/map';
 import { useNearWallet } from '@/store/near-wallet.store';
 import type { MarketRules } from './market.service';
 import type { Category } from './categories.service';
@@ -213,6 +213,8 @@ export interface PammMarketTrade {
    * trade status — is what the claim button should follow.
    */
   claimAction?: 'redeem' | 'refund' | null;
+  /** Set once paid out: a redeem was a right call, a refund neither. */
+  claimKind?: 'redeem' | 'refund';
   /**
    * Collateral owed, raw base units. Real money, unlike `redeemableAmount`
    * (a SHARE COUNT on V3) — safe to format as an amount.
@@ -330,8 +332,13 @@ export interface PammMarketRealtime {
 const myNearPositionRows = async (): Promise<PammMarketTrade[]> => {
   const accountId = useNearWallet.getState().accountId;
   if (!accountId) return [];
-  const held = await getNearUserMarkets(accountId);
-  return held.flatMap(([market, position]) => positionRows(market, position)).reverse();
+  const [held, claims] = await Promise.all([getNearUserMarkets(accountId), getNearUserClaims(accountId)]);
+  return held
+    .flatMap(([market, position]) => {
+      const claim = claims.get(market.id);
+      return [...positionRows(market, position), ...(claim ? claimRows(market, position, claim) : [])];
+    })
+    .reverse();
 };
 
 export const getPammMarkets = (params?: ListPammMarketsParams): Promise<ListPammMarketsResponse> =>
@@ -438,12 +445,14 @@ export const getMyPammTrades = async (
 
 
 export const getMyPammSummary = async (): Promise<PammMarketSummary> => {
-  const rows = await myNearPositionRows();
+  const all = await myNearPositionRows();
+  // Paid-out rows are history: their money is back in the wallet.
+  const rows = all.filter((r) => r.status !== 'claimed');
   const stake = (r: PammMarketTrade) => Number(r.amountIn) / 10 ** USDC_DECIMALS;
   const value = (r: PammMarketTrade) =>
     r.status === 'lost' ? 0 : r.claimAmount != null ? Number(r.claimAmount) / 10 ** USDC_DECIMALS : stake(r);
   const totalValue = rows.reduce((sum, r) => sum + value(r), 0);
-  const wins = rows.filter((r) => r.status === 'won').length;
+  const wins = rows.filter((r) => r.status === 'won').length + all.filter((r) => r.claimKind === 'redeem').length;
   const losses = rows.filter((r) => r.status === 'lost').length;
   const settled = wins + losses;
   const cost = rows.reduce((sum, r) => sum + stake(r), 0);
@@ -454,7 +463,7 @@ export const getMyPammSummary = async (): Promise<PammMarketSummary> => {
     openCount: rows.filter((r) => r.status === 'open').length,
     wins,
     losses,
-    totalTrades: rows.length,
+    totalTrades: all.length,
     winRate: settled > 0 ? (wins / settled) * 100 : 0,
     sparkline: [],
     headlineSymbol: USDC_SYMBOL,

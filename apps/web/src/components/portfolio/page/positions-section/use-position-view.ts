@@ -45,7 +45,7 @@ export type PositionPayout =
   | { kind: 'reclaim' }
   | { kind: 'closed' }
   | { kind: 'lost' }
-  | { kind: 'claimed' }
+  | { kind: 'claimed'; amount: number | null }
   | { kind: 'to-win'; amount: number }
   | { kind: 'at-resolution' }
   | { kind: 'none' };
@@ -130,7 +130,7 @@ function payoutOf(
   if (pammTrade && status === 'won') return { kind: 'claim', trade: pammTrade, amount: payoutAmount ?? null };
   if (source === 'pamm' && status === 'closed') return { kind: 'closed' };
   if (pammTrade && status === 'lost') return { kind: 'lost' };
-  if (pammTrade && status === 'claimed') return { kind: 'claimed' };
+  if (pammTrade && status === 'claimed') return { kind: 'claimed', amount: payoutAmount ?? null };
   // A cancelled v3 market pays back through refund_v3 (selling reverts once
   // cancelled), so claim inline. Covers the auto-cancelled one-sided market
   // too: the BE marks both sides `cancelled` off the pool's settlement mode.

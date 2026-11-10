@@ -1,0 +1,69 @@
+{
+ "id": "36",
+ "creator": "predit-markets-owner.testnet",
+ "post": {
+  "source": "x",
+  "post_id": "2119163723998761371",
+  "author_ref": "x:NEARProtocol",
+  "text": "Only 7 days left to submit to the NEAR Hackathon. \n\n$250K in prizes across 13 tracks.\n\nNo sign-up. Just ship and post by November 14, 23:59 UTC."
+ },
+ "claim_side": "yes",
+ "rules": {
+  "question": "Does nearhackathon.com list a Games With Real Economies track?",
+  "description": "The post announces the NEAR Hackathon track Games With Real Economies.",
+  "yes_label": "Yes",
+  "no_label": "No",
+  "yes_condition": "At the deadline, https://nearhackathon.com lists a track named Games With Real Economies.",
+  "no_condition": "At the deadline, the page lists no track with that name.",
+  "resolution_source": "https://nearhackathon.com",
+  "invalid_conditions": "The page cannot be read at the deadline.",
+  "category": "tech",
+  "image_url": "",
+  "expiry_sec": "1794305231"
+ },
+ "rules_hash": "820c7317a158ffc750d0dce970d8e3d1de439f580fdd38bf797d824a68e509d1",
+ "draft": {
+  "model": "manual",
+  "chat_id": ""
+ },
+ "creation_bond": "0",
+ "challenge_window_sec": 60,
+ "created_at_sec": "1794305082",
+ "status": "finalized",
+ "outcome": "yes",
+ "receipt": {
+  "outcome": "yes",
+  "reason": "The tracks section lists \"[ 09 / GAM ]\\n\\nGames With Real Economies\" with the tagline \"The economy is the gameplay\".",
+  "evidence": {
+   "hash": "9613567ef6078c7aa5252783b6ebeed566659c9c48c0be1eadfb99adb2faa17c",
+   "uri": "http://localhost:3461/api/evidence/36",
+   "ai": {
+    "model": "deepseek-ai/DeepSeek-V4.1-Flash-1017",
+    "chat_id": "chatcmpl-367114a9-ed93-49cb-bc7f-7ab5674063a6",
+    "signed_text": "deepseek-ai/DeepSeek-V4.1-Flash-1017:1d579e1a679b2f37b044bd96be7818a9b6e13b9b4ef22fa3f8829c144c7d13b4:8efea89bbc5821fa7e2663a4d8bd2ce2ed7b374340b8c9fe1ef16a78ad62b91f",
+    "signature": "0xb2fd129ae9fca56c294a0b5c3dfc53ad0b2dda798eb917d0e087f984012310823ecc7bb04edcd52aebb14d4a85b4f35b948d003f4fceca475f87aa2158b089c51b",
+    "signing_address": "0xfe0071895500a9755c18044948ab4f4e1a7f337e"
+   }
+  },
+  "posted_at_sec": "1794305288"
+ },
+ "challenge": null,
+ "price_yes_bps": 4979,
+ "pool_collateral": "0",
+ "total_yes": "0",
+ "total_no": "1994000",
+ "volume": "5000000",
+ "trades": 2,
+ "yes_shares": "0",
+ "no_shares": "4003864",
+ "virtual_liquidity_l": "500000000",
+ "trade_fee_bps": 30,
+ "redeem_fee_bps": 100,
+ "creator_share_bps": 1000,
+ "trade_freeze_sec": 10,
+ "refunds_only": false,
+ "resolved_pool_collateral": "4985000",
+ "resolved_x_win": "2991000",
+ "resolved_ts": "1794305352",
+ "resolved_redeem_fee_bps": 100
+}

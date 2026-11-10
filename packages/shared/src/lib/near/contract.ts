@@ -1,6 +1,6 @@
 import { NEAR_MARKET_CONTRACT as MARKET, NEAR_USDC_CONTRACT as USDC } from './config';
 import { nearView } from './rpc';
-import type { NearForecastRecord, NearMarket, NearPosition, NearPost, NearRules, NearSide } from './types';
+import type { NearClaim, NearForecastRecord, NearMarket, NearPosition, NearPost, NearRules, NearSide } from './types';
 import { useNearWallet, type NearTxOutcome } from '@/store/near-wallet.store';
 
 const PAGE = 100;
@@ -38,6 +38,12 @@ export async function getNearUserMarkets(accountId: string) {
     rows.push(...page);
     if (page.length < PAGE) return rows;
   }
+}
+
+/** Every payout the account took, by market id. */
+export async function getNearUserClaims(accountId: string): Promise<Map<string, NearClaim>> {
+  const rows = await nearView<[string, NearClaim][]>(MARKET, 'get_user_claims', { account_id: accountId });
+  return new Map(rows);
 }
 
 export const getNearClaimable = async (accountId: string) =>

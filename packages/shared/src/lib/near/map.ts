@@ -7,7 +7,7 @@ import type {
 } from '@/services/pamm-market.service';
 import { NearAddress } from './address';
 import { NEAR_MARKET_CONTRACT, NEAR_USDC_CONTRACT, USDC_DECIMALS } from './config';
-import type { NearMarket, NearOutcome, NearPosition, NearPost, NearSide } from './types';
+import type { NearClaim, NearMarket, NearOutcome, NearPosition, NearPost, NearSide } from './types';
 
 const iso = (sec: string | number) => new Date(Number(sec) * 1000).toISOString();
 
@@ -247,5 +247,34 @@ export function positionRows(m: NearMarket, p: NearPosition): PammMarketTrade[] 
   const rows: PammMarketTrade[] = [];
   if (BigInt(p.yes_cost) > 0n) rows.push(tradeRow(m, 'yes', BigInt(p.yes_shares), BigInt(p.yes_cost)));
   if (BigInt(p.no_cost) > 0n) rows.push(tradeRow(m, 'no', BigInt(p.no_shares), BigInt(p.no_cost)));
+  return rows;
+}
+
+/**
+ * Sides the account was already paid for: the contract empties them, so they
+ * come back from its claim record. A redeemed winning side reads as claimed
+ * (and right), a losing side cleared with it as lost, a refund as claimed.
+ */
+export function claimRows(m: NearMarket, held: NearPosition, claim: NearClaim): PammMarketTrade[] {
+  const winner = winnerOf(m);
+  const rows: PammMarketTrade[] = [];
+  for (const side of ['yes', 'no'] as const) {
+    const cost = BigInt(side === 'yes' ? claim.position.yes_cost : claim.position.no_cost);
+    const stillHeld = BigInt(side === 'yes' ? held.yes_cost : held.no_cost) > 0n;
+    if (cost === 0n || stillHeld) continue;
+    const shares = BigInt(side === 'yes' ? claim.position.yes_shares : claim.position.no_shares);
+    const row = tradeRow(m, side, shares, cost);
+    const paid = claim.kind === 'refund' || side === winner;
+    rows.push({
+      ...row,
+      status: paid ? 'claimed' : 'lost',
+      // A paid refund is history, not a cancelled position to act on.
+      settlement: 'resolved',
+      claimAction: null,
+      claimAmount: paid ? (claim.kind === 'refund' ? cost.toString() : claim.payout) : null,
+      claimKind: paid ? claim.kind : undefined,
+      createdAt: iso(claim.at_sec),
+    });
+  }
   return rows;
 }
