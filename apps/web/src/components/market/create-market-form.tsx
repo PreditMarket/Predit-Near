@@ -297,8 +297,10 @@ export function CreateMarketForm({
 
       {shortOfNear && (
         <p data-testid="create-short-of-near" className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-[12px] text-warning">
-          Creating a market locks a {bondNear} NEAR bond, returned when it settles. This account needs about{' '}
-          {Number(needed) / 1e24} NEAR on testnet.
+          {bond
+            ? `Creating a market locks a ${bondNear} NEAR bond, returned when it settles.`
+            : 'Creating a market only pays for the storage it takes; the rest comes back in the same transaction.'}{' '}
+          This account needs about {Number(needed) / 1e24} NEAR on testnet.
         </p>
       )}
       {problem && <p data-testid="create-problem" className="text-[12px] text-muted-foreground">{problem}</p>}
@@ -311,7 +313,7 @@ export function CreateMarketForm({
             Confirm in your wallet…
           </>
         ) : (
-          `Lock rules and create · ${bondNear} NEAR bond`
+          bond ? `Lock rules and create · ${bondNear} NEAR bond` : 'Lock rules and create'
         )}
       </Button>
     </div>

@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { send, signerFor, signNep413, type FunctionCall } from './near';
+import { accountWithKey, send, signerFor, signNep413, type FunctionCall } from './near';
 
 export type WalletMode = 'dry' | 'live';
 
@@ -16,6 +16,7 @@ export async function injectWallet(
     connected = true,
     answer,
     name = 'E2E Wallet',
+    privateKey,
   }: {
     mode?: WalletMode;
     connected?: boolean;
@@ -23,10 +24,12 @@ export async function injectWallet(
     answer?: (calls: FunctionCall[]) => unknown;
     /** What the wallet selector shows. */
     name?: string;
+    /** Live mode with this key instead of one from ~/.near-credentials. */
+    privateKey?: string;
   } = {},
 ): Promise<FunctionCall[]> {
   const calls: FunctionCall[] = [];
-  const signer = mode === 'live' ? await signerFor(accountId) : null;
+  const signer = mode !== 'live' ? null : privateKey ? accountWithKey(accountId, privateKey) : await signerFor(accountId);
 
   await page.exposeFunction('__e2eSign', async (tx: { receiverId: string; actions: { params?: Record<string, unknown> }[] }) => {
     const batch: FunctionCall[] = tx.actions.map((raw) => {

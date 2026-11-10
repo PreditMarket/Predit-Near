@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { DRAFT, stubFeed } from './helpers/feed';
-import { allMarkets, isTradable, MARKET } from './helpers/near';
+import { allMarkets, isTradable, MARKET, view } from './helpers/near';
 import { injectWallet } from './helpers/wallet';
 
 const ACCOUNT = 'predit-markets-alice.testnet';
@@ -29,7 +29,9 @@ test.describe('create a market without leaving the feed', () => {
     expect(call.args.rules).toMatchObject({ question: 'Will NEAR TVL double by May 2027 (e2e)?', resolution_source: DRAFT.draft.source });
     expect(typeof (call.args.rules as { expiry_sec: unknown }).expiry_sec).toBe('string');
     expect(call.args.draft).toEqual({ model: DRAFT.model, chat_id: DRAFT.chatId });
-    expect(BigInt(call.deposit)).toBe(BigInt('1100000000000000000000000'));
+    // The bond (0 on the demo deployment) plus the storage margin; the contract refunds what it does not use.
+    const { creation_bond } = await view<{ creation_bond: string }>(MARKET, 'get_config');
+    expect(BigInt(call.deposit)).toBe(BigInt(creation_bond) + BigInt('100000000000000000000000'));
     // The wallet refused: the dialog says so and can send again.
     await expect(dialog.getByTestId('create-error')).toBeVisible();
     await expect(dialog.getByTestId('create-submit')).toBeEnabled();

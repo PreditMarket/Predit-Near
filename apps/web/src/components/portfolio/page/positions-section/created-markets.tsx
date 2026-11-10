@@ -36,7 +36,13 @@ function CreatedMarketRow({ market }: { market: NearMarket }) {
       <span className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[11px] text-muted-foreground">
         <span className="font-bold text-foreground">{phaseLabel(market)}</span>
         <span data-testid="created-market-bond">
-          Bond {near(market.creation_bond)} NEAR · <span className={BOND_TONE[bond]}>{BOND_LABEL[bond]}</span>
+          {BigInt(market.creation_bond) > BigInt(0) ? (
+            <>
+              Bond {near(market.creation_bond)} NEAR · <span className={BOND_TONE[bond]}>{BOND_LABEL[bond]}</span>
+            </>
+          ) : (
+            'No bond'
+          )}
         </span>
         <span>
           Volume {usdc(market.volume).toLocaleString('en-US', { maximumFractionDigits: 2 })} {USDC_SYMBOL}

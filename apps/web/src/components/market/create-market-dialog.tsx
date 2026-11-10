@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Sparkles } from 'lucide-react';
+import { toast } from 'sonner';
 import { MarketCreatedCard } from '@/components/market/create/market-created-card';
 import { QuickTradeDialog } from '@/components/pamm/quick-trade-dialog';
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,17 @@ import { useNearWallet } from '@/store/near-wallet.store';
 import { CreateMarketForm, fetchPost } from './create-market-form';
 
 const MAX_MARKETS_PER_POST = 5;
+const READ_TRIES = 15;
+
+/** A market just created: the RPC node may not have it for a moment. */
+async function readNewMarket(id: string): Promise<NearMarket | null> {
+  for (let tries = 0; tries < READ_TRIES; tries += 1) {
+    const market = await getNearMarket(id).catch(() => null);
+    if (market) return market;
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+  }
+  return null;
+}
 const PICKER_POSTS = 30;
 
 interface Pickable {
@@ -124,9 +136,10 @@ export function CreateMarketDialog() {
               primaryAction={{
                 label: 'Bet on it now',
                 onClick: async () => {
-                  const market = await getNearMarket(created.id);
+                  const market = await readNewMarket(created.id);
                   finish();
                   if (market) setTrading(market);
+                  else toast.error('The market is on chain but not readable yet. Open it from under its post.');
                 },
               }}
               skipAction={{ label: 'Done', onClick: finish }}

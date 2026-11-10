@@ -90,6 +90,10 @@ export async function keyFor(accountId: string): Promise<KeyPairString> {
   throw new Error(`No full-access key for ${accountId} in ${dir}`);
 }
 
+/** An account signing with a key the test holds, e.g. a brand-new implicit account. */
+export const accountWithKey = (accountId: string, privateKey: string) =>
+  new Account(accountId, new JsonRpcProvider({ url: RPC }), privateKey as KeyPairString);
+
 export const signerFor = async (accountId: string) =>
   new Account(accountId, new JsonRpcProvider({ url: RPC }), await keyFor(accountId));
 
