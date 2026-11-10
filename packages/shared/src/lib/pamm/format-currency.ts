@@ -14,8 +14,7 @@
  * the assumed default, and one that slips through as `''` still means dollars.
  *
  * Note there are two deliberate local variants of this that are NOT bugs and
- * should stay separate: `formatFee` in creator-campaign-detail-page.tsx and in
- * admin's creator-leaderboard-table.tsx. They format in the browser locale,
+ * should stay separate: fee formatters that use the browser locale,
  * drop decimals above 1000, and return null for nullish input so the caller
  * can skip rendering — none of which belongs in this function.
  */

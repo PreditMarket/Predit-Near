@@ -1,11 +1,6 @@
 /**
- * Unified feed-item union — every feed source (user posts, PAMM/Perps/Spot
- * trades, news takes) normalizes into one of these variants so the same
- * `<FeedPost>` renderer can switch on `kind` without per-source components.
- *
- * All variants share `FeedItemBase` (id/createdAt/author). Phase 01 only
- * exposes/renders the `post` variant; the trade + take variants ship in
- * their own phases (03–06).
+ * A feed item. The NEAR build's feed only carries posts (from X, or the
+ * sample feed); the union keeps room for other kinds.
  */
 
 export interface FeedAuthor {
@@ -115,40 +110,6 @@ export type FeedItem =
       /** The row's time in the list it came from (the repost's time on a
        *  repost row); what the server orders by. Absent on optimistic rows. */
       feedAt?: string;
-    })
-  | (FeedItemBase & {
-      kind: 'trade-pamm';
-      marketId: string;
-      question: string;
-      side: 'YES' | 'NO';
-      shares: number;
-      avgPrice: number;
-      usdAmount: number;
-    })
-  | (FeedItemBase & {
-      kind: 'trade-perps';
-      symbol: string;
-      side: 'LONG' | 'SHORT';
-      leverage: number;
-      entryPrice: number;
-      size: number;
-      pnl?: number;
-    })
-  | (FeedItemBase & {
-      kind: 'trade-spot';
-      inSymbol: string;
-      outSymbol: string;
-      inAmount: number;
-      outAmount: number;
-      usdValue: number;
-    })
-  | (FeedItemBase & {
-      kind: 'take';
-      title: string;
-      excerpt: string;
-      coverUrl?: string | null;
-      topic?: string | null;
-      slug: string;
     });
 
 export interface Paginated<T> {

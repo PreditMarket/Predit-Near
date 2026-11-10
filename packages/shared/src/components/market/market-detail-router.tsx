@@ -58,7 +58,7 @@ function PammDetailContent({ poolAddress }: { poolAddress: string }) {
   if (isMarketError || isPoolError || !poolState || !market) {
     return (
       <div className="rounded-[10px] border border-border bg-card p-16 text-center font-mono text-[13px] text-muted-foreground">
-        Failed to load pool. It may not exist.
+        Could not load this market. It may not exist.
       </div>
     );
   }

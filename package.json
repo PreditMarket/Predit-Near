@@ -13,7 +13,9 @@
     "typecheck": "pnpm -r typecheck",
     "verify": "node packages/shared/scripts/verify.mjs",
     "test": "pnpm -r --if-present test",
-    "prepare": "husky"
+    "prepare": "husky",
+    "e2e": "pnpm --filter web test:e2e",
+    "e2e:testnet": "pnpm --filter web test:e2e:testnet"
   },
   "devDependencies": {
     "husky": "^9.1.7"

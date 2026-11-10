@@ -580,11 +580,6 @@ export function PoolDetailLayout({
                       </span>
                     )
                   )}
-                  {market.autoResolveDisputed && (
-                    <span className="rounded-[3px] border border-danger/40 bg-danger/10 px-1.75 py-0.5 font-mono text-[9px] font-bold uppercase tracking-widest text-danger">
-                      Disputed
-                    </span>
-                  )}
                 </div>
               </div>
             )}

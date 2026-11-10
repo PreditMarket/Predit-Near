@@ -91,7 +91,7 @@ export function QuickTradeDialog({
       }
       isLoading={isLoading}
       isError={isError || (!isLoading && !poolState && open && !!poolAddress)}
-      errorMessage="Failed to load pool. It may not exist."
+      errorMessage="Could not load this market. It may not exist."
     >
       {poolState && market && showRedeemPanel && (
         <div className="space-y-2">

@@ -1,14 +1,5 @@
 /**
- * Server-side metadata fetchers for dynamic market pages.
- * Uses plain fetch() with ISR caching — no axios (client-only).
- *
- * `API_BASE` already ends in `/api/v1` per NEXT_PUBLIC_API_BASE_URL convention.
- * Do NOT prepend `/api/v1` again in route paths.
- *
- * OG images come from backend-rendered PNG endpoints (see deor-be
- * market-og-image.controller.ts): `/{source}/:id/og-image.png`. URL is
- * deterministic, no entity fetch needed for the image itself — entity fetch
- * remains for title/description.
+ * Server-side metadata for market pages, read from the NEAR contract.
  */
 
 import { getNearMarket } from '@/lib/near/contract';

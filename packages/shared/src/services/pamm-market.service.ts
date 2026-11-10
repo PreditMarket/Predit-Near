@@ -141,23 +141,6 @@ export interface PammMarket {
   uniqueTraderCount?: number;
   totalVolumeUsdc?: number;
   creatorShareBps?: number;
-  /** Set when this market was cloned from an external source (currently only Polymarket). */
-  sourceProvider?: 'polymarket' | 'kalshi' | null;
-  sourceMarketId?: string | null;
-  sourceUrl?: string | null;
-  /**
-   * Which bot/cron generated this short-term market, if any. `'quick'` = quick-market
-   * (Pyth oracle) cron; `'polymarket_clone'` = Polymarket up/down clone cron; `null`
-   * covers ordinary markets and manually-cloned Polymarket markets (see `sourceProvider`).
-   */
-  marketOrigin?: 'quick' | 'polymarket_clone' | null;
-  /** Internal — used by auto-resolve to pin down the winning side; not shown in UI. */
-  sourceYesTokenId?: string | null;
-  /** Set when the backend auto-resolved this market from its source resolving. */
-  autoResolvedAt?: string | null;
-  /** Deadline until which an admin can dispute the auto-resolve outcome. */
-  autoResolveDisputeUntil?: string | null;
-  autoResolveDisputed?: boolean;
   /**
    * Moderation state, orthogonal to `status`. When set to `under_review`
    * an admin has flagged the market pending review — trading is halted at the
