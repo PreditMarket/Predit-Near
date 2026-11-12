@@ -36,7 +36,7 @@ Needs Node 20+ and pnpm (`corepack enable`). No keys or accounts.
 ./demo.sh --contracts    # also build the contracts and run the Rust tests (needs Rust and cargo-near 0.23)
 ```
 
-`demo.sh` first runs `pnpm verify 36 --evidence evidence/36.json`, which checks a real receipt on testnet:
+`demo.sh` first runs `pnpm verify 37`, which checks a real receipt on testnet against its public evidence link (or the copy in `evidence/37.json` if the hosted app is down):
 
 ```
 PASS  Rules match the hash locked at creation
@@ -57,7 +57,7 @@ Then open http://localhost:3000:
 | Do | See | Needs |
 |---|---|---|
 | Scroll the home feed | Posts with their markets and live odds, read from the contract | Sample posts without `TWITTER_API_KEY`; their markets are real |
-| Open `/market/36` | A settled market: locked rules, the result receipt, the NEAR AI reading, the challenge window | Nothing |
+| Open `/market/37` | A settled market made from a post by Vitalik Buterin: rules drafted by NEAR AI and created by a new account, the result receipt, the NEAR AI reading, the public evidence | Nothing |
 | Open `/u/NEARProtocol` | The author record the contract keeps: hit rate, every post that became a market, which market counted | Nothing |
 | Connect a NEAR testnet wallet | The balance pill; a new account gets 0.25 testnet NEAR for gas and storage | Gas only with `NEAR_ONBOARD_*`; otherwise use the testnet faucet |
 | Balance pill → Deposit → NEAR → "Get 100 tUSDC from the faucet" | 100 tUSDC from the mock token's faucet in your wallet (once an hour) | Nothing |
@@ -70,7 +70,7 @@ The variables are listed in [`apps/web/.env.example`](apps/web/.env.example). `P
 
 ### About the testnet data
 
-The markets on the testnet contract were created by the team to test the app and film the demo. Their deadlines are minutes away, not months, and the contract runs with a 60-second challenge window and free market creation (see `get_config`). The records on author pages such as `/u/NEARProtocol` come from these test markets: they are not real track records of those accounts. Market 36 was created from the owner account with its rules typed in by hand, not drafted by NEAR AI.
+The markets on the testnet contract were created by the team to test the app and film the demo. Their deadlines are minutes away, not months, and the contract runs with a 60-second challenge window and free market creation (see `get_config`). The records on author pages such as `/u/NEARProtocol` and `/u/VitalikButerin` come from these test markets: they are not real track records of those accounts.
 
 ## Where NEAR is used
 
@@ -141,7 +141,7 @@ More in [`contracts/SECURITY.md`](contracts/SECURITY.md): the review results, th
 | [`contracts/`](contracts/README.md) | Rust workspace: `market` (the contract), `core` (market maths), `mock-usdc`, `sandbox-tests`, testnet scripts |
 | `apps/web/` | Next.js app: feed, markets, create, portfolio, admin review, Predit AI, the result agent (`src/lib/resolve`) |
 | `packages/shared/` | NEAR client, contract mappers, shared UI and the `verify` script |
-| `evidence/` | A copy of market 36's evidence bundle, for `pnpm verify` |
+| `evidence/` | Copies of evidence bundles, for `pnpm verify` |
 
 ## Tests
 
