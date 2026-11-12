@@ -20,7 +20,6 @@ export function useMarketTx<Args>(
       toastTxSuccess(successLabel, hash);
       void qc.invalidateQueries({ queryKey: ['pamm', 'pool', poolAddress] });
       void qc.invalidateQueries({ queryKey: ['pamm', 'market', poolAddress] });
-      void qc.invalidateQueries({ queryKey: ['pamm', 'userBalances'] });
       void qc.invalidateQueries({ queryKey: ['pamm', 'v3Position'] });
       void qc.invalidateQueries({ queryKey: ['near'] });
       void usePortfolioStore.getState().fetchAll();

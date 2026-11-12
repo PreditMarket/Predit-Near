@@ -1,5 +1,5 @@
 /**
- * When to offer "install the app", as pure functions (plan 5.4, Q8). The
+ * When to offer "install the app", as pure functions. The
  * browser state they read is gathered by store/install-prompt.store.ts.
  */
 
@@ -50,8 +50,6 @@ const IN_APP_BROWSER = new RegExp(
     'Slack', // "Slack/…", "Slack_SSB"
     'GSA\\/', // the Google app, and Gmail's link viewer on iOS
     'Gmail',
-    'Phantom', // wallets' dApp browsers
-    'Solflare',
     'MicroMessenger', // WeChat
     'KAKAOTALK',
   ].join('|'),

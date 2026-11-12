@@ -1,6 +1,6 @@
 'use client';
 
-import type { TradeMode } from './types';
+type TradeMode = 'buy' | 'sell';
 
 interface ModeTabsProps {
   mode: TradeMode;

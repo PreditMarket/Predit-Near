@@ -1,6 +1,5 @@
 import * as Sentry from '@sentry/nextjs';
 import { scrubPII } from '@/lib/sentry-pii';
-import { ApiError } from '@/lib/api-error';
 
 function isUserRejected(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false;
@@ -13,16 +12,6 @@ function isUserRejected(err: unknown): boolean {
 const DSN = process.env.NEXT_PUBLIC_SENTRY_DSN;
 const ENABLE = process.env.NEXT_PUBLIC_ENABLE_SENTRY === 'true';
 const ENV = process.env.NODE_ENV;
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL?.trim();
-
-const tracePropagationTargets: (string | RegExp)[] = [/^\//];
-if (API_BASE_URL) {
-  try {
-    tracePropagationTargets.push(new URL(API_BASE_URL).host);
-  } catch {
-    // Malformed URL — fall back to same-origin propagation only.
-  }
-}
 
 if (ENABLE && DSN) {
   Sentry.init({
@@ -31,18 +20,12 @@ if (ENABLE && DSN) {
     sendDefaultPii: false,
     tracesSampleRate: ENV === 'production' ? 0.2 : 1.0,
     enabled: ENV !== 'development',
-    // No replayIntegration: PostHog already records sessions, and Replay
-    // (with rrweb) was the heaviest script parsed on every page load.
+    // No replayIntegration: Replay (with rrweb) is the heaviest script on every page load.
     integrations: [Sentry.browserTracingIntegration()],
-    tracePropagationTargets,
+    // Same-origin only: trace headers must not reach the NEAR RPCs.
+    tracePropagationTargets: [/^\//],
     beforeSend(event, hint) {
       const err = hint?.originalException;
-
-      // Auth errors (401/403) are expected user flows — session expired or
-      // permission denied. They are handled in the UI; drop from Sentry.
-      if (err instanceof ApiError && err.category === 'auth') {
-        return null;
-      }
 
       // Wallet cancellations are user-initiated, not bugs — drop from Sentry.
       if (isUserRejected(err)) {
@@ -61,11 +44,6 @@ if (ENABLE && DSN) {
       }
       if (event.contexts) {
         event.contexts = scrubPII(event.contexts) as typeof event.contexts;
-      }
-
-      // Tag 5xx ApiErrors with errorCode for Sentry filtering/alerting
-      if (err instanceof ApiError && (err.category === 'system' || err.category === 'external')) {
-        event.tags = { ...event.tags, errorCode: err.code };
       }
 
       return event;

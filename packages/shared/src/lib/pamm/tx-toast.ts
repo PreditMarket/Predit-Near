@@ -1,7 +1,4 @@
-/**
- * Sonner toast wrapper that adds a "View on Solscan" action button for
- * successful transactions. Keeps every pm-AMM mutation consistent.
- */
+/** Success toast with a link to the transaction on NEAR Blocks. */
 
 import { toast } from "sonner";
 

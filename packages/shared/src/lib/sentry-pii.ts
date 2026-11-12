@@ -2,15 +2,15 @@ const PII_KEYS = new Set(['email', 'wallet', 'jwt', 'signature', 'phone', 'autho
 
 // EVM wallet: 0x followed by 40 hex chars
 const EVM_WALLET_RE = /0x[0-9a-fA-F]{40}/g;
-// Solana wallet: base58 string 32-44 chars (rough heuristic)
-const SOLANA_WALLET_RE = /\b[1-9A-HJ-NP-Za-km-z]{32,44}\b/g;
+// NEAR account: a named `.near` / `.testnet` account, or a 64-hex implicit one
+const NEAR_ACCOUNT_RE = /\b(?:[a-z0-9_-]+\.)+(?:near|testnet)(?![\w-]|\.\w)|\b[0-9a-f]{64}\b/g;
 // JWT: three base64url segments
 const JWT_RE = /eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g;
 
 function maskWallets(value: string): string {
   return value
     .replace(EVM_WALLET_RE, '[EVM_WALLET]')
-    .replace(SOLANA_WALLET_RE, '[SOL_WALLET]')
+    .replace(NEAR_ACCOUNT_RE, '[NEAR_ACCOUNT]')
     .replace(JWT_RE, '[JWT]');
 }
 

@@ -326,7 +326,7 @@ export function RightRailNearAi({ onCollapse }: { onCollapse: () => void }) {
           market={toPammMarket(trading)}
           open
           initialSide="yes"
-          preset={{ amountUsd: 5 }}
+          presetAmountUsd={5}
           onOpenChange={(open) => !open && setTrading(null)}
         />
       )}

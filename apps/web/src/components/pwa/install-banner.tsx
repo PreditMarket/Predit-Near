@@ -6,7 +6,7 @@ import { useInstallPromptStore } from '@/store/install-prompt.store';
 import { IosInstallSheet } from './ios-install-sheet';
 
 /**
- * "Install the app" on phones (plan 5.4): from the second visit or after the
+ * "Install the app" on phones: from the second visit or after the
  * first trade, until installed or put off with "Not now" (14 days). Android
  * opens the browser's install dialog; iOS, which has none, the Share → Add to
  * Home Screen guide. In an iOS in-app browser (Telegram, Instagram, a

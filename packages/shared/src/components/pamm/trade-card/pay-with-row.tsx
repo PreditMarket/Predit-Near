@@ -1,6 +1,6 @@
 'use client';
 
-import { fmtCompactAmount } from './formatters';
+import { fmtTokenAmount } from './formatters';
 
 interface PayWithRowProps {
   /** The pool's collateral: the one thing a buy pays with. */
@@ -10,17 +10,10 @@ interface PayWithRowProps {
   decimals: number;
 }
 
-/** Coin dot 14×14. Renders the token's icon when present; falls back to a
- * lettered avatar only if the icon URL 404s or was never supplied. Error
- * flag resets when the icon URL flips (enrichment lands after first paint). */
+/** Coin dot 14×14: the symbol's first letter. */
 function CoinBadge({ symbol, size = 14 }: { symbol: string; size?: number }) {
   const sym = symbol.toUpperCase();
-  const fallbackBg =
-    sym === 'USDC' || sym === 'USDT'
-      ? 'bg-primary text-background'
-      : sym === 'SOL'
-        ? 'bg-brand-purple text-white'
-        : 'bg-card text-foreground';
+  const fallbackBg = sym.endsWith('USDC') ? 'bg-primary text-background' : 'bg-card text-foreground';
   return (
     <span
       style={{ width: size, height: size }}
@@ -32,12 +25,10 @@ function CoinBadge({ symbol, size = 14 }: { symbol: string; size?: number }) {
 }
 
 /** Thin row that sits flush on top of the amount input (`-mb-2` = -8px),
- * grouping the "buy with X" decision with the "how much" input. Balance
- * headline is USDC-equivalent, with the raw token amount as a caption. */
+ * grouping the "buy with X" decision with the "how much" input. */
 export function PayWithRow({ symbol, rawBalance, decimals }: PayWithRowProps) {
   const units = rawBalance === undefined ? null : Number(rawBalance) / 10 ** decimals;
-  // Every market trades in USDC: naming it on each buy says nothing. Another
-  // collateral is still named, since that is a real difference.
+  // Plain USDC needs no label; the testnet token is named so it isn't taken for it.
   const named = symbol.toUpperCase() !== 'USDC';
   return (
     <div className="-mb-[8px] flex items-center gap-[8px] px-[2px] pt-[2px]">
@@ -55,7 +46,7 @@ export function PayWithRow({ symbol, rawBalance, decimals }: PayWithRowProps) {
       <span className="ml-auto font-mono text-[11px] text-faint">
         Bal{' '}
         <span className="font-bold text-muted-foreground">
-          {units === null ? '—' : `${fmtCompactAmount(units, symbol)} ${symbol}`}
+          {units === null ? '—' : `${fmtTokenAmount(units)} ${symbol}`}
         </span>
       </span>
     </div>

@@ -41,11 +41,9 @@
     "@types/node": "^20.10.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.0",
-    "buffer": "^6.0.3",
     "eslint": "^8.57.1",
     "eslint-config-next": "^15.5.18",
     "serwist": "^9.5.13",
-    "typescript": "^5",
-    "webpack": "^5"
+    "typescript": "^5"
   }
 }

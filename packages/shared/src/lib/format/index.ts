@@ -1,4 +1,4 @@
-// One formatter per kind of figure — see plan 01-improvement-ui §6.1.
+// One formatter per kind of figure.
 export { DASH, toNumber, pnlTone, type Numeric, type PnlTone } from './number';
 export { formatUsd, formatFeeUsd, type FormatUsdOptions } from './usd';
 export { formatPct } from './pct';

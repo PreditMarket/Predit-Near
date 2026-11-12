@@ -72,11 +72,11 @@ test.describe('social feed', () => {
     await page.getByTestId('amount-input').first().fill('1');
     await page.getByTestId('submit-trade-btn').first().click();
     await expect.poll(() => calls.length).toBeGreaterThan(0);
-    const bet = calls[0];
-    expect(bet.methodName).toBe('ft_transfer_call');
-    expect(bet.args.receiver_id).toBe(MARKET);
-    expect(bet.args.amount).toBe('1000000');
-    expect(JSON.parse(bet.args.msg as string)).toMatchObject({ action: 'buy', market_id: btc.id, side: 'yes' });
+    const buy = calls[0];
+    expect(buy.methodName).toBe('ft_transfer_call');
+    expect(buy.args.receiver_id).toBe(MARKET);
+    expect(buy.args.amount).toBe('1000000');
+    expect(JSON.parse(buy.args.msg as string)).toMatchObject({ action: 'buy', market_id: btc.id, side: 'yes' });
   });
 
   test('older posts load on their own as the reader scrolls down', async ({ page }) => {

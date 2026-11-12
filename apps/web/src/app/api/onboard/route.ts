@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 const ONE_NEAR = BigInt(10) ** BigInt(24);
 // NEAR checks an account can cover all the gas it attaches before running a
-// transaction, and refunds what is unused. A 150 Tgas bet needs about 0.15 NEAR
+// transaction, and refunds what is unused. A 150 Tgas trade needs about 0.15 NEAR
 // on hand, though it spends a small fraction of that.
 const GRANT = ONE_NEAR / BigInt(4); // 0.25 NEAR
 const ENOUGH = ONE_NEAR / BigInt(5); // 0.2 NEAR

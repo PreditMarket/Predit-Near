@@ -1,17 +1,11 @@
 'use client';
 
-import { useState, type CSSProperties, type ReactNode } from 'react';
+import { useState, type CSSProperties } from 'react';
 import Link from 'next/link';
-import {
-  Repeat,
-  Clock,
-  BadgeCheck,
-  Play,
-} from 'lucide-react';
+import { BadgeCheck, Play } from 'lucide-react';
 import { UserAvatar } from '@/components/v2';
 import type { NearMarket } from '@/lib/near/types';
 import { PredictionBar } from './prediction-bar';
-import { displayName } from '@/lib/display-name';
 import { XLogo, xProfileUrl } from '@/components/shared/x-logo';
 import { tokenizeContent } from '@/lib/linkify';
 import { playableVideoUrl } from '@/lib/x-media';
@@ -48,12 +42,6 @@ function PostVariant({
 }) {
   return (
     <article className="px-5 py-3.5 border-b border-border/60 hover:bg-muted/40 transition-colors">
-      {item.repostedBy && (
-        <div className="pl-[52px] flex items-center gap-1.5 text-[11px] text-muted-foreground mb-1.5">
-          <Repeat className="w-3 h-3" />
-          <span>{displayName(item.repostedBy)} reposted</span>
-        </div>
-      )}
       <div className="grid grid-cols-[44px_1fr] gap-3">
       <UserAvatar address={item.author.handle ?? item.author.id} size={40} photoUrl={item.author.avatar} />
       <div className="flex flex-col gap-1.5 min-w-0">
@@ -61,13 +49,8 @@ function PostVariant({
           name={authorName(item.author)}
           href={item.source === 'x' && item.author.handle ? `/u/@${item.author.handle}` : undefined}
           handle={item.author.handle ?? null}
-          tierRank={item.author.tierRank ?? null}
-          tier={item.author.tier ?? null}
           createdAt={item.createdAt}
-          pending={false}
           fromX={item.source === 'x'}
-          kol={!!item.author.isVirtual}
-          menu={null}
         />
         {item.content && (
           <div className="text-[14px] leading-[1.45] text-white whitespace-pre-wrap break-words">
@@ -212,39 +195,26 @@ function ExternalQuoteCard({ quote }: { quote: ExternalQuote }) {
   );
 }
 
-/** X KOLs show their real name ("Elon Musk"), not the handle. */
+/** X authors show their real name ("Elon Musk"), not the handle. */
 function authorName(author: PostItem['author']): string {
-  if (author.isVirtual && author.displayName) return author.displayName;
-  return displayName(author);
+  return author.displayName?.trim() || author.username?.trim() || author.handle || 'anon';
 }
 
 function PostHeader({
   name,
   href,
   handle,
-  tierRank,
-  tier,
   createdAt,
-  pending,
   fromX,
-  kol,
-  menu,
 }: {
   name: string;
-  /** The author's profile, when they have a public one. */
+  /** The author's record page, when there is one. */
   href?: string;
-  /** Shown as `@handle` beside the name, as on the author's trades. */
+  /** Shown as `@handle` beside the name. */
   handle?: string | null;
-  tierRank: number | null;
-  tier: string | null;
   createdAt: string;
-  pending?: boolean;
   /** Mirrored from a tweet: badge the source. */
   fromX?: boolean;
-  /** Author is an admin-added X KOL (virtual account), not a member. */
-  kol?: boolean;
-  /** Owner actions, pinned to the right of the header. */
-  menu?: ReactNode;
 }) {
   return (
     <div className="flex items-center gap-2 flex-wrap">
@@ -261,20 +231,6 @@ function PostHeader({
           className="inline-flex items-center gap-1 rounded-[3px] bg-accent/70 px-1.5 py-[1px] [font-family:var(--font-mono)] text-[9.5px] font-bold tracking-[0.06em] text-muted-foreground"
         >
           <XLogo className="w-2.5 h-2.5" />
-          {kol && 'KOL'}
-        </span>
-      )}
-      {tierRank !== null && (
-        <span
-          className={`[font-family:var(--font-mono)] text-[9.5px] font-bold px-1.5 py-[1px] rounded-[3px] tracking-[0.06em] ${
-            tier === 'plat'
-              ? 'bg-primary/14 text-primary'
-              : tier === 'gold'
-              ? 'bg-warning/14 text-warning'
-              : 'bg-accent/70 text-muted-foreground'
-          }`}
-        >
-          {(tier ?? '').toUpperCase()} #{tierRank}
         </span>
       )}
       {/* Relative to now: a server-rendered page says it as of then. */}
@@ -282,22 +238,10 @@ function PostHeader({
         {handle && <span data-testid="post-author-handle">@{handle} </span>}·{' '}
         {formatTime(createdAt)}
       </span>
-      {pending && (
-        <span
-          data-testid="pending-marker"
-          title="Will be sent when you're back online"
-          className="inline-flex items-center gap-1 rounded-[3px] bg-accent/70 px-1.5 py-[1px] [font-family:var(--font-mono)] text-[9.5px] font-bold uppercase tracking-[0.06em] text-muted-foreground"
-        >
-          <Clock className="w-2.5 h-2.5" />
-          Pending
-        </span>
-      )}
-      {menu && <div className="ml-auto -my-1">{menu}</div>}
     </div>
   );
 }
 
-/** "⋯" on the viewer's own post: Delete, behind a confirm dialog. */
 /** Very small relative-time helper (avoid pulling date-fns just for feed). */
 function formatTime(iso: string): string {
   const t = Date.parse(iso);

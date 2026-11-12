@@ -1,8 +1,4 @@
-/**
- * Number formatting helpers for the trade card. All cent prices are integer;
- * USD / SOL / long-decimal tokens each get their own precision so they read
- * consistently across the panel.
- */
+/** Number formatting helpers for the trade card. All cent prices are integer. */
 
 /** Integer cents from a 0..1 probability. */
 export const cents = (p: number): string => `${Math.round(p * 100)}¢`;
@@ -26,25 +22,9 @@ export const usdSmart = (n: number): string => {
   return `$${Math.round(n).toLocaleString()}`;
 };
 
-/** Format a token amount at symbol-appropriate precision. */
-export function fmtTokenAmount(amount: number, symbol: string): string {
-  const sym = symbol.toUpperCase();
-  if (sym === 'SOL') return amount.toLocaleString('en-US', { maximumFractionDigits: 3 });
-  if (sym === 'BONK' || sym === 'PEPE' || sym === 'WIF')
-    return Math.round(amount).toLocaleString('en-US');
-  // Stablecoins & everything else: 2 decimals.
+/** A share or token amount, up to 2 decimals. */
+export function fmtTokenAmount(amount: number): string {
   return amount.toLocaleString('en-US', { maximumFractionDigits: 2 });
-}
-
-/** Compact form for very-large token balances (e.g. "12.5M BONK"). */
-export function fmtCompactAmount(amount: number, symbol: string): string {
-  const sym = symbol.toUpperCase();
-  if (sym === 'BONK' || sym === 'PEPE' || sym === 'WIF') {
-    if (amount >= 1_000_000) return `${(amount / 1_000_000).toFixed(1)}M`;
-    if (amount >= 1_000) return `${(amount / 1_000).toFixed(1)}K`;
-    return Math.round(amount).toLocaleString('en-US');
-  }
-  return fmtTokenAmount(amount, symbol);
 }
 
 /** Human token amount from raw base units. */

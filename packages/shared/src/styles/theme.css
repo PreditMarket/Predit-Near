@@ -1,14 +1,13 @@
 /*
- * Predit theme — the one palette and motion scale every app uses.
- * Imported by apps/web and apps/admin globals.css (after tailwindcss).
+ * Predit theme — the one palette and motion scale.
+ * Imported by apps/web globals.css (after tailwindcss).
  *
  * Use the semantic utilities, never raw Tailwind palette colours or hex:
  *   action / active / link / focus  → primary        (turquoise)
  *   gain / yes / buy / success      → success        (green)
  *   loss / no / sell / error        → danger         (red; `destructive` is the same)
- *   pending / caution / XP / prize  → warning        (gold)
+ *   pending / caution               → warning        (gold)
  *   brand highlight (AI, gradients) → brand-purple, brand-pink
- *   podium 1st / 2nd / 3rd           → medal-gold, medal-silver, medal-bronze (rankMedalClass)
  *   text                            → foreground, muted-foreground, faint
  *   surfaces                        → background < elevated < card, border, border-strong
  * Tints come from opacity: `bg-success/10 border-success/30 text-success`.
@@ -31,8 +30,6 @@
   --brand-green: #22D17E;
   --brand-red: #FF5757;
   --brand-gold: #FCD05A;
-  --medal-silver: #D5D9E0;
-  --medal-bronze: #E0915A;
   --brand-primary-soft: color-mix(in srgb, var(--brand-purple) 16%, transparent);
   --brand-primary-border: color-mix(in srgb, var(--brand-purple) 30%, transparent);
   --brand-primary-strong: color-mix(in srgb, var(--brand-purple) 82%, white 18%);
@@ -114,9 +111,6 @@
   --color-brand-pink: var(--brand-pink);
   --color-brand-blue: var(--brand-blue);
   --color-brand-gold: var(--brand-gold);
-  --color-medal-gold: var(--brand-gold);
-  --color-medal-silver: var(--medal-silver);
-  --color-medal-bronze: var(--medal-bronze);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -132,8 +126,6 @@
   --animate-accordion-down: accordion-down 0.2s var(--ease-smooth);
   --animate-accordion-up: accordion-up 0.2s var(--ease-smooth) forwards;
   --animate-page-in: page-in 0.22s var(--ease-smooth);
-  --animate-pump-arrive: pump-arrive 0.5s var(--ease-smooth);
-  --animate-pump-flash: pump-flash 2.4s ease-out;
 }
 
 /* ─── Motion ─── one curve and one duration for every hover, focus and
@@ -152,29 +144,11 @@
   to   { opacity: 1; }
 }
 
-/* A token just launched on pump.fun joins a live list: its row opens from
-   nothing (the rows under it slide down rather than jump), drops in, and
-   glows in the brand turquoise for a moment. Reduced motion skips it below. */
-@keyframes pump-arrive {
-  from { grid-template-rows: 0fr; opacity: 0; transform: translateY(-8px); }
-  to   { grid-template-rows: 1fr; opacity: 1; transform: none; }
-}
-@keyframes pump-flash {
-  0%, 25% {
-    background-color: color-mix(in srgb, var(--brand-turq) 16%, transparent);
-    box-shadow: inset 2px 0 0 var(--brand-turq);
-  }
-  100% {
-    background-color: transparent;
-    box-shadow: inset 2px 0 0 transparent;
-  }
-}
-
 /* Create market in the nav: a shine sweeping across and a pulsing glow.
    Both run on the compositor (transform / opacity), never repainting the
    button: the glow is a fixed box-shadow on its own element (`cta-glow`,
    behind the button, which clips its overflow for the shine) whose opacity
-   pulses. Animating box-shadow repainted every frame (plan 21). */
+   pulses; animating box-shadow would repaint every frame. */
 .create-cta {
   position: relative;
   overflow: hidden;
@@ -192,10 +166,6 @@
 .cta-glow-turq {
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand-turq) 18%, transparent),
     0 0 14px 2px color-mix(in srgb, var(--brand-turq) 45%, transparent);
-}
-.cta-glow-ai {
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand-purple) 18%, transparent),
-    0 0 16px 3px color-mix(in srgb, var(--brand-pink) 50%, transparent);
 }
 @keyframes cta-glow-pulse {
   0%, 100% { opacity: 0; }

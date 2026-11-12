@@ -2,11 +2,10 @@
 
 import { useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { ColumnBar, ColumnTitle } from '@/components/app-shell/column-bar';
 
-import { getCategories, type Category } from '@/services/categories.service';
+import { CATEGORIES as categories, type Category } from '@/services/categories.service';
 import { NearMarketList } from '@/components/markets/near-market-list';
 
 /**
@@ -18,12 +17,6 @@ export default function PredictionsPageV2() {
   const searchParams = useSearchParams();
   const activeSlug = searchParams?.get('category') ?? null;
   const [leftCollapsed, setLeftCollapsed] = useState(false);
-
-  const { data: categories = [] } = useQuery({
-    queryKey: ['categories-list'],
-    queryFn: getCategories,
-    staleTime: 5 * 60_000,
-  });
 
   // Category rail drives MarketList via the `?category=<slug>` URL param,
   // handed down as `categorySlug` — MarketList reads the URL itself only on
@@ -149,11 +142,10 @@ function CategoryRail({
         />
         {categories.map((c) => (
           <CategoryLink
-            key={c.id}
+            key={c.slug}
             active={activeSlug === c.slug}
             onClick={() => onChange(c.slug)}
             label={c.name}
-            color={c.color ?? undefined}
           />
         ))}
       </nav>
@@ -192,17 +184,11 @@ function MobileCategoryStrip({
       </button>
       {categories.map((c) => (
         <button
-          key={c.id}
+          key={c.slug}
           type="button"
           onClick={() => onChange(c.slug)}
           className={`touch-hit ${chip(activeSlug === c.slug)}`}
         >
-          {c.color && (
-            <span
-              className="w-2 h-2 rounded-full shrink-0"
-              style={{ background: c.color }}
-            />
-          )}
           {c.name}
         </button>
       ))}
@@ -214,12 +200,10 @@ function CategoryLink({
   active,
   onClick,
   label,
-  color,
 }: {
   active: boolean;
   onClick: () => void;
   label: string;
-  color?: string;
 }) {
   return (
     <button
@@ -231,12 +215,6 @@ function CategoryLink({
           : 'text-white/65 hover:text-white hover:bg-white/3'
       }`}
     >
-      {color && (
-        <span
-          className="w-2 h-2 rounded-full shrink-0"
-          style={{ background: color }}
-        />
-      )}
       <span className="flex-1 truncate">{label}</span>
     </button>
   );

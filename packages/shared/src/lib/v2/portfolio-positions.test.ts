@@ -10,7 +10,7 @@ import {
 const row = (
   id: string,
   status: string,
-  over: Partial<{ marketQuestion: string; createdAt: string; amount: string; xpValue: number }> = {},
+  over: Partial<{ marketQuestion: string; createdAt: string; amount: string }> = {},
 ) => ({
   id,
   status,
@@ -21,8 +21,8 @@ const row = (
 });
 
 const ROWS = [
-  row('a', 'open', { createdAt: '2026-10-03T00:00:00Z', amount: '5', xpValue: 10 }),
-  row('b', 'WON', { createdAt: '2026-10-01T00:00:00Z', amount: '50', xpValue: 1 }),
+  row('a', 'open', { createdAt: '2026-10-03T00:00:00Z', amount: '5' }),
+  row('b', 'WON', { createdAt: '2026-10-01T00:00:00Z', amount: '50' }),
   row('c', 'cancelled', { createdAt: '2026-10-02T00:00:00Z', amount: '20' }),
   row('d', 'live', { marketQuestion: 'Will BTC close above 100k?', amount: 'oops' }),
   row('e', 'claimed'),
@@ -68,10 +68,6 @@ describe('sortPositions', () => {
 
   it('value is largest traded amount first; unreadable amounts count as 0', () => {
     expect(ids(sortPositions(ROWS, 'value')).slice(0, 3)).toEqual(['b', 'c', 'a']);
-  });
-
-  it('xp is largest first; missing xp counts as 0', () => {
-    expect(ids(sortPositions(ROWS, 'xp')).slice(0, 2)).toEqual(['a', 'b']);
   });
 
   it('does not mutate its input', () => {

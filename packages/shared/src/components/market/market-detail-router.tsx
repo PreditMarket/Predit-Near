@@ -1,13 +1,11 @@
 'use client';
 
-import { useEffect } from 'react';
 import { notFound, useParams } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PoolDetailLayout } from '@/components/pamm/pool-detail-layout';
 import { usePoolState } from '@/hooks/pamm/use-pool-state';
 import { useQuery } from '@tanstack/react-query';
-import { pammMarketService } from '@/services/pamm-market.service';
-import { markMarketViewed } from '@/lib/last-market-view';
+import { getPammMarketById } from '@/services/pamm-market.service';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 
@@ -17,31 +15,19 @@ const isMarketId = (id: string) => /^\d+$/.test(id);
 function PammDetailContent({ poolAddress }: { poolAddress: string }) {
   const { data: market, isLoading: isMarketLoading, isError: isMarketError } = useQuery({
     queryKey: ['pamm', 'market', poolAddress],
-    queryFn: () => pammMarketService.getMarketById(poolAddress),
-    // While the AI resolve flow is mid-flight the row changes on the backend's
-    // schedule (ensemble finishes, dispute window lapses, settle tx lands) with
-    // no event to listen for. A dispute countdown reaching zero is NOT the
-    // settlement — the cron still has to send the tx — so keep polling until
-    // the status actually reaches resolved/cancelled.
+    queryFn: () => getPammMarketById(poolAddress),
+    // Waiting for a result, the market changes when a receipt is posted,
+    // challenged or finalized, with no event to listen for.
     refetchInterval: (query) => {
       const m = query.state.data;
-      if (!m) return false;
-      // `tradingPausedAt` is checked separately: a paused market is still
-      // `active`, and an admin can lift or close it at any moment.
-      return m.status === 'pending_resolution' ||
-        m.status === 'pending_resolve_review' ||
-        !!m.tradingPausedAt
+      return m?.status === 'pending_resolution' || m?.status === 'pending_resolve_review'
         ? 15_000
         : false;
     },
   });
 
   const { data: poolState, isLoading: isPoolLoading, isError: isPoolError } =
-    usePoolState(poolAddress, market?.marketVersion ?? null);
-
-  useEffect(() => {
-    if (market) markMarketViewed(poolAddress);
-  }, [poolAddress, market]);
+    usePoolState(poolAddress);
 
   if (isMarketLoading || isPoolLoading) {
     return (

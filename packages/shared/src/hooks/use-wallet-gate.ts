@@ -4,11 +4,8 @@ import { useNearWallet } from '@/store/near-wallet.store';
 
 export interface WalletGate {
   walletReady: boolean;
-  signedIn: boolean;
   /** Not ready yet, and nothing for the user to do but wait — disable the CTA. */
   connecting: boolean;
-  /** The connected NEAR account, when known. */
-  walletAddress: string | null;
   handleAction: (onReady: () => void) => () => void;
   getCtaLabel: (readyLabel: string, isPending?: boolean) => string;
 }
@@ -35,9 +32,7 @@ export function useWalletGate(): WalletGate {
 
   return {
     walletReady,
-    signedIn: walletReady,
     connecting,
-    walletAddress: accountId,
     handleAction,
     getCtaLabel,
   };

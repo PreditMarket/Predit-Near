@@ -6,18 +6,15 @@ import { fmtPct, fmtVol } from '@/components/shared/market-card';
 import type { PoolStateResult } from '@/hooks/pamm/use-pool-state';
 import { useConfig } from '@/hooks/pamm/use-config';
 import { NearMarketProof } from './near-market-proof';
-import { useTradingBan } from '@/hooks/pamm/use-trading-ban';
 import { formatDate } from '@/lib/date';
 import type { MarketRules } from '@/services/market.service';
-import BN from 'bn.js';
 import {
     ChevronDown,
     Clock,
     ExternalLink,
     Gavel, TimerReset,
-    TrendingUp
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { RedeemPanel } from './redeem-panel';
 import { SwapPanel } from './swap-panel';
 
@@ -25,24 +22,15 @@ import { SwapPanel } from './swap-panel';
 
 function RulesResolutionCard({
   rules,
-  outcome,
-  oracleName,
   yesLabel = 'Yes',
   noLabel = 'No',
 }: {
   rules: MarketRules;
-  outcome?: string | null;
-  oracleName?: string;
   yesLabel?: string;
   noLabel?: string;
 }) {
   const yesRule = rules.outcomeRules?.find((r) => r.outcomeIndex === 0);
   const noRule = rules.outcomeRules?.find((r) => r.outcomeIndex === 1);
-  // `outcome` is a raw resolution-code string ('YES'/'NO') from the AI
-  // suggestion, not a display label — map it through the market's own
-  // custom labels for what's actually shown.
-  const outcomeDisplay =
-    outcome === 'YES' ? yesLabel : outcome === 'NO' ? noLabel : outcome;
 
   return (
     <div className="px-[18px] py-4 border-b border-border last:border-0">
@@ -51,26 +39,6 @@ function RulesResolutionCard({
       </div>
 
       <div className="space-y-4">
-        {outcome && (
-          <div className="flex items-center gap-2 text-[12px]">
-            <span className="text-muted-foreground">Resolves to</span>
-            <span
-              className={`font-bold ${outcome === 'YES' ? 'text-success' : 'text-danger'}`}
-            >
-              {outcomeDisplay}
-            </span>
-          </div>
-        )}
-
-        {rules.description && (
-          <div>
-            <MarketDescriptionContent
-              value={rules.description}
-              className="text-[13px] text-muted-foreground"
-            />
-          </div>
-        )}
-
         {(yesRule || noRule) && (
           <div className="space-y-3">
             <p className="font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
@@ -81,7 +49,7 @@ function RulesResolutionCard({
               <div className="space-y-1.5">
                 <div className="flex items-center gap-1.5">
                   <div className="rounded-md px-2 py-0.5 text-[11px] font-bold border border-success/60 bg-success/10 text-success">
-                    {(yesRule.label || yesLabel).toUpperCase()}
+                    {yesLabel.toUpperCase()}
                   </div>
                 </div>
                 <div className="rounded-lg border border-border/40 bg-muted/20 p-3">
@@ -97,7 +65,7 @@ function RulesResolutionCard({
               <div className="space-y-1.5">
                 <div className="flex items-center gap-1.5">
                   <div className="rounded-md px-2 py-0.5 text-[11px] font-bold border border-danger/60 bg-danger/10 text-danger">
-                    {(noRule.label || noLabel).toUpperCase()}
+                    {noLabel.toUpperCase()}
                   </div>
                 </div>
                 <div className="rounded-lg border border-border/40 bg-muted/20 p-3">
@@ -108,15 +76,6 @@ function RulesResolutionCard({
                 </div>
               </div>
             )}
-          </div>
-        )}
-
-        {oracleName && (
-          <div className="space-y-1 pt-2 border-t border-border/40">
-            <p className="font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
-              Resolver
-            </p>
-            <p className="text-[13px]">{oracleName}</p>
           </div>
         )}
       </div>
@@ -185,14 +144,13 @@ function getStatus(
 
 // ─── dual-line chart ─────────────────────────────────────────────────────────
 
+/** Start (50%) to the current price: the contract keeps no price history. */
 function buildRealChart(
-  trades: any[],
   currentPriceYes: number,
   createdTs: number,
   now: number,
 ) {
   type Pt = [number, number];
-  const duration = Math.max(1, now - createdTs);
 
   const yesPts: Pt[] = [];
   const noPts: Pt[] = [];
@@ -203,25 +161,6 @@ function buildRealChart(
   yesPts.push([40, startY]);
   noPts.push([40, Math.round(0.5 * 224 + 8)]);
   meta.push({ x: 40, priceYes: 0.5, ts: createdTs });
-
-  // Trades
-  const sortedTrades = [...(trades || [])].sort(
-    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-  );
-
-  sortedTrades.forEach((t) => {
-    const tradeTs = new Date(t.createdAt).getTime() / 1000;
-    const pct = Math.max(0, Math.min(1, (tradeTs - createdTs) / duration));
-    const x = 40 + pct * 640;
-    const priceYes = Math.max(0.04, Math.min(0.96, t.priceYes));
-
-    const yesY = Math.round((1 - priceYes) * 224 + 8);
-    const noY = Math.round(priceYes * 224 + 8);
-
-    yesPts.push([Math.round(x), yesY]);
-    noPts.push([Math.round(x), noY]);
-    meta.push({ x: Math.round(x), priceYes, ts: tradeTs });
-  });
 
   // End point (current price)
   const finalPriceYes = Math.max(0.04, Math.min(0.96, currentPriceYes));
@@ -254,11 +193,8 @@ function buildRealChart(
 
 // ─── component ───────────────────────────────────────────────────────────────
 
-import { useCollateralMap } from '@/hooks/pamm/use-collaterals';
-import { NEAR_MARKET_CONTRACT, nearExplorerAccountUrl } from '@/lib/near/config';
-import { PammMarket, pammMarketService } from '@/services/pamm-market.service';
-import { useQuery } from '@tanstack/react-query';
-import { useEffect, useMemo } from 'react';
+import { NEAR_MARKET_CONTRACT, USDC_DECIMALS, USDC_SYMBOL, nearExplorerAccountUrl } from '@/lib/near/config';
+import type { PammMarket } from '@/services/pamm-market.service';
 import { PammShareButton } from './share-button';
 import {
     Drawer,
@@ -278,15 +214,12 @@ export function PoolDetailLayout({
   poolAddress,
   market,
 }: PoolDetailLayoutProps) {
-  const { pool } = poolState;
   const { data: pammConfig } = useConfig();
-  const bannedFromTrading = useTradingBan(poolAddress);
   const [howOpen, setHowOpen] = useState(false);
   const [now, setNow] = useState<number | null>(null);
   const [tradeOpen, setTradeOpen] = useState(false);
-  // `?side=yes|no` from a Predit AI "Trade on Predit" link (plan 05 F3):
-  // the side the trade form opens on. Read after mount, so the cached page
-  // stays the same for every visitor.
+  // `?side=yes|no` picks the side the trade form opens on. Read after mount,
+  // so the cached page stays the same for every visitor.
   const [linkSide, setLinkSide] = useState<'yes' | 'no' | undefined>();
   useEffect(() => {
     const s = new URLSearchParams(window.location.search).get('side');
@@ -297,8 +230,6 @@ export function PoolDetailLayout({
     priceYes: number;
     ts: number;
   } | null>(null);
-  const isMethodologyEnabled =
-    process.env.NEXT_PUBLIC_METHODOLOGY_ENABLE === 'true';
 
   useEffect(() => {
     setNow(Date.now() / 1000);
@@ -306,55 +237,20 @@ export function PoolDetailLayout({
     return () => clearInterval(t);
   }, []);
 
-  const { data: realtime } = useQuery({
-    queryKey: ['pamm', 'market', poolAddress, 'realtime'],
-    queryFn: () => pammMarketService.getRealtime(poolAddress),
-    refetchInterval: 5000,
-  });
-
-  const collateralMap = useCollateralMap();
-  const collateralToken = collateralMap.get(pool.collateralMint.toBase58());
-  const collateralSymbol =
-    collateralToken?.symbol ?? pool.collateralMint.toBase58().slice(0, 6);
-
-  // "Widget" mode's floating anchor — mainnet + real-USDC-collateral only,
-  // and only while the user's preference is 'widget' (the alternative,
-  // 'inline', has no floating anchor at all — its trigger lives inside
-  // SwapPanel's own insufficient-balance banner instead).
-
-  // Prefer the on-chain resolutionCode (source of truth), but fall back to
-  // the DB resolution so the result shows immediately after an admin resolve
-  // even while the on-chain account read is still catching up (RPC lag) or
-  // when the market was resolved off-chain.
-  const dbResolutionCode =
-    market.resolution === 'yes' ? 1 : market.resolution === 'no' ? 2 : 0;
-  const effectiveResolutionCode =
-    pool.resolutionCode !== 0 ? pool.resolutionCode : dbResolutionCode;
-  const isResolved = effectiveResolutionCode !== 0;
-  // Cancelled = resolver flagged the market undeterminable. Trading stays open
-  // (sell-only) so holders can reclaim collateral. On-chain flag is source of
-  // truth; fall back to the DB status while the account read catches up.
-  const isCancelled =
-    !isResolved && (pool.cancelled || market.status === 'cancelled');
-  // V3's only cancelled-market reclaim path is refund_v3 (RedeemPanel) — sell
-  // always reverts once cancelled (on-chain AlreadyCancelled). V1/V2
-  // cancelled pools legitimately still take sells as the reclaim mechanism
-  // (LP-based), so only redirect V3 to RedeemPanel here.
-  // The AI-resolve window. Both statuses mean the backend has stopped
-  // recording trades, and `pending_resolve_review` in particular is NOT a
-  // settled market: no outcome is on-chain, so redeem/refund would revert.
+  const collateralSymbol = USDC_SYMBOL;
+  const resolutionCode = poolState.resolutionCode;
+  const isResolved = resolutionCode !== 0;
+  // Cancelled, invalid or one-sided: everyone claims a refund.
+  const isCancelled = !isResolved && poolState.cancelled;
+  // Past expiry until the result is final: no outcome to redeem yet.
   const isResolving =
     market.status === 'pending_resolution' ||
     market.status === 'pending_resolve_review';
-  // Reversible halt from the trader petition — the market is still `active`,
-  // so nothing in `status` reflects it.
-  const isTradingPaused = !!market.tradingPausedAt && !isResolving;
-  const showRedeemPanel =
-    isResolved || (isCancelled && poolState.marketVersion === 'v3_shares');
-  const expiryTs = (pool.expiryTs as unknown as BN).toNumber();
+  const showRedeemPanel = isResolved || isCancelled;
+  const expiryTs = poolState.expiryTs;
   const isExpiredUnresolved =
     !isResolved && !isCancelled && now !== null && now >= expiryTs;
-  const createdTs = (pool.createdTs as unknown as BN).toNumber();
+  const createdTs = poolState.createdTs;
 
   const yesPercent = poolState.priceYes * 100;
   const yesLabel = market.yesLabel?.trim() || 'Yes';
@@ -364,19 +260,12 @@ export function PoolDetailLayout({
         label: 'Cancelled',
         cls: 'bg-danger/10 text-danger border-danger/20',
       }
-    : getStatus(effectiveResolutionCode, expiryTs, yesLabel, noLabel);
+    : getStatus(resolutionCode, expiryTs, yesLabel, noLabel);
   const countdown = now !== null ? formatCountdown(expiryTs, now) : '--m --s';
-  // Stable time for chart to prevent constant drifting
-  const chartNow = useMemo(() => {
-    return Date.now() / 1000;
-  }, [realtime?.latestTrades]);
+  // Fixed at mount so the chart doesn't drift every second.
+  const chartNow = useMemo(() => Date.now() / 1000, []);
 
-  const chart = buildRealChart(
-    realtime?.latestTrades || [],
-    poolState.priceYes,
-    createdTs,
-    chartNow,
-  );
+  const chart = buildRealChart(poolState.priceYes, createdTs, chartNow);
 
   const handleMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -401,15 +290,11 @@ export function PoolDetailLayout({
 
   const explorerUrl = nearExplorerAccountUrl(NEAR_MARKET_CONTRACT);
 
-  const collateralDecimals = poolState.pool.collateralDecimals;
-  const collateralScale = 10 ** collateralDecimals;
-  const collateralUSD =
-    Number(poolState.collateralVaultBalance) / collateralScale;
+  const collateralUSD = Number(poolState.v3.poolCollateral) / 10 ** USDC_DECIMALS;
 
-  // resolver is now global (on Config), not per-pool.
   const resolverShort = pammConfig?.resolver
-    ? shortAddr(pammConfig.resolver.toBase58(), 4, 4)
-    : 'Global resolver';
+    ? shortAddr(pammConfig.resolver, 4, 4)
+    : 'Result operator';
 
   return (
     <>
@@ -432,17 +317,6 @@ export function PoolDetailLayout({
                   className={`rounded-[3px] border px-[7px] py-0.5 font-mono text-[8.5px] font-bold uppercase tracking-[0.1em] flex items-center gap-1 ${status.cls}`}
                 >
                   <span className="text-[7px]">★</span> {status.label}
-                </span>
-              )}
-              {market.isBonusXp && (
-                <span className="rounded-[3px] border border-warning/40 bg-warning/10 px-1.75 py-0.5 font-mono text-[8.5px] font-bold uppercase tracking-widest text-warning">
-                  Bonus XP
-                </span>
-              )}
-              {market.isTrending && (
-                <span className="flex items-center gap-1 rounded-[3px] border border-success/40 bg-success/10 px-1.75 py-0.5 font-mono text-[8.5px] font-bold uppercase tracking-widest text-success">
-                  <TrendingUp className="h-2.5 w-2.5" />
-                  Trending
                 </span>
               )}
               <span className="flex-1" />
@@ -517,15 +391,14 @@ export function PoolDetailLayout({
                   cls: 'text-danger',
                 },
                 {
-                  label: `${collateralSymbol} ${poolState.marketVersion === 'v2_position' ? 'reserve' : 'vault'}`,
+                  label: `${collateralSymbol} vault`,
                   value: formatCompact(collateralUSD),
                   cls: '',
                 },
                 {
                   label: 'Total volume',
                   value:
-                    fmtVol(String(market.totalVolumeUsdc ?? 0), collateralSymbol) ??
-                    (collateralSymbol === 'PXP' ? '0 XP' : '$0'),
+                    fmtVol(String(market.totalVolumeUsdc ?? 0)) ?? '$0',
                   cls: '',
                 },
                 {
@@ -559,27 +432,16 @@ export function PoolDetailLayout({
                   </span>
                   <span
                     className={`rounded-[5px] px-2.5 py-1 font-mono text-[12px] font-bold ${
-                      effectiveResolutionCode === 1
+                      resolutionCode === 1
                         ? 'bg-[var(--brand-success-soft)] text-[color:var(--brand-green)]'
                         : 'bg-[var(--brand-danger-soft)] text-[color:var(--brand-red)]'
                     }`}
                   >
-                    {(effectiveResolutionCode === 1
+                    {(resolutionCode === 1
                       ? yesLabel
                       : noLabel
                     ).toUpperCase()}
                   </span>
-                  {market.resolvedBy?.startsWith('system:') ? (
-                    <span className="rounded-[3px] border border-primary/40 bg-primary/10 px-1.75 py-0.5 font-mono text-[9px] font-bold uppercase tracking-widest text-primary">
-                      Auto-resolved
-                    </span>
-                  ) : (
-                    market.resolvedBy && (
-                      <span className="font-mono text-[10px] text-muted-foreground">
-                        by {market.resolvedBy}
-                      </span>
-                    )
-                  )}
                 </div>
               </div>
             )}
@@ -841,7 +703,6 @@ export function PoolDetailLayout({
             {market.rules && (
               <RulesResolutionCard
                 rules={market.rules}
-                outcome={market.suggestedOutcome}
                 yesLabel={yesLabel}
                 noLabel={noLabel}
               />
@@ -854,7 +715,7 @@ export function PoolDetailLayout({
                 { label: 'Pool', value: shortAddr(poolAddress, 8, 6) },
                 {
                   label: 'Creator',
-                  value: shortAddr(pool.creator.toBase58(), 8, 6),
+                  value: shortAddr(poolState.creator, 8, 6),
                 },
               ].map((item, i, arr) => (
                 <div
@@ -914,7 +775,7 @@ export function PoolDetailLayout({
                 {isResolved && (
                   <div
                     className={`mb-3 flex items-center gap-2 rounded-[6px] border px-2.5 py-2 text-[11px] ${
-                      effectiveResolutionCode === 1
+                      resolutionCode === 1
                         ? 'border-success/30 bg-success/10 text-success'
                         : 'border-danger/30 bg-danger/10 text-danger'
                     }`}
@@ -923,7 +784,7 @@ export function PoolDetailLayout({
                       Resolved
                     </span>
                     <span className="font-mono text-[12px] font-black">
-                      {(effectiveResolutionCode === 1
+                      {(resolutionCode === 1
                         ? yesLabel
                         : noLabel
                       ).toUpperCase()}
@@ -944,27 +805,10 @@ export function PoolDetailLayout({
                       Collateral
                     </div>
                     <div className="flex items-center gap-1.5 font-mono text-[11px] font-bold text-primary">
-                      {collateralToken?.image && (
-                        <img
-                          src={collateralToken.image}
-                          alt={collateralSymbol}
-                          className="size-3.5 rounded-full"
-                        />
-                      )}
                       {collateralSymbol}
                     </div>
                   </div>
                 </div>
-                {isMethodologyEnabled && (
-                  <a
-                    href={explorerUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="font-mono text-[11px] text-primary hover:underline"
-                  >
-                    Read methodology →
-                  </a>
-                )}
               </div>
             )}
           </div>
@@ -988,10 +832,7 @@ export function PoolDetailLayout({
                 yesLabel={market.yesLabel}
                 noLabel={market.noLabel}
                 cancelled={isCancelled}
-                underReview={market.moderationStatus === 'under_review'}
                 resolving={isResolving}
-                tradingPaused={isTradingPaused}
-                bannedFromTrading={bannedFromTrading}
               />
             )}
           </div>
@@ -1037,7 +878,7 @@ export function PoolDetailLayout({
             className={`shrink-0 h-11 rounded-full px-7 font-mono text-[11px] font-black uppercase tracking-widest transition-all duration-150 active:scale-[0.95] active:brightness-90 ${
               isResolved
                 ? 'bg-warning text-black shadow-lg shadow-warning/25'
-                : isResolving || isTradingPaused
+                : isResolving
                   ? 'bg-muted text-muted-foreground'
                   : 'bg-primary text-white shadow-lg shadow-primary/30'
             }`}
@@ -1048,9 +889,7 @@ export function PoolDetailLayout({
                 ? 'Reclaim'
                 : isResolving
                   ? 'Resolving'
-                  : isTradingPaused
-                    ? 'Paused'
-                    : 'Trade ↗'}
+                  : 'Trade ↗'}
           </button>
         </div>
       </div>
@@ -1070,7 +909,7 @@ export function PoolDetailLayout({
               <span
                 className={`shrink-0 rounded-lg px-1.5 py-0.5 font-mono text-[8px] font-bold uppercase tracking-widest ${
                   isResolved
-                    ? effectiveResolutionCode === 1
+                    ? resolutionCode === 1
                       ? 'bg-success/15 text-success'
                       : 'bg-danger/15 text-danger'
                     : isCancelled
@@ -1079,7 +918,7 @@ export function PoolDetailLayout({
                 }`}
               >
                 {isResolved
-                  ? effectiveResolutionCode === 1
+                  ? resolutionCode === 1
                     ? yesLabel
                     : noLabel
                   : isCancelled
@@ -1111,10 +950,7 @@ export function PoolDetailLayout({
                 yesLabel={market.yesLabel}
                 noLabel={market.noLabel}
                 cancelled={isCancelled}
-                underReview={market.moderationStatus === 'under_review'}
                 resolving={isResolving}
-                tradingPaused={isTradingPaused}
-                bannedFromTrading={bannedFromTrading}
               />
             )}
           </div>

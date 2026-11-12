@@ -74,7 +74,7 @@ const isStandalone = () =>
   (navigator as Navigator & { standalone?: boolean }).standalone === true;
 
 /**
- * Install-prompt state (plan 5.4). The decision itself is the pure
+ * Install-prompt state. The decision itself is the pure
  * shouldShowInstallBanner in lib/pwa/install.ts; this holds what it reads.
  */
 export const useInstallPromptStore = create<InstallPromptState>((set, get) => ({

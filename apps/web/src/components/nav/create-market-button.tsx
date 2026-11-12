@@ -37,7 +37,7 @@ export function CreateMarketButton() {
         className="group touch-hit inline-flex"
       >
         {/* The glow sits behind the button on its own element: opacity
-            only, so its pulse never repaints the button (plan 21). */}
+            only, so its pulse never repaints the button. */}
         <span className="relative inline-flex rounded-md">
           <span aria-hidden className="cta-glow cta-glow-turq" />
           <span

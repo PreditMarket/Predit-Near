@@ -2,7 +2,6 @@
 
 import { useQuery } from '@tanstack/react-query';
 
-import { NearAddress } from '@/lib/near/address';
 import { NEAR_MARKET_CONTRACT } from '@/lib/near/config';
 import { nearView } from '@/lib/near/rpc';
 
@@ -14,7 +13,7 @@ export function useConfig() {
     queryKey: ['pamm', 'config'],
     queryFn: async () => {
       const [, operator] = await nearView<Roles>(NEAR_MARKET_CONTRACT, 'get_roles', {});
-      return { resolver: new NearAddress(operator) };
+      return { resolver: operator };
     },
     staleTime: 10 * 60_000,
     gcTime: 10 * 60_000,

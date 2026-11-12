@@ -28,7 +28,7 @@ export async function generateMetadata({
       image: m?.image,
     });
   } catch {
-    return { title: 'Predit Market' };
+    return { title: 'Predit' };
   }
 }
 
@@ -41,7 +41,7 @@ export default async function Page({
   // Market ids are the contract's sequence numbers.
   if (!/^\d+$/.test(id)) notFound();
   const market = await fetchPammMarketDetail(id);
-  const pagePath = `/market/${market?.slug || id}`;
+  const pagePath = `/market/${id}`;
   const pageUrl = `${SITE_URL}${pagePath}`;
 
   const breadcrumbJsonLd = market
@@ -54,7 +54,7 @@ export default async function Page({
             '@type': 'ListItem',
             position: 2,
             name: 'Markets',
-            item: `${SITE_URL}/market`,
+            item: `${SITE_URL}/markets`,
           },
           {
             '@type': 'ListItem',
@@ -85,7 +85,7 @@ export default async function Page({
           name: market.question,
           ...(market.description ? { text: market.description } : {}),
         },
-        ...(market.category?.name ? { keywords: market.category.name } : {}),
+        ...(market.category ? { keywords: market.category } : {}),
       }
     : null;
 

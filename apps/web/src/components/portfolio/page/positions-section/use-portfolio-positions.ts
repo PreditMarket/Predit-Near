@@ -21,7 +21,7 @@ export function usePortfolioPositions({
   search,
   sort,
 }: {
-  /** null for the tabs that aren't positions (raffles, markets, withdraw). */
+  /** null for the tabs that aren't positions (my markets). */
   tab: PositionsTab | null;
   search: string;
   sort: PositionsSort;

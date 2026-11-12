@@ -1,22 +1,15 @@
 import { create } from 'zustand';
 import { UnifiedPosition, fetchPammPositions } from '@/services/unified-market.service';
-import { getMyPammSummary, PammMarketSummary } from '@/services/pamm-market.service';
+import { getMyPammSummary } from '@/services/pamm-market.service';
 
 interface PortfolioState {
   positions: UnifiedPosition[];
-  summary: PammMarketSummary | null;
-  // derived from summary (fallback to 0 when summary not loaded).
-  // NOTE: totalValue/totalPnL/sparkline are denominated in ONE collateral —
-  // `summary.headlineSymbol` — not summed across all of them. Label them with
-  // that symbol, and read `summary.byCollateral` for every currency.
+  /** What the open and settled-but-unclaimed positions are worth, in tUSDC. */
   totalValue: number;
-  totalPnL: number;
   openCount: number;
   winRate: number;
   wins: number;
   losses: number;
-  sparkline: number[];
-  hasPendingData: boolean;
   loading: boolean;
   summaryLoading: boolean;
   error: string | null;
@@ -25,20 +18,20 @@ interface PortfolioState {
   reset: () => void;
 }
 
-export const usePortfolioStore = create<PortfolioState>((set) => ({
+const EMPTY = {
   positions: [],
-  summary: null,
   totalValue: 0,
-  totalPnL: 0,
   openCount: 0,
   winRate: 0,
   wins: 0,
   losses: 0,
-  sparkline: [],
-  hasPendingData: false,
   loading: false,
   summaryLoading: false,
   error: null,
+};
+
+export const usePortfolioStore = create<PortfolioState>((set) => ({
+  ...EMPTY,
 
   async fetchAll() {
     set({ loading: true, summaryLoading: true, error: null });
@@ -52,15 +45,11 @@ export const usePortfolioStore = create<PortfolioState>((set) => ({
     if (summaryResult.status === 'fulfilled') {
       const s = summaryResult.value;
       set({
-        summary: s,
         totalValue: s.totalValue,
-        totalPnL: s.totalPnL,
         openCount: s.openCount,
         winRate: s.winRate,
         wins: s.wins,
         losses: s.losses,
-        sparkline: s.sparkline,
-        hasPendingData: s.hasPendingData,
         summaryLoading: false,
       });
     } else {
@@ -82,20 +71,6 @@ export const usePortfolioStore = create<PortfolioState>((set) => ({
   },
 
   reset() {
-    set({
-      positions: [],
-      summary: null,
-      totalValue: 0,
-      totalPnL: 0,
-      openCount: 0,
-      winRate: 0,
-      wins: 0,
-      losses: 0,
-      sparkline: [],
-      hasPendingData: false,
-      loading: false,
-      summaryLoading: false,
-      error: null,
-    });
+    set(EMPTY);
   },
 }));

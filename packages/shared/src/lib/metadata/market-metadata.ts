@@ -2,10 +2,8 @@
  * Server-side metadata for market pages, read from the NEAR contract.
  */
 
-import { getNearMarket } from '@/lib/near/contract';
-import { statusOf } from '@/lib/near/map';
-import { listNearMarkets } from '@/lib/near/market-list';
-
+import { getAllNearMarkets, getNearMarket } from '@/lib/near/contract';
+import { statusOf, toPammMarket } from '@/lib/near/map';
 
 export interface MarketMeta {
   title: string;
@@ -14,11 +12,9 @@ export interface MarketMeta {
   canonicalUrl?: string;
 }
 
-// Backend stores `description` as rich-text HTML (<p>, <br>, etc.).
-// Passing it raw to <meta name="description"> leaves the entities
-// escaped in the SERP snippet ("&lt;p&gt;..."), which tanks CTR. Strip
-// tags, collapse whitespace, decode the few common entities the
-// editor emits, and trim to Google's recommended cap.
+// A description may carry HTML (<p>, <br>, entities). Raw in
+// <meta name="description"> the entities show escaped in the search
+// snippet, so strip tags, decode the common entities and trim.
 function htmlToMetaText(html: string | undefined | null, max = 200): string {
   if (!html) return '';
   return html
@@ -36,28 +32,27 @@ function htmlToMetaText(html: string | undefined | null, max = 200): string {
     .slice(0, max);
 }
 
-/** An active PAMM market, as crawlers need it: where it lives and what it asks. */
-export interface ActivePammMarket {
+/** An open market, as crawlers need it: where it lives and what it asks. */
+interface ActivePammMarket {
   id: string;
   question: string;
   updatedAt?: string;
 }
 
 /**
- * Active PAMM markets for server-rendered SEO (Home links, sitemap). Grouped
- * listings are skipped — their members are reachable from the group page.
- * Never throws: a failed fetch just means no market links this time.
+ * The newest open markets for the sitemap. Never throws: a failed read just
+ * means no market links this time.
  */
 export async function fetchActivePammMarkets(
   limit = 50,
 ): Promise<ActivePammMarket[]> {
   try {
-    const { data } = await listNearMarkets({ page: 1, limit, status: 'active' });
-    return data.flatMap((item) =>
-      item.kind === 'market'
-        ? [{ id: item.market.id, question: item.market.question, updatedAt: item.market.updatedAt }]
-        : [],
-    );
+    return (await getAllNearMarkets())
+      .map(toPammMarket)
+      .filter((m) => m.status === 'active')
+      .sort((a, b) => Number(b.id) - Number(a.id))
+      .slice(0, limit)
+      .map(({ id, question, updatedAt }) => ({ id, question, updatedAt }));
   } catch {
     return [];
   }
@@ -88,22 +83,19 @@ export async function fetchPammMarketDetail(id: string): Promise<MarketDetailSna
     description: htmlToMetaText(market.rules.description, 500),
     image: market.rules.image_url || undefined,
     status: statusOf(market),
+    category: market.rules.category || undefined,
   };
 }
 
 /**
- * Server-side detail fetcher for the per-market SEO shell. Returns
- * the fields needed to render the SSR header (h1, intro) and the
- * BreadcrumbList / Event JSON-LD. Distinct from `fetchMarketMeta`
- * which is metadata-only.
+ * What the per-market SEO shell renders: the server-side header (h1, intro)
+ * and the BreadcrumbList / WebPage JSON-LD.
  */
-export interface MarketDetailSnapshot {
+interface MarketDetailSnapshot {
   id: string;
-  slug?: string;
   question: string;
   description?: string;
   image?: string;
-  closeAt?: string;
   status?: string;
-  category?: { name?: string } | null;
+  category?: string;
 }

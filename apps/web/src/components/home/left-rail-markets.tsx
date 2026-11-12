@@ -80,7 +80,7 @@ function Row({ market, onTrade }: { market: NearMarket; onTrade: (m: NearMarket)
   );
 }
 
-/** The left column: the contract's markets, one tap from a bet. */
+/** The left column: the contract's markets, one tap from a position. */
 export function LeftRailMarkets({ onCollapse }: { onCollapse: () => void }) {
   const [tab, setTab] = useState<Tab>('hot');
   const [trading, setTrading] = useState<NearMarket | null>(null);
@@ -142,7 +142,7 @@ export function LeftRailMarkets({ onCollapse }: { onCollapse: () => void }) {
           market={toPammMarket(trading)}
           open
           initialSide="yes"
-          preset={{ amountUsd: 5 }}
+          presetAmountUsd={5}
           onOpenChange={(open) => !open && setTrading(null)}
         />
       )}

@@ -7,13 +7,10 @@ import {
   cpmmFee,
   cpmmPriceYes,
 } from '@/lib/pamm/cpmm';
-import type { NormalizedPoolStateV3 } from '@/lib/pamm/adapters/types';
+import type { NormalizedPoolStateV3 } from './use-pool-state';
 import type { NearSide as SwapSide } from '@/lib/near/types';
 
-/**
- * User's on-chain position — needed for Semantic B sell quote where
- * payout = proportional cost_removed (not curve gross).
- */
+/** The account's position: a sell pays back a proportional share of its cost, not the curve price. */
 export interface UserPositionForQuote {
   yesShares: bigint;
   noShares: bigint;
@@ -22,17 +19,9 @@ export interface UserPositionForQuote {
 }
 
 /**
- * Client-side v3 quote. Runs the same integer math as the program
- * (`lib/pamm/cpmm.ts` is a direct port), so the preview matches what lands
- * on-chain rather than approximating it in floating point the way the v1/v2
- * quotes do.
- *
- * The backend also exposes `GET /pamm-markets/:id/quote` with identical math.
- * We compute locally so the preview updates as the user types without a
- * network round-trip per keystroke; use the BE quote when you need a figure
- * the server has also seen (e.g. recording intent).
- *
- * Fees on v3 split two ways only — creator and platform. There are no LPs.
+ * Client-side quote with the contract's integer maths (`lib/pamm/cpmm.ts`), so
+ * the preview matches what lands on chain. Fees split between creator and
+ * platform only.
  */
 export interface V3BuyQuote {
   kind: 'buy';
@@ -123,8 +112,8 @@ function computeBuy(
   };
 }
 
-/** A v3 sell of `sharesIn`, priced as the trade card prices it. */
-export function computeSell(
+/** A sell of `sharesIn`, priced as the trade card prices it. */
+function computeSell(
   v3: NormalizedPoolStateV3,
   creatorShareBps: number,
   side: SwapSide,
@@ -139,11 +128,8 @@ export function computeSell(
   const sideShares = side === 'yes' ? yesShares : noShares;
   if (sharesIn > sideShares) return null;
 
-  // Semantic B (on-chain): payout = proportional cost basis, NOT curve gross.
-  //   gross_out = user_cost × shares_in / user_shares
-  // Curve is only the pricing signal for BUY. Sell is deterministic exit
-  // at cost. Without the user's position we can't quote — return null so
-  // the UI stays in "quoting" until position loads.
+  // A sell exits at cost: gross_out = user_cost × shares_in / user_shares.
+  // Without the position there is no quote, so the UI stays "quoting".
   if (!position) return null;
   const userShares = side === 'yes' ? position.yesShares : position.noShares;
   const userCost = side === 'yes' ? position.yesCostAcc : position.noCostAcc;
@@ -250,8 +236,7 @@ export function useV3Quote(
       setState({ key: 'none', quote: null });
       return;
     }
-    // Debounced to match the v1/v2 quote hooks so the summary doesn't thrash
-    // while typing.
+    // Debounced so the summary doesn't thrash while typing.
     const timer = setTimeout(() => {
       setState({
         key,

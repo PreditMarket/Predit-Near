@@ -5,11 +5,10 @@ import type { BuyPreview, SellPreview } from './use-trade-preview';
 
 export interface ResultTextArgs {
   mode: 'buy' | 'sell';
-  isV3: boolean;
   buyPreview: BuyPreview | null;
   sellPreview: SellPreview | null;
   sideLabel: string;
-  /** The other side, whose bets pay a winner's profit. */
+  /** The other side, whose positions pay a winner's profit. */
   oppositeSideLabel?: string;
   collateralSymbol: string;
   /** Cost basis for the active side (0..1). Zero if unknown. */
@@ -57,13 +56,9 @@ export function deriveResultTexts(a: ResultTextArgs): ResultTexts {
     return {
       paymentText,
       payoutText,
-      metricLabel: a.isV3 ? 'Realized P&L' : 'You receive',
-      metricValue: a.isV3
-        ? `${sign}${usd2(Math.abs(pnl))}`
-        : usd2(a.sellPreview.netUsd),
-      metricRoi: a.isV3
-        ? `${sign}${Math.abs(Math.round(a.sellPreview.roi))}%`
-        : undefined,
+      metricLabel: 'Realized P&L',
+      metricValue: `${sign}${usd2(Math.abs(pnl))}`,
+      metricRoi: `${sign}${Math.abs(Math.round(a.sellPreview.roi))}%`,
       negative,
     };
   }
@@ -78,12 +73,8 @@ export function deriveResultTexts(a: ResultTextArgs): ResultTexts {
       negative: false,
     };
   }
-  // V3 payout depends on opposite-side liquidity. When no losers exist yet
-  // (or bonus < fee), projected profit can land ≤ 0 — show a dash instead of
-  // "+$-x.xx". Matches the Advance panel's Max profit tile behavior.
-  // A winner's profit is the losing side's money, so with no bets (or only
-  // small ones) against this side there is nothing to win yet: say so, as a
-  // bare dash read as broken.
+  // A winner's profit is the losing side's money, so with few positions against
+  // this side there is nothing to win yet: say so rather than "+$-x.xx".
   const profit = a.buyPreview.potentialProfit;
   const hasProfit = profit > 0;
   const other = a.oppositeSideLabel ?? 'the other side';
@@ -102,7 +93,7 @@ export function deriveResultTexts(a: ResultTextArgs): ResultTexts {
 
 function derivePaymentText(a: ResultTextArgs): ReactNode {
   if (a.mode === 'sell') {
-    if (a.isV3 && a.avgCost > 0) {
+    if (a.avgCost > 0) {
       return (
         <>
           Cost basis{' '}
@@ -115,7 +106,7 @@ function derivePaymentText(a: ResultTextArgs): ReactNode {
       <>
         Selling{' '}
         <span className="font-bold text-foreground">
-          {fmtTokenAmount(shares, a.sideLabel)} {a.sideLabel}
+          {fmtTokenAmount(shares)} {a.sideLabel}
         </span>
       </>
     );

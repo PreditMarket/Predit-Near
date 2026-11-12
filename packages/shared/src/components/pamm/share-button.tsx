@@ -151,15 +151,9 @@ export function PammShareButton({
   const [open, setOpen] = useState(false);
   const isMobile = useIsMobile();
 
-  // Previously this appended ?ref=<first 6 chars of the wallet pubkey>, which
-  // nothing on the receiving end ever read. The referral code is the value the
-  // invite-code system actually tracks.
   const shareUrl = useShareUrl(url);
 
-  // `question` is typed as required, but it is threaded through several list /
-  // portfolio payloads where the field can be missing at runtime. A share
-  // button must never be the thing that takes a page down, so treat a missing
-  // title as "no title" rather than trusting the type.
+  // A share button must never take a page down, so a missing question is "no title".
   const safeQuestion = typeof question === 'string' ? question.trim() : '';
   const shortQ =
     safeQuestion.length > 80 ? `${safeQuestion.slice(0, 77)}…` : safeQuestion;

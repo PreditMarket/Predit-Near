@@ -5,11 +5,8 @@
  * components/pwa/service-worker-registrar.tsx.
  *
  * Each concern lives in its own module under ./sw/ and is wired up here:
- *   routes.ts    what is cached, and how (plan 5.2)
- *   messages.ts  messages from the app (clear-api-cache on sign-out), and
- *                the saved pages dropped when a new worker activates
- *   push.ts      web push: push, notificationclick, pushsubscriptionchange
- *   outbox.ts    Background Sync wake-up for the offline outbox (plan 5.3)
+ *   routes.ts    what is cached, and how
+ *   messages.ts  the saved pages dropped when a new worker activates
  * Add new event handlers the same way, before `serwist.addEventListeners()`.
  *
  * The precache list is trimmed at build time to what the offline shell needs

@@ -6,7 +6,7 @@ import Avatar from 'boring-avatars'
 const PALETTE = ['#3B82F6', '#6366F1', '#8B5CF6', '#EC4899', '#F59E0B'];
 
 interface ImageWithFallbackProps extends React.ImgHTMLAttributes<HTMLImageElement> {
-  /** Seed string for 8-bit avatar fallback (e.g. oracle name or id) */
+  /** Seed string for the generated avatar shown when the image fails. */
   fallbackSeed?: string;
 }
 

@@ -3,9 +3,9 @@
 import type { UnifiedPosition } from '@/services/unified-market.service';
 
 export type PositionsTab = 'open' | 'history' | 'resolved' | 'cancelled';
-export type PositionsSort = 'recent' | 'value' | 'xp';
+export type PositionsSort = 'recent' | 'value';
 
-export const POSITIONS_SORTS: PositionsSort[] = ['recent', 'value', 'xp'];
+export const POSITIONS_SORTS: PositionsSort[] = ['recent', 'value'];
 
 type Status = Pick<UnifiedPosition, 'status'>;
 
@@ -14,9 +14,9 @@ const statusOf = (p: Status) => p.status?.toLowerCase() ?? '';
 const OPEN_STATUSES = ['open', 'active', 'pending', 'live'];
 const SETTLED_STATUSES = ['won', 'lost', 'claimed'];
 
-export const isOpenPosition = (p: Status) => OPEN_STATUSES.includes(statusOf(p));
-export const isSettledPosition = (p: Status) => SETTLED_STATUSES.includes(statusOf(p));
-export const isCancelledPosition = (p: Status) => statusOf(p) === 'cancelled';
+const isOpenPosition = (p: Status) => OPEN_STATUSES.includes(statusOf(p));
+const isSettledPosition = (p: Status) => SETTLED_STATUSES.includes(statusOf(p));
+const isCancelledPosition = (p: Status) => statusOf(p) === 'cancelled';
 
 /** Rows in one tab. `history` (Trades) is every row. */
 export function positionsInTab<T extends Status>(positions: T[], tab: PositionsTab): T[] {
@@ -43,7 +43,7 @@ export function searchPositions<T extends Pick<UnifiedPosition, 'marketQuestion'
   return positions.filter((p) => p.marketQuestion.toLowerCase().includes(q));
 }
 
-type Sortable = Pick<UnifiedPosition, 'createdAt' | 'xpValue' | 'amount'>;
+type Sortable = Pick<UnifiedPosition, 'createdAt' | 'amount'>;
 
 const time = (iso: string) => {
   const t = Date.parse(iso);
@@ -55,11 +55,10 @@ const amountOf = (p: Sortable) => {
   return Number.isFinite(n) ? n : 0;
 };
 
-/** Newest first, or largest first by traded amount / XP. Never mutates. */
+/** Newest first, or largest first by traded amount. Never mutates. */
 export function sortPositions<T extends Sortable>(positions: T[], sort: PositionsSort): T[] {
   const rows = [...positions];
   if (sort === 'recent') return rows.sort((a, b) => time(b.createdAt) - time(a.createdAt));
-  if (sort === 'xp') return rows.sort((a, b) => (b.xpValue ?? 0) - (a.xpValue ?? 0));
   return rows.sort((a, b) => amountOf(b) - amountOf(a));
 }
 
@@ -78,9 +77,8 @@ export interface PositionsCounts {
 }
 
 /**
- * Tab badges. The BE summary counts cancelled trades as open (a cancelled
- * market isn't resolved or sold), so they come off its `openCount` now that
- * they are listed apart — otherwise Open overcounts its rows.
+ * Tab badges. The summary's `openCount` still counts cancelled rows (they keep
+ * an `open` status), and they are listed in their own tab, so they come off it.
  */
 export function positionsCounts(positions: Status[], summaryOpenCount: number): PositionsCounts {
   const cancelled = positions.filter(isCancelledPosition).length;

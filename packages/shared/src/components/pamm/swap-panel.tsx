@@ -1,10 +1,9 @@
 'use client';
 
 import { X } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 
 import { PammShareButton } from './share-button';
-import { useRouter } from 'next/navigation';
 import { useWalletGate } from '@/hooks/use-wallet-gate';
 import { useGlobalPause } from '@/hooks/pamm/use-global-pause';
 import {
@@ -12,22 +11,15 @@ import {
     TooltipContent,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { useBuyQuote } from '@/hooks/pamm/use-buy-quote';
 import { useBuyOutcome } from '@/hooks/pamm/use-buy-outcome';
-import { useAutoSubmit, type AutoSubmit } from '@/hooks/v2/use-auto-submit';
-import { useSellQuote } from '@/hooks/pamm/use-sell-quote';
 import { useSellOutcome } from '@/hooks/pamm/use-sell-outcome';
-import { useUserBalances } from '@/hooks/pamm/use-user-balances';
 import { useV3Position } from '@/hooks/pamm/use-v3-position';
 import type { PoolStateResult } from '@/hooks/pamm/use-pool-state';
 import type { NearSide as SwapSide } from '@/lib/near/types';
+import { USDC_DECIMALS, USDC_SYMBOL } from '@/lib/near/config';
 
 import { useV3Quote } from '@/hooks/pamm/use-v3-quote';
-import { useCollateralSymbol } from '@/hooks/pamm/use-collaterals';
-import { maxBuyable, maxSellable } from '@/lib/pamm/pool-math';
 import { getSecondsUntilFreeze, isTradeFrozen } from '@/lib/pamm/v3-rules';
-import { trackSwapInitiated, trackPammSwapSignals } from '@/lib/analytics';
-import { getMsSinceMarketView } from '@/lib/last-market-view';
 
 import { ModeTabs } from './trade-card/mode-tabs';
 import { SidePills } from './trade-card/side-pills';
@@ -58,7 +50,9 @@ import {
 const IMPACT_WARN = 0.05;
 const IMPACT_DANGER = 0.15;
 
-export type TradeMode = 'buy' | 'sell';
+type TradeMode = 'buy' | 'sell';
+const SCALE = 10 ** USDC_DECIMALS;
+const collateralSymbol = USDC_SYMBOL;
 
 interface SwapPanelProps {
   poolState: PoolStateResult;
@@ -71,30 +65,12 @@ interface SwapPanelProps {
   standalone?: boolean;
   yesLabel?: string;
   noLabel?: string;
-  /** Market was cancelled on-chain — sell-only, and past-expiry stays live. */
+  /** Market pays everyone back: there is nothing left to trade. */
   cancelled?: boolean;
-  /** Admin has flagged this market for review — buy halted, sell allowed. */
-  underReview?: boolean;
-  /**
-   * Market has entered the AI resolve flow (`pending_resolution` /
-   * `pending_resolve_review`). The backend no longer records trades, so both
-   * sides are halted — unlike `underReview`, which only blocks buys.
-   */
+  /** Past expiry, waiting for its result: both sides are halted. */
   resolving?: boolean;
-  /**
-   * Trader petition paused trading while an admin decides. Unlike `resolving`
-   * this is reversible — an admin can lift it and trading resumes — but it
-   * blocks trades just as hard, since the backend rejects them outright.
-   */
-  tradingPaused?: boolean;
-  /** Admin has banned the caller's wallet from trading here. Blocks both
-   * buy and sell CTAs. FE-side gating only — no on-chain enforcement. */
-  bannedFromTrading?: boolean;
-  /**
-   * Opened from a Predit AI chat card (plan 11): the amount to fill in once
-   * (buy: dollars; sell: a share of the position) and the chat limit, USD.
-   */
-  preset?: { amountUsd?: number; sellPct?: number; maxUsd?: number; autoSubmit?: AutoSubmit };
+  /** Dollars to fill in for a buy. */
+  presetAmountUsd?: number;
 }
 
 export function SwapPanel({
@@ -108,20 +84,15 @@ export function SwapPanel({
   yesLabel,
   noLabel,
   cancelled = false,
-  underReview = false,
   resolving = false,
-  tradingPaused = false,
-  bannedFromTrading = false,
-  preset,
+  presetAmountUsd,
 }: SwapPanelProps) {
-  const router = useRouter();
   const gate = useWalletGate();
   const isPaused = useGlobalPause();
   const [mode, setMode] = useState<TradeMode>(cancelled ? 'sell' : initialMode);
   const [side, setSide] = useState<SwapSide>(initialSide);
-  // A buy from a chat card opens with its dollars; a sell's share waits for the position (below).
   const [amountStr, setAmountStr] = useState(
-    initialMode === 'buy' && preset?.amountUsd ? String(preset.amountUsd) : '',
+    initialMode === 'buy' && presetAmountUsd ? String(presetAmountUsd) : '',
   );
   const [slippageBps, setSlippageBps] = useState(200); // 2% default (matches mockup)
   // Default open — the advance insights (break-even meter, min-received,
@@ -140,10 +111,6 @@ export function SwapPanel({
     side === 'yes' ? (noLabel ?? 'NO') : (yesLabel ?? 'YES')
   ).toUpperCase();
 
-  const collateralSymbol = useCollateralSymbol(
-    poolState.pool.collateralMint.toBase58(),
-  );
-  const SCALE = 10 ** poolState.pool.collateralDecimals;
   const parseRaw = (v: string): bigint => {
     const n = parseFloat(v);
     if (isNaN(n) || n <= 0) return BigInt(0);
@@ -157,140 +124,52 @@ export function SwapPanel({
     });
   };
 
-  // ── Balances / v3 position / quote hooks ─────────────────────────────────
-  const { data: balances } = useUserBalances(
-    poolAddress,
-    poolState.marketVersion);
-  const { data: v3Position } = useV3Position(
-    poolState.marketVersion === 'v3_shares' ? poolAddress : null,
-    poolState.pool.collateralMint,
-    poolState.marketVersion === 'v3_shares',
-  );
+  // ── Position / quote hooks ────────────────────────────────────────────────
+  const { data: position } = useV3Position(poolAddress);
   const buyMut = useBuyOutcome(poolAddress);
   const sellMut = useSellOutcome(poolAddress);
 
-  const isV3 = poolState.marketVersion === 'v3_shares';
   const v3 = poolState.v3;
   const amountRaw = parseRaw(amountStr);
 
-  const buyQuote = useBuyQuote(
-    poolState,
-    side,
-    !isV3 && mode === 'buy' ? amountRaw : BigInt(0),
-    slippageBps,
-  );
-  const sellQuote = useSellQuote(
-    poolState,
-    side,
-    !isV3 && mode === 'sell' ? amountRaw : BigInt(0),
-    slippageBps,
-  );
   const { quote: v3Quote, isQuoting: v3Quoting } = useV3Quote(
-    isV3 ? v3 : null,
-    poolState.pool.creatorShareBps,
+    v3,
+    poolState.creatorShareBps,
     mode,
     side,
     amountRaw,
     slippageBps,
-    v3Position
+    position
       ? {
-          yesShares: v3Position.yes,
-          noShares: v3Position.no,
-          yesCostAcc: v3Position.yesCostAcc,
-          noCostAcc: v3Position.noCostAcc,
+          yesShares: position.yes,
+          noShares: position.no,
+          yesCostAcc: position.yesCostAcc,
+          noCostAcc: position.noCostAcc,
         }
       : null,
   );
 
-  // ── Balance / insufficient / pool-max derivations ────────────────────────
-  const usdcBalance = balances?.usdc ?? BigInt(0);
-  const sideBalanceRaw =
-    side === 'yes' ? (balances?.yes ?? BigInt(0)) : (balances?.no ?? BigInt(0));
-  const v3SideBalanceRaw =
-    isV3 && v3Position
-      ? side === 'yes'
-        ? v3Position.yes
-        : v3Position.no
-      : sideBalanceRaw;
-  const sideBalance = isV3 ? v3SideBalanceRaw : sideBalanceRaw;
+  // ── Balance / insufficient derivations ───────────────────────────────────
+  const usdcBalance = position?.collateral ?? BigInt(0);
+  const sideBalance =
+    side === 'yes' ? (position?.yes ?? BigInt(0)) : (position?.no ?? BigInt(0));
   const inputBalance = mode === 'buy' ? usdcBalance : sideBalance;
-  // v3 takes fee out of amount rather than on top — never overspends.
-  const feeRaw =
-    isV3 || mode !== 'buy' ? BigInt(0) : (buyQuote?.feeTotal ?? BigInt(0));
-  const totalSpend = amountRaw + feeRaw;
-  const insufficient =
-    amountRaw > BigInt(0) &&
-    (mode === 'buy' ? totalSpend > inputBalance : amountRaw > inputBalance);
+  // The fee comes out of the amount, never on top of it.
+  const insufficient = amountRaw > BigInt(0) && amountRaw > inputBalance;
   const isPending = buyMut.isPending || sellMut.isPending;
   const noBalance = inputBalance === BigInt(0);
 
-  // ── v3 trading guards ─────────────────────────────────────────────────────
-  const expiryTsNum = poolState.pool.expiryTs.toNumber();
-  const v3Frozen =
-    isV3 && !!v3 && isTradeFrozen(expiryTsNum, v3.tradeFreezeSeconds);
-  const v3SecondsUntilFreeze =
-    isV3 && v3 ? getSecondsUntilFreeze(expiryTsNum, v3.tradeFreezeSeconds) : 0;
-  const v3FreezeSoon =
-    isV3 &&
-    !v3Frozen &&
-    v3SecondsUntilFreeze > 0 &&
-    v3SecondsUntilFreeze <= 3_600;
-  const v3NoQuoteYet = isV3 && amountRaw > BigInt(0) && v3Quoting;
-  const v3Unquotable =
-    isV3 && amountRaw > BigInt(0) && !v3Quoting && v3Quote == null;
+  // ── Trading guards ───────────────────────────────────────────────────────
+  const frozen = isTradeFrozen(poolState.expiryTs, v3.tradeFreezeSeconds);
+  const secondsUntilFreeze = getSecondsUntilFreeze(poolState.expiryTs, v3.tradeFreezeSeconds);
+  const freezeSoon = !frozen && secondsUntilFreeze > 0 && secondsUntilFreeze <= 3_600;
+  const v3NoQuoteYet = amountRaw > BigInt(0) && v3Quoting;
+  const v3Unquotable = amountRaw > BigInt(0) && !v3Quoting && v3Quote == null;
 
-  const totalFeeFraction = poolState.pool.tradingFeeBps / 10_000;
-  const yesReal = Number(poolState.yesVaultBalance) / SCALE;
-  const noReal = Number(poolState.noVaultBalance) / SCALE;
-  const maxTradeRaw = useMemo(() => {
-    if (isV3 || !poolState.pool.seeded) return BigInt(0);
-    const real =
-      mode === 'buy'
-        ? maxBuyable(
-            yesReal,
-            noReal,
-            poolState.lEffective,
-            side,
-            totalFeeFraction,
-          )
-        : maxSellable(
-            side === 'yes' ? yesReal : noReal,
-            side === 'yes' ? noReal : yesReal,
-            poolState.lEffective,
-            totalFeeFraction,
-          );
-    return real > 0 ? BigInt(Math.floor(real * SCALE)) : BigInt(0);
-  }, [
-    isV3,
-    mode,
-    poolState.pool.seeded,
-    poolState.lEffective,
-    side,
-    totalFeeFraction,
-    yesReal,
-    noReal,
-  ]);
-  const maxLabel = mode === 'buy' ? 'buyable' : 'sellable';
-  const maxUnit = mode === 'buy' ? collateralSymbol : sideLabel;
-  const exceedsMax =
-    amountRaw > BigInt(0) &&
-    maxTradeRaw > BigInt(0) &&
-    amountRaw > maxTradeRaw &&
-    !insufficient;
-  const poolCannotBuy =
-    !isV3 &&
-    mode === 'buy' &&
-    amountRaw > BigInt(0) &&
-    poolState.pool.seeded &&
-    !insufficient &&
-    maxTradeRaw === BigInt(0);
-
-  const quote = mode === 'buy' ? buyQuote : sellQuote;
-  const impact = (isV3 ? v3Quote?.priceImpact : quote?.priceImpact) ?? 0;
+  const impact = v3Quote?.priceImpact ?? 0;
   const impactDanger = impact >= IMPACT_DANGER;
   const impactWarn = impact >= IMPACT_WARN;
-  const isExpired =
-    !cancelled && Date.now() / 1000 >= poolState.pool.expiryTs.toNumber();
+  const isExpired = !cancelled && Date.now() / 1000 >= poolState.expiryTs;
 
   // ── Prices / percents ───────────────────────────────────────────────────
   // 2-decimal percent — whole cents hid every move of a pool near 50/50.
@@ -299,57 +178,38 @@ export function SwapPanel({
   const activePercent = side === 'yes' ? yesPercent : noPercent;
   const activePrice = activePercent / 100;
 
-  // Held snapshot (sell-mode banner) — v3 uses the position hook's YES/NO
-  // shares; v1/v2 falls back to the outcome-token balance.
-  const heldSideUnits = rawToUnits(
-    sideBalance,
-    poolState.pool.collateralDecimals,
-  );
-  // Cost basis is v3-only. Both `costAcc` and `shares` are same-decimals base
-  // units so their ratio drops out to a fair 0..1 price without any SCALE.
+  const heldSideUnits = rawToUnits(sideBalance, USDC_DECIMALS);
+  // `costAcc` and `shares` share decimals, so their ratio is a 0..1 price.
   const avgCost = useMemo(() => {
-    if (!isV3 || !v3Position) return 0;
-    const shares = side === 'yes' ? v3Position.yes : v3Position.no;
-    const costAcc =
-      side === 'yes' ? v3Position.yesCostAcc : v3Position.noCostAcc;
+    if (!position) return 0;
+    const shares = side === 'yes' ? position.yes : position.no;
+    const costAcc = side === 'yes' ? position.yesCostAcc : position.noCostAcc;
     if (shares <= BigInt(0)) return 0;
     return Number(costAcc) / Number(shares);
-  }, [isV3, v3Position, side]);
+  }, [position, side]);
 
   // ── Buy / Sell previews (derived numbers for result / advance / CTA) ─────
-  const redeemFeeBps = v3?.redeemFeeBps ?? 0;
+  const redeemFeeBps = v3.redeemFeeBps;
   const buyPreview = useBuyPreview({
     amountRaw: mode === 'buy' ? amountRaw : BigInt(0),
     scale: SCALE,
-    isV3,
     v3Quote,
-    buyQuote,
     redeemFeeBps,
     buySide: side,
-    v3Payout:
-      isV3 && v3
-        ? {
-            poolCollateral: v3.poolCollateral,
-            totalYesCostAcc: v3.totalYesCostAcc,
-            totalNoCostAcc: v3.totalNoCostAcc,
-          }
-        : null,
+    v3Payout: v3,
   });
   const sellPreview = useSellPreview({
     amountRaw: mode === 'sell' ? amountRaw : BigInt(0),
     scale: SCALE,
-    isV3,
     v3Quote,
-    sellQuote,
     avgCost,
-    redeemFeeBps,
   });
 
   // ── Amount helpers ───────────────────────────────────────────────────────
   const setAlloc = (pct: number) => {
     let rawAlloc: bigint;
     if (mode === 'buy') {
-      const feeBps = BigInt(poolState.pool.tradingFeeBps);
+      const feeBps = BigInt(v3.tradeFeeBps);
       rawAlloc =
         (inputBalance * BigInt(pct) * BigInt(10_000)) /
         (BigInt(100) * (BigInt(10_000) + feeBps));
@@ -359,39 +219,17 @@ export function SwapPanel({
     const amount = Number(rawAlloc) / SCALE;
     setAmountStr(amount > 0 ? amount.toFixed(6) : '');
   };
-  const sellPctSeed = useRef(initialMode === 'sell' ? preset?.sellPct : undefined);
-  useEffect(() => {
-    const pct = sellPctSeed.current;
-    if (!pct || mode !== 'sell' || sideBalance <= BigInt(0)) return;
-    sellPctSeed.current = undefined;
-    setAlloc(Math.min(100, Math.round(pct)));
-    // setAlloc reads this render's balance; it runs once, when the position loads.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sideBalance, mode]);
   const setBuyAmount = (dollars: number) => {
     setAmountStr(dollars.toString());
-  };
-  const applyMaxTrade = () => {
-    if (maxTradeRaw <= BigInt(0)) return;
-    setAmountStr((Number(maxTradeRaw) / SCALE).toFixed(6));
   };
   const focusAmount = () => amountInputRef.current?.focus();
 
   // ── CTA & submit ─────────────────────────────────────────────────────────
-  // Orders from chat stay inside the admin's limit (plan 11 Q3).
-  const overChatLimit =
-    !!preset?.maxUsd &&
-    (mode === 'buy' ? Number(amountRaw) / SCALE : (sellPreview?.netUsd ?? 0)) >
-      preset.maxUsd;
   const ctaLabel = (() => {
     if (isPaused) return 'Trading paused';
-    if (overChatLimit)
-      return `Orders from Predit AI go up to $${preset!.maxUsd!.toLocaleString()}`;
     if (resolving) return 'Trading closed — resolving';
-    if (tradingPaused) return 'Trading paused — awaiting review';
-    if (bannedFromTrading) return 'Trading restricted';
-    if (cancelled && isV3) return 'Market cancelled — claim your refund';
-    if (v3Frozen) return 'Trading closed before settlement';
+    if (cancelled) return 'Market cancelled — claim your refund';
+    if (frozen) return 'Trading closed before settlement';
     if (insufficient)
       return `Insufficient ${mode === 'buy' ? collateralSymbol : sideLabel}`;
     if (v3NoQuoteYet) return 'Getting price…';
@@ -403,23 +241,15 @@ export function SwapPanel({
     }
     // Sell CTA — shows shares to close + payout when we have a preview.
     if (sellPreview) {
-      const sharesText = fmtTokenAmount(sellPreview.sharesIn, sideLabel);
+      const sharesText = fmtTokenAmount(sellPreview.sharesIn);
       return `Sell ${sharesText} ${sideLabel} · ${usdSmart(sellPreview.netUsd)}`;
     }
     return `Sell ${sideLabel} · ${pct2(activePrice)}`;
   })();
 
-  // Under-review markets: block Buy only. Sell stays enabled so bettors can
-  // exit while admin reviews (Refund on v3 handled by RedeemPanel elsewhere).
-  const buyBlockedByReview = underReview && mode === 'buy';
-
   const isDisabled =
     isPaused ||
     resolving ||
-    tradingPaused ||
-    bannedFromTrading ||
-    buyBlockedByReview ||
-    overChatLimit ||
     (gate.walletReady
       ? isExpired ||
         amountRaw === BigInt(0) ||
@@ -427,56 +257,26 @@ export function SwapPanel({
         noBalance ||
         (mode === 'sell' && sideBalance === BigInt(0)) ||
         isPending ||
-        !poolState.pool.seeded ||
-        v3Frozen ||
+        frozen ||
         v3NoQuoteYet ||
         v3Unquotable ||
-        (cancelled && isV3)
+        cancelled
       : gate.connecting);
 
   const handleSubmit = async () => {
     if (amountRaw === BigInt(0)) return;
-    const sellUsdcOut = isV3
-      ? v3Quote?.kind === 'sell'
-        ? v3Quote.net
-        : BigInt(0)
-      : (sellQuote?.usdcOut ?? BigInt(0));
-    const amountUsdcInitiated =
-      mode === 'buy' ? Number(amountRaw) / SCALE : Number(sellUsdcOut) / SCALE;
-    trackSwapInitiated({
-      market_id: poolAddress,
-      side,
-      action: mode,
-      amount_usdc: amountUsdcInitiated,
-    });
-    trackPammSwapSignals({
-      market_id: poolAddress,
-      side,
-      action: mode,
-      ms_since_page_load: Math.floor(performance.now()),
-      ms_since_market_view: getMsSinceMarketView(poolAddress),
-      slippage_bps: slippageBps,
-    });
     let txSig: string | undefined;
     if (mode === 'buy') {
-      const v3Buy = v3Quote?.kind === 'buy' ? v3Quote : null;
       txSig = await buyMut.mutateAsync({
-        poolState,
         buySide: side,
         usdcAmountIn: amountRaw,
-        minOutTotal: (isV3 ? v3Buy?.minOut : buyQuote?.minOut) ?? BigInt(0),
-        expectedOutTotal:
-          (isV3 ? v3Buy?.sharesOut : buyQuote?.amountOut) ?? BigInt(0),
+        minOutTotal: v3Quote?.kind === 'buy' ? v3Quote.minOut : BigInt(0),
       });
-    } else if (mode === 'sell') {
-      const v3Sell = v3Quote?.kind === 'sell' ? v3Quote : null;
+    } else {
       txSig = await sellMut.mutateAsync({
-        poolState,
         sellSide: side,
         sellAmountIn: amountRaw,
-        minUsdcOut:
-          (isV3 ? v3Sell?.minOut : sellQuote?.minUsdcOut) ?? BigInt(0),
-        expectedUsdcOut: (isV3 ? v3Sell?.net : sellQuote?.usdcOut) ?? BigInt(0),
+        minUsdcOut: v3Quote?.kind === 'sell' ? v3Quote.minOut : BigInt(0),
       });
     }
     setAmountStr('');
@@ -484,23 +284,10 @@ export function SwapPanel({
     onSuccess?.(txSig);
   };
 
-  // A chat card confirmed (plan 19): this button, pressed once it is ready.
-  useAutoSubmit(
-    preset?.autoSubmit,
-    {
-      ready: gate.walletReady && !isDisabled && amountRaw > BigInt(0),
-      waiting:
-        !gate.walletReady || !balances || v3NoQuoteYet || sellPctSeed.current !== undefined,
-      label: ctaLabel,
-    },
-    handleSubmit,
-  );
-
   // ── Derived UI-text (pure) ───────────────────────────────────────────────
   const amtNum = Number(amountRaw) / SCALE;
   const resultTexts = deriveResultTexts({
     mode,
-    isV3,
     buyPreview,
     sellPreview,
     sideLabel,
@@ -553,7 +340,6 @@ export function SwapPanel({
         sideLabel,
         oppositeSideLabel,
         amountUsd: amtNum,
-        isV3,
         avgCost,
         activePrice,
         redeemFeeBps,
@@ -565,7 +351,6 @@ export function SwapPanel({
       sideLabel,
       oppositeSideLabel,
       amtNum,
-      isV3,
       avgCost,
       activePrice,
       redeemFeeBps,
@@ -581,12 +366,12 @@ export function SwapPanel({
     items.push({ label: 'Redeem fee (on win)', value: '2%' });
     items.push({
       label: 'Creator share',
-      value: `${(poolState.pool.creatorShareBps / 100).toFixed(0)}%`,
+      value: `${(poolState.creatorShareBps / 100).toFixed(0)}%`,
     });
     if (mode === 'buy' && buyPreview) {
       items.push({
         label: 'Min received',
-        value: `${fmtTokenAmount(buyPreview.minShares, sideLabel)} ${sideLabel}`,
+        value: `${fmtTokenAmount(buyPreview.minShares)} ${sideLabel}`,
       });
     } else if (mode === 'sell' && sellPreview) {
       items.push({
@@ -605,7 +390,7 @@ export function SwapPanel({
     buyPreview,
     sellPreview,
     sideLabel,
-    poolState.pool.creatorShareBps,
+    poolState.creatorShareBps,
   ]);
 
   // ── Held-indicator for Sell ──────────────────────────────────────────────
@@ -615,7 +400,7 @@ export function SwapPanel({
       sideLabel={sideLabel}
       oppositeSideLabel={oppositeSideLabel}
       heldShares={heldSideUnits}
-      closingShares={rawToUnits(amountRaw, poolState.pool.collateralDecimals)}
+      closingShares={rawToUnits(amountRaw, USDC_DECIMALS)}
       avgCost={avgCost}
       onSwitchToBuyOpposite={() => {
         setMode('buy');
@@ -626,40 +411,26 @@ export function SwapPanel({
   );
 
   // ── Warnings ─────────────────────────────────────────────────────────────
-  // One banner at a time, highest severity wins, rendered directly above the
-  // CTA. Every guard the old panel surfaced survives — see `build-warnings`.
+  // One banner at a time, highest severity wins, rendered directly above the CTA.
   const topWarning = pickTopWarning(
     buildWarnings({
       mode,
-      isV3,
       isPaused,
       cancelled,
-      underReview,
       resolving,
-      tradingPaused,
-      bannedFromTrading,
-      v3Frozen,
-      v3FreezeSoon,
-      v3SecondsUntilFreeze,
-      v3TradeFreezeSeconds: v3?.tradeFreezeSeconds,
-      seeded: poolState.pool.seeded,
+      frozen,
+      freezeSoon,
+      secondsUntilFreeze,
+      tradeFreezeSeconds: v3.tradeFreezeSeconds,
       isExpired,
-      v3Unquotable,
+      unquotable: v3Unquotable,
       insufficient,
-      poolCannotBuy,
-      exceedsMax,
       impactWarn,
       impactDanger,
       impact,
-      hasQuote: !!quote,
+      hasQuote: !!v3Quote,
       sideLabel,
-      oppositeSideLabel,
       collateralSymbol,
-      totalSpendDisplay: fmtTokens(totalSpend, 2),
-      feeRawIsZero: feeRaw === BigInt(0),
-      maxTradeDisplay: fmtTokens(maxTradeRaw, 2),
-      maxUnit,
-      onApplyMaxTrade: applyMaxTrade,
     }),
   );
 
@@ -693,8 +464,8 @@ export function SwapPanel({
       {mode === 'buy' && (
         <PayWithRow
           symbol={collateralSymbol}
-          rawBalance={balances?.usdc}
-          decimals={poolState.pool.collateralDecimals}
+          rawBalance={position?.collateral}
+          decimals={USDC_DECIMALS}
         />
       )}
 
@@ -726,16 +497,6 @@ export function SwapPanel({
       {heldIndicator}
 
       <QuickChips chips={quickChips} />
-
-      {maxTradeRaw > BigInt(0) && maxTradeRaw < inputBalance && (
-        <button
-          onClick={applyMaxTrade}
-          disabled={isPending}
-          className="cursor-pointer text-left font-mono text-[9.5px] text-faint transition-colors hover:text-foreground disabled:opacity-50"
-        >
-          Max {maxLabel}: ~{fmtTokens(maxTradeRaw, 2)} {maxUnit} · tap to use
-        </button>
-      )}
 
       {showResult && (
         <div
@@ -781,23 +542,6 @@ export function SwapPanel({
           rows={advanceData.rows}
         />
       )}
-
-      {mode === 'buy' &&
-        balances !== undefined &&
-        noBalance &&
-        collateralSymbol === 'PXP' && (
-          <div className="rounded-[9px] border border-primary/30 bg-primary/5 px-3.5 py-3 space-y-2">
-            <p className="font-mono text-[11px] text-muted-foreground">
-              No {collateralSymbol} balance — claim XP to start trading.
-            </p>
-            <button
-              onClick={() => router.push('/earn?tutorial=pamm')}
-              className="w-full cursor-pointer rounded-[7px] bg-primary/90 hover:bg-primary py-2 font-mono text-[11px] font-bold text-white transition-colors"
-            >
-              Go to Earn Center →
-            </button>
-          </div>
-        )}
 
       {tradeSuccess && question && (
         <div className="flex items-center justify-between gap-2 rounded-xl border border-success/20 bg-success/8 px-3 py-2">

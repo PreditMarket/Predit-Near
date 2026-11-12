@@ -9,7 +9,7 @@ import { fitBytes, MAX_LABEL, MAX_LONG, MAX_SHORT, textBytes as bytes, type Mark
 import { safeHttpUrl } from '@/lib/near/map';
 import { getNearNativeBalance } from '@/lib/near/rpc';
 import type { NearSide } from '@/lib/near/types';
-import { getCategories } from '@/services/categories.service';
+import { CATEGORIES } from '@/services/categories.service';
 import type { PostDto } from '@/services/feed.service';
 import { useNearWallet } from '@/store/near-wallet.store';
 
@@ -185,7 +185,6 @@ export function CreateMarketForm({
   const [error, setError] = useState<string | null>(null);
   const [moreOpen, setMoreOpen] = useState(false);
 
-  const { data: categories = [] } = useQuery({ queryKey: ['categories-list'], queryFn: getCategories });
   const { data: bond } = useQuery({ queryKey: ['near', 'creation-bond'], queryFn: getNearCreationBond });
   const { data: balance } = useQuery({
     queryKey: ['near', 'balance', 'native', accountId],
@@ -376,8 +375,8 @@ export function CreateMarketForm({
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Category">
                   <select className={INPUT} value={form.category} onChange={(e) => set('category', e.target.value)}>
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.id}>
+                    {CATEGORIES.map((c) => (
+                      <option key={c.slug} value={c.slug}>
                         {c.name}
                       </option>
                     ))}

@@ -5,10 +5,7 @@ import { Check } from 'lucide-react';
 
 import { useShareUrl } from '@/utils/referral-link';
 
-/** Predit's mark as an inline path (not an <img src="/logo-*.svg">) so this
- * renders correctly from any app without depending on that app's public/
- * folder having the asset — packages/shared components run in both web and
- * admin. */
+/** Predit's mark as an inline path, so this needs no asset in public/. */
 function PreditMark({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 120 155.7" className={className} fill="currentColor">
@@ -18,35 +15,28 @@ function PreditMark({ className }: { className?: string }) {
 }
 
 interface MarketCreatedCardProps {
-  /** "Your Market" / "Your Group". */
-  itemLabel: string;
-  /** The question / group title. */
+  /** The market's question. */
   itemTitle: string;
   thumbnailUrl?: string;
-  /** Relative or absolute URL to the created market/group — used for the share link only ("My markets →" always goes to /market?tab=my-markets, not this URL). */
+  /** The created market's page: shared, and opened by "Skip for now". */
   url: string;
-  needsApproval?: boolean;
   /** Closes the modal. No standalone close (X) button — "Skip for now" and
    * "My markets" are the only two ways out, and both call this before navigating. */
   onDismiss: () => void;
-  /** Replaces "My markets →", e.g. to bet on the new market without leaving the page. */
+  /** Replaces "My markets →", e.g. to take a position on the new market without leaving the page. */
   primaryAction?: { label: string; onClick: () => void };
   /** Replaces "Skip for now", which otherwise opens the market's page. */
   skipAction?: { label: string; onClick: () => void };
 }
 
 /**
- * The create-market/create-group success state — styled as a shareable
- * "launch" moment (dark card, primary-color glow, Predit mark watermark)
- * instead of a plain checklist-done dialog. Shared by both progress modals
- * (single-market and group) so the moment looks identical either way.
+ * The create-market success state — styled as a shareable "launch" moment
+ * (dark card, primary-color glow, Predit mark watermark).
  */
 export function MarketCreatedCard({
-  itemLabel,
   itemTitle,
   thumbnailUrl,
   url,
-  needsApproval,
   onDismiss,
   primaryAction,
   skipAction,
@@ -69,15 +59,8 @@ export function MarketCreatedCard({
     // Blank line between the headline and the call to action: X renders the
     // break, so the tweet reads as two beats instead of one long dash-joined
     // sentence.
-    //
-    // `@preditmarket` is the real X handle — the one `quest-page` links to.
-    // Writing the domain as `@predit.market` would NOT mention the brand: X
-    // stops a handle at the dot, so it would tag someone else's `@predit` and
-    // leave `.market` as plain text.
     const text = encodeURIComponent(
-      needsApproval
-        ? `Just submitted "${itemTitle}" on @preditmarket !\n\nlive once approved 👀`
-        : `Just launched "${itemTitle}" on @preditmarket !\n\ngo stake your take 👇`,
+      `Just launched "${itemTitle}" on @preditmarket !\n\ngo stake your take 👇`,
     );
     window.open(
       `https://x.com/intent/tweet?text=${text}&url=${encodeURIComponent(absUrl)}`,
@@ -117,7 +100,7 @@ export function MarketCreatedCard({
           <span className="inline-flex items-center gap-1.5 rounded-full border border-success/40 bg-success/10 px-2.5 py-1 backdrop-blur-sm">
             <Check className="h-3 w-3 text-success" />
             <span className="text-[9px] font-bold uppercase tracking-[0.15em] text-success">
-              {needsApproval ? 'Submitted' : 'Confirmed'}
+              Confirmed
             </span>
           </span>
         </div>
@@ -125,15 +108,13 @@ export function MarketCreatedCard({
         {/* Headline */}
         <div>
           <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-primary">
-            New {itemLabel === 'Your Group' ? 'Group' : 'Market'}
+            New Market
           </p>
           <h2 className="mt-1 text-3xl font-black uppercase leading-[1.05] tracking-tight text-white">
-            {needsApproval ? 'Submitted' : 'Live Now'}
+            Live Now
           </h2>
           <p className="mt-1.5 text-[13px] leading-relaxed text-white/60">
-            {needsApproval
-              ? "It's in review — you'll be notified once an admin approves it."
-              : "It's live. Give your first traders something to discover."}
+            It&apos;s live. Give your first traders something to discover.
           </p>
         </div>
 
@@ -152,7 +133,7 @@ export function MarketCreatedCard({
             )}
             <div className="min-w-0 flex-1">
               <p className="text-[9px] font-bold uppercase tracking-[0.15em] text-white/40">
-                {itemLabel}
+                Your Market
               </p>
               <p className="truncate text-sm font-bold text-white">
                 {itemTitle}
@@ -160,7 +141,7 @@ export function MarketCreatedCard({
             </div>
             <span className="inline-flex shrink-0 items-center gap-1 text-[9px] font-bold uppercase tracking-[0.15em] text-success">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-success" />
-              {needsApproval ? 'Pending' : 'Live'}
+              Live
             </span>
           </div>
         </div>

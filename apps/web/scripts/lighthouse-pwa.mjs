@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * PWA acceptance (plan 02, T1/Q3): the individual Lighthouse PWA audits must
+ * PWA acceptance: the individual Lighthouse PWA audits must
  * all pass. Exits non-zero if any fails.
  *
  *   pnpm --filter web build && pnpm --filter web start -p 3123

@@ -1,23 +1,9 @@
 import type { NextConfig } from 'next';
-import webpack from 'webpack';
 import { withSentryConfig } from '@sentry/nextjs';
 import withSerwistInit from '@serwist/next';
 import { randomUUID } from 'crypto';
 // Relative, not '@/': this file is loaded by Node, outside the app's aliases.
 import { shellPrecache, type AppBuildPages } from '../../packages/shared/src/lib/pwa/precache';
-
-/** Old public/ icon paths → their public/icons/ successors (see redirects). */
-const LEGACY_ICON_REDIRECTS: Array<[string, string]> = [
-  ['/icon-48x48.png', '/icons/icon-192.png'],
-  ['/icon-72x72.png', '/icons/icon-192.png'],
-  ['/icon-96x96.png', '/icons/icon-192.png'],
-  ['/icon-144x144.png', '/icons/icon-192.png'],
-  ['/icon-192x192.png', '/icons/icon-192.png'],
-  ['/icon-192x192-maskable.png', '/icons/icon-192-maskable.png'],
-  ['/icon-512.png', '/icons/icon-512.png'],
-  ['/icon-512-maskable.png', '/icons/icon-512-maskable.png'],
-  ['/manifest.json', '/manifest.webmanifest'],
-];
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
@@ -31,19 +17,6 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     '/**': ['./node_modules/jsdom/**/*'],
   },
-  webpack: (config) => {
-    config.resolve.fallback = {
-      ...config.resolve.fallback,
-      fs: false,
-      net: false,
-      tls: false,
-      crypto: false,
-    };
-    config.plugins.push(
-      new webpack.ProvidePlugin({ Buffer: ['buffer', 'Buffer'] }),
-    );
-    return config;
-  },
   images: {
     // Serve AVIF first (best compression), fall back to WebP.
     formats: ['image/avif', 'image/webp'],
@@ -52,9 +25,6 @@ const nextConfig: NextConfig = {
   experimental: {
     // packages/shared is compiled here as source, through the tsconfig alias.
     externalDir: true,
-    serverActions: {
-      bodySizeLimit: '2mb',
-    },
     optimizePackageImports: [
       'lucide-react',
       '@tanstack/react-query',
@@ -75,38 +45,9 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  // 301 canonicalization. Crawlers + audit tools flag duplicate content when
-  // the same page resolves on both www and apex domains.
   async redirects() {
-    return [
-      // The icons and manifest moved (public/icons/, app/manifest.ts); the old
-      // URLs may still be in emails, bookmarks, an installed app's manifest
-      // or another site's config. Each goes to the nearest new size.
-      ...LEGACY_ICON_REDIRECTS.map(([source, destination]) => ({
-        source,
-        destination,
-        permanent: true,
-      })),
-      // Legacy alias — `/market` was the previous listing route. A real 308
-      // here rather than redirect() in a page: that prerendered a 200 with a
-      // meta refresh, so visitors loaded the whole app shell before going on.
-      { source: '/market', destination: '/markets', permanent: true },
-      // Short legal URLs people type or paste. (`/help` is a real route.)
-      { source: '/terms', destination: '/terms-of-service', permanent: true },
-      { source: '/privacy', destination: '/privacy-policy', permanent: true },
-      {
-        source: '/:path*',
-        has: [{ type: 'host', value: 'www.predit.market' }],
-        destination: 'https://predit.market/:path*',
-        permanent: true,
-      },
-      {
-        source: '/:path*',
-        has: [{ type: 'host', value: 'www.intl.predit.market' }],
-        destination: 'https://intl.predit.market/:path*',
-        permanent: true,
-      },
-    ];
+    // `/market` alone has no page; the list lives at `/markets`.
+    return [{ source: '/market', destination: '/markets', permanent: true }];
   },
 };
 
@@ -123,7 +64,7 @@ const withSerwist = withSerwistInit({
   register: false,
   reloadOnOnline: false,
   cacheOnNavigation: false,
-  // Instead of the whole public/ dir (splash screens, legal pages…): the
+  // Instead of the whole public/ dir (splash screens…): the
   // offline shell and what it shows. A new revision per build re-fetches them.
   additionalPrecacheEntries: ['/~offline', '/logo-MarkWhite.svg', '/icons/icon-192.png'].map(
     (url) => ({ url, revision: BUILD_REVISION }),

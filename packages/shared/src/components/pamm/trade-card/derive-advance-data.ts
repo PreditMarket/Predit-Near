@@ -20,19 +20,18 @@ interface Args {
   oppositeSideLabel: string;
   /** USD value the user typed (buy) — used for the max-loss tile. */
   amountUsd: number;
-  isV3: boolean;
-  /** V3 cost basis for the active side (0..1 price). */
+  /** Cost basis for the active side (0..1 price). */
   avgCost: number;
   /** Current market price of the active side (0..1). */
   activePrice: number;
-  /** V3 on-chain redeem fee (basis points). 0 for v1/v2. */
+  /** Redeem fee charged on a win, basis points. */
   redeemFeeBps: number;
 }
 
 const DASH = '—';
 
-const fmtRedeemFee = (bps: number, isV3: boolean): string =>
-  isV3 ? `${(bps / 100).toLocaleString('en-US', { maximumFractionDigits: 2 })}%` : DASH;
+const fmtRedeemFee = (bps: number): string =>
+  `${(bps / 100).toLocaleString('en-US', { maximumFractionDigits: 2 })}%`;
 
 /** Compose the numbers the AdvancePanel component needs from the raw quote
  * previews. Always returns a value — when the preview is null (no amount
@@ -68,14 +67,14 @@ export function deriveAdvanceData(a: Args): AdvanceData {
           { label: 'Avg fill', value: `${currentCents}¢` },
           { label: 'Min received', value: DASH },
           { label: 'Trade fee', value: DASH },
-          { label: 'Redeem fee on win', value: fmtRedeemFee(a.redeemFeeBps, a.isV3) },
+          { label: 'Redeem fee on win', value: fmtRedeemFee(a.redeemFeeBps) },
         ],
       };
     }
     const markerCents = Math.round(a.buyPreview.avgPx * 100);
     const impactSign = a.buyPreview.impactPct >= 0 ? '+' : '−';
     const impactStr = `${impactSign}${Math.abs(a.buyPreview.impactPct).toFixed(2)}%`;
-    // Max profit — v3 payout depends on the opposite side's trades. If the
+    // Max profit — the payout depends on the opposite side's trades. If the
     // projected profit is not positive yet (no losers, or bonus < fee) show a
     // dash + hint instead of a misleading "+$-x.xx".
     const profit = a.buyPreview.potentialProfit;
@@ -115,10 +114,10 @@ export function deriveAdvanceData(a: Args): AdvanceData {
         { label: 'Avg fill', value: `${markerCents}¢` },
         {
           label: 'Min received',
-          value: `${fmtTokenAmount(a.buyPreview.minShares, a.sideLabel)} ${a.sideLabel}`,
+          value: `${fmtTokenAmount(a.buyPreview.minShares)} ${a.sideLabel}`,
         },
         { label: 'Trade fee', value: usd2(a.buyPreview.feeUsd) },
-        { label: 'Redeem fee on win', value: fmtRedeemFee(a.redeemFeeBps, a.isV3) },
+        { label: 'Redeem fee on win', value: fmtRedeemFee(a.redeemFeeBps) },
       ],
     };
   }
@@ -136,7 +135,7 @@ export function deriveAdvanceData(a: Args): AdvanceData {
         {
           label: 'Realized P&L',
           value: DASH,
-          sub: a.isV3 ? 'vs. avg cost' : 'no cost basis on this market',
+          sub: 'vs. avg cost',
           tone: 'win',
         },
       ],
@@ -147,12 +146,12 @@ export function deriveAdvanceData(a: Args): AdvanceData {
       impactText: 'impact 0.00%',
       rows: [
         {
-          label: a.isV3 ? 'Cost basis' : 'Avg price',
-          value: a.isV3 && a.avgCost > 0 ? cents(a.avgCost) : `${currentCents}¢`,
+          label: 'Cost basis',
+          value: a.avgCost > 0 ? cents(a.avgCost) : `${currentCents}¢`,
         },
         { label: 'Min received', value: DASH },
         { label: 'Trade fee', value: DASH },
-        { label: 'Redeem fee on win', value: fmtRedeemFee(a.redeemFeeBps, a.isV3) },
+        { label: 'Redeem fee on win', value: fmtRedeemFee(a.redeemFeeBps) },
       ],
     };
   }
@@ -169,10 +168,8 @@ export function deriveAdvanceData(a: Args): AdvanceData {
       },
       {
         label: 'Realized P&L',
-        value: a.isV3
-          ? `${pnlSign}${usd2(Math.abs(a.sellPreview.realizedPnl))}`
-          : DASH,
-        sub: a.isV3 ? 'vs. avg cost' : 'no cost basis on this market',
+        value: `${pnlSign}${usd2(Math.abs(a.sellPreview.realizedPnl))}`,
+        sub: 'vs. avg cost',
         tone: a.sellPreview.realizedPnl < 0 ? 'lose' : 'win',
       },
     ],
@@ -183,12 +180,12 @@ export function deriveAdvanceData(a: Args): AdvanceData {
     impactText: `impact ${a.sellPreview.impactPct.toFixed(2)}%`,
     rows: [
       {
-        label: a.isV3 ? 'Cost basis' : 'Avg price',
-        value: a.isV3 && a.avgCost > 0 ? cents(a.avgCost) : `${markerCents}¢`,
+        label: 'Cost basis',
+        value: a.avgCost > 0 ? cents(a.avgCost) : `${markerCents}¢`,
       },
       { label: 'Min received', value: `${usd2(a.sellPreview.minReceive)} USDC` },
       { label: 'Trade fee', value: usd2(a.sellPreview.feeUsd) },
-      { label: 'Redeem fee on win', value: fmtRedeemFee(a.redeemFeeBps, a.isV3) },
+      { label: 'Redeem fee on win', value: fmtRedeemFee(a.redeemFeeBps) },
     ],
   };
 }

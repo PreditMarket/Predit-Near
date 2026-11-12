@@ -193,7 +193,6 @@ export function tweetToPost(tweet: RawTweet, username: string): PostDto | null {
       displayName: tweet.author?.name || username,
       handle: username,
       avatar: fullSizeAvatar(tweet.author?.profilePicture),
-      isVirtual: true,
     },
     media,
     source: 'x',

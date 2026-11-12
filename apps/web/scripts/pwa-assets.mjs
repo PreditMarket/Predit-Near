@@ -2,24 +2,16 @@
 /**
  * Renders the PWA's raster assets from public/logo-MarkWhite.svg:
  *
- *   public/icons/icon-{192,512}.png            `any` icons: desktop installs, the
- *                                              notification icon (rounded tile)
+ *   public/icons/icon-{192,512}.png            `any` icons: desktop installs (rounded tile)
  *   public/icons/icon-{192,512}-maskable.png   logo inside the 80% safe zone
  *   public/icons/apple-touch-icon-180.png      iOS home screen (no transparency)
- *   public/icons/badge-72.png                  notification badge (white on clear)
  *   public/splash/apple-splash-<w>x<h>.png     iOS launch screens
- *
- * The `any` icons used to be the original artwork — a #333 mark on a clear
- * background, which all but vanished on a dark dock, taskbar or launcher.
  *
  *   pnpm --filter web pwa:assets
  *
  * Rasterises with Playwright's Chromium (already a dev dependency) instead of
  * pwa-asset-generator / sharp — both need install scripts, which pnpm blocks
  * here unless listed in pnpm-workspace.yaml `allowBuilds`.
- *
- * The manifest screenshots (public/screenshots/) are real pages, not drawn
- * here: see playwright/specs/pwa-screenshots.spec.ts.
  */
 
 import { readFile, mkdir } from 'node:fs/promises';
@@ -51,7 +43,6 @@ const ASSETS = [
   { file: 'icons/icon-192-maskable.png', width: 192, height: 192, logo: 0.56 },
   { file: 'icons/icon-512-maskable.png', width: 512, height: 512, logo: 0.56 },
   { file: 'icons/apple-touch-icon-180.png', width: 180, height: 180, logo: 0.6 },
-  { file: 'icons/badge-72.png', width: 72, height: 72, logo: 0.78, transparent: true },
 ];
 
 const splash = JSON.parse(await readFile(splashList, 'utf8')).map((s) => ({

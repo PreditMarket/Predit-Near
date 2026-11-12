@@ -110,9 +110,9 @@ const sendToMarket = (methodName: string, args: Record<string, unknown>, gas = G
   });
 
 /**
- * A bet that the contract refuses still "succeeds" as a transaction: the token
+ * A buy that the contract refuses still "succeeds" as a transaction: the token
  * calls the market, the market panics and the token refunds. The token returns
- * how much it kept, so zero means the bet did not happen.
+ * how much it kept, so zero means the buy did not happen.
  */
 export async function buyOnNear(
   marketId: string,

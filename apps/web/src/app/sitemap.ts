@@ -15,8 +15,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const staticRoutes: MetadataRoute.Sitemap = [
     { url: `${SITE}/`, lastModified: now, changeFrequency: 'daily', priority: 1 },
-    { url: `${SITE}/market`, lastModified: now, changeFrequency: 'hourly', priority: 0.9 },
-    { url: `${SITE}/terms-of-service`, lastModified: now, changeFrequency: 'yearly', priority: 0.3 },
+    { url: `${SITE}/markets`, lastModified: now, changeFrequency: 'hourly', priority: 0.9 },
   ];
 
   const markets = await fetchActivePammMarkets(50);

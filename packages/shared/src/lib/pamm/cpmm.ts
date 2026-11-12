@@ -1,8 +1,8 @@
 /**
- * Virtual-liquidity CPMM used by v3 markets — a direct port of
- * `programs/pm-amm/src/math/cpmm.rs`.
+ * Virtual-liquidity CPMM, the same integer maths as the contract's
+ * `contracts/core/src/math/cpmm.rs`.
  *
- * A v3 pool stores only outstanding YES/NO **share counts** and an immutable
+ * A pool stores only outstanding YES/NO **share counts** and an immutable
  * liquidity constant `L`. The tradeable reserves are derived, never stored:
  *
  *   M   = ((y + n) + √((y − n)² + 4L²)) / 2
@@ -12,11 +12,11 @@
  * Note the inversion in the last line: the YES price comes off the **NO**
  * reserve, because buying YES drains R_y and makes YES scarcer.
  *
- * Everything is integer math on bigint so it matches the on-chain result
+ * Everything is integer math on bigint so it matches the contract's result
  * exactly — never route these through `number`, u128 share counts overflow it.
  */
 
-/** Integer square root (Newton's method), mirroring the program's u128 sqrt. */
+/** Integer square root (Newton's method), mirroring the contract's u128 sqrt. */
 export function bigIntSqrt(value: bigint): bigint {
   if (value < 0n) throw new Error('sqrt of a negative number');
   if (value < 2n) return value;
@@ -71,7 +71,7 @@ export function cpmmBuyOut(
     : rn + netCollateral - (l * l) / (ry + netCollateral);
 }
 
-/** Fee charged on `amount` at `bps`, rounded up like the program does. */
+/** Fee charged on `amount` at `bps`, rounded up like the contract does. */
 export function cpmmFee(amount: bigint, bps: number): bigint {
   return (amount * BigInt(bps) + 9_999n) / 10_000n;
 }

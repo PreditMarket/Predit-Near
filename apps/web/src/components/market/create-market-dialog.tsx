@@ -154,7 +154,6 @@ export function CreateMarketDialog() {
               <DialogTitle className="sr-only">Market created</DialogTitle>
               <DialogDescription className="sr-only">Your market is on NEAR.</DialogDescription>
               <MarketCreatedCard
-                itemLabel="Your Market"
                 itemTitle={created.question}
                 url={`/market/${created.id}`}
                 onDismiss={finish}
@@ -193,7 +192,7 @@ export function CreateMarketDialog() {
           open
           initialSide="yes"
           // As under a post: one tap to place, the chips change the amount.
-          preset={{ amountUsd: 5 }}
+          presetAmountUsd={5}
           onOpenChange={(next) => !next && setTrading(null)}
         />
       )}

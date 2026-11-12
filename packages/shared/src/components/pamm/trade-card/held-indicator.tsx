@@ -13,7 +13,7 @@ interface HeldIndicatorProps {
   onSwitchToBuyOpposite: () => void;
 }
 
-/** Sell-mode banner. Makes the v3 "sell = close existing position" rule
+/** Sell-mode banner. Makes the "sell = close existing position" rule
  * explicit — green-tinted EXIT copy when holding, red-tinted "Nothing to
  * sell" + Buy-opposite jump when not. Matches mockup pixel values. */
 export function HeldIndicator({
@@ -35,11 +35,11 @@ export function HeldIndicator({
         <span className="text-faint">EXIT</span>{' '}
         Closing{' '}
         <span className="font-bold text-foreground">
-          {fmtTokenAmount(closing, sideLabel)}
+          {fmtTokenAmount(closing)}
         </span>{' '}
         /{' '}
         <span className="font-bold text-foreground">
-          {fmtTokenAmount(heldShares, sideLabel)} {sideCaps}
+          {fmtTokenAmount(heldShares)} {sideCaps}
         </span>{' '}
         <span className="text-faint">held @ avg</span>{' '}
         <span className="font-bold text-foreground">{cents(avgCost)}</span>

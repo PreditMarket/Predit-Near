@@ -15,16 +15,16 @@ import { useCreateMarketDialog } from '@/store/create-market-dialog.store';
 import { useNearWallet } from '@/store/near-wallet.store';
 
 const MAX_SHOWN = 5;
-const QUICK_BET = 5;
+const QUICK_AMOUNT_USD = 5;
 const SIDE_BUTTON =
   'flex items-center justify-between gap-2 rounded-md border px-3 py-1.5 font-mono text-[12px] font-bold transition-colors';
 const CLAIM_BUTTON =
   'inline-flex items-center gap-1 rounded-md bg-primary px-3 py-1 font-mono text-[11px] font-bold text-primary-foreground disabled:opacity-50';
 
 function RedeemButton({ marketId }: { marketId: string }) {
-  const redeem = usePortfolioRedeem(marketId, marketId);
+  const redeem = usePortfolioRedeem(marketId);
   return (
-    <button type="button" className={CLAIM_BUTTON} disabled={redeem.isPending} onClick={() => redeem.mutate('0')}>
+    <button type="button" className={CLAIM_BUTTON} disabled={redeem.isPending} onClick={() => redeem.mutate()}>
       {redeem.isPending && <Loader2 className="h-3 w-3 animate-spin" />}
       Redeem
     </button>
@@ -164,7 +164,7 @@ function PostMarket({ market }: { market: NearMarket }) {
           open
           initialSide={side}
           // One tap to place: the amount is filled in, and the chips change it.
-          preset={{ amountUsd: QUICK_BET }}
+          presetAmountUsd={QUICK_AMOUNT_USD}
           onOpenChange={(open) => !open && setSide(null)}
         />
       )}

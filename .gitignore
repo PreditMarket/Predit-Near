@@ -45,9 +45,6 @@ yarn-error.log*
 /playwright/test-results/
 /playwright/report/
 
-/apps/web/extensions
-/apps/web/phantom-profile
-
 # vercel
 .vercel
 
@@ -63,12 +60,6 @@ plans/reports/fullstack-*.md
 # planning artifacts — kept local, not part of code PRs
 plans/
 
-# local redis dump
-dump.rdb
-
-extensions/phantom
-phantom-profile
-
 # service worker — built from apps/web/src/app/sw.ts by @serwist/next
 apps/web/public/sw.js
 apps/web/public/sw.js.map
@@ -77,11 +68,6 @@ apps/web/public/swe-worker-*.js.map
 
 plan/
 docs/
-/apps/web/playwright/.staging-profile/
-/apps/web/playwright/.staging-chrome-profile/
-/apps/web/playwright/recordings/
-/apps/web/playwright/staging-report/
-/apps/web/playwright/staging-results/
 
 # Source snapshots and AI readings written by the resolve agent
 .data/

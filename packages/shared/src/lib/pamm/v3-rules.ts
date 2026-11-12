@@ -1,16 +1,14 @@
 /**
- * Trading rules that exist only on v3 markets. Each one mirrors a specific
- * on-chain guard so the UI can explain the situation before the user signs,
- * instead of surfacing a raw program error afterwards.
+ * Contract trading rules, mirrored so the UI can explain a refusal before the
+ * user signs instead of surfacing a raw contract error afterwards.
  */
-import type { NormalizedPoolStateV3 } from './adapters/types';
+import type { NormalizedPoolStateV3 } from '@/hooks/pamm/use-pool-state';
 
 /**
- * `PoolTradeFrozen` — the program blocks trades once we are within
- * `trade_freeze_seconds` of expiry, so a market can't be traded on the back of
- * information that arrives right as it settles.
+ * The contract blocks trades within `trade_freeze_sec` of expiry, so nobody
+ * trades on information that arrives right as the market closes.
  */
-export function getTradeFreezeStartTs(
+function getTradeFreezeStartTs(
   expiryTs: number,
   tradeFreezeSeconds: number,
 ): number {
@@ -41,8 +39,8 @@ export function getSecondsUntilFreeze(
 }
 
 /**
- * Estimated `redeem_v3` payout for a winning position — cost-weighted
- * (uniform-ROI) parimutuel, matching on-chain `plan_redeem`:
+ * Estimated `redeem` payout for a winning position — cost-weighted
+ * (uniform-ROI) parimutuel, matching the contract's `plan_redeem`:
  *
  *   lose_cost = resolved_pool_collateral − resolved_x_win
  *   bonus     = winning_cost_acc × lose_cost / resolved_x_win
@@ -50,14 +48,9 @@ export function getSecondsUntilFreeze(
  *             = winning_cost_acc × resolved_pool_collateral / resolved_x_win
  *   net       = gross − ceil(gross × resolved_redeem_fee_bps / 10_000)
  *
- * i.e. every winner earns identical ROI = `lose_cost / X_win`. Share count no
- * longer feeds the payout — the on-chain program docstring is explicit that
- * `resolved_win_shares` is telemetry only. Returns null until the pool is
- * resolved with a valid `resolved_x_win`.
- *
- * Note this uses `resolvedRedeemFeeBps` (frozen at resolve), not the live
- * `redeemFeeBps` — the program does the same so the fee can't be raised
- * between a user's buy and their claim.
+ * i.e. every winner earns identical ROI = `lose_cost / X_win`; share counts
+ * don't feed it. Returns null until the pool is settled with a winner. Uses the
+ * fee frozen at settlement, as the contract does.
  */
 export function estimateV3Payout(
   v3: Pick<
@@ -71,8 +64,7 @@ export function estimateV3Payout(
   if (v3.resolvedXWin <= BigInt(0)) return null;
   if (winningCostAcc <= BigInt(0)) return null;
 
-  // Same u128-floor mul_div the program uses so client-side matches on-chain
-  // to the atom. Ceil the fee to mirror `fee_ceil`.
+  // Same u128-floor mul_div as the contract, so it matches to the atom; the fee rounds up.
   const gross =
     (winningCostAcc * v3.resolvedPoolCollateral) / v3.resolvedXWin;
   const feeBps = BigInt(v3.resolvedRedeemFeeBps);
@@ -84,7 +76,7 @@ export function estimateV3Payout(
   return { gross, fee, net: gross - fee };
 }
 
-/** Human "1h 20m" style countdown, reusing the claim-delay formatter shape. */
+/** Human "1h 20m" style countdown. */
 export function formatCountdown(totalSeconds: number): string {
   const safe = Math.max(Math.ceil(totalSeconds), 0);
   const days = Math.floor(safe / 86_400);
