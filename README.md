@@ -154,7 +154,7 @@ More in [`contracts/SECURITY.md`](contracts/SECURITY.md): the review results, th
 
 ## Built during NEAR HACKATHON
 
-The first commit, tagged `pre-hackathon`, holds code that existed before the hackathon: the app files this build reuses and the market maths in `contracts/core`. Everything after it was built during the hackathon: `git diff pre-hackathon HEAD`.
+The first commit, tagged `pre-hackathon`, holds code that existed before the hackathon: the app files this build reuses and the market maths in `contracts/core`. Everything after it, up to the `hackathon-submission` tag, was built during the hackathon: [compare on GitHub](https://github.com/PreditMarket/Predit-Near/compare/pre-hackathon...hackathon-submission), or `git diff pre-hackathon hackathon-submission`.
 
 ## Libraries
 
