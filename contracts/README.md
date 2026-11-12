@@ -1,16 +1,16 @@
 # Predit contracts on NEAR
 
-Turn a social post into a YES/NO prediction market on NEAR. One contract holds the whole market: locked rules, a creation bond, USDC bets, a result receipt with evidence, a bonded challenge, payouts, and the post author's forecasting record.
+Turn a social post into a YES/NO prediction market on NEAR. One contract holds the whole market: locked rules, a creation bond, USDC positions, a result receipt with evidence, a bonded challenge, payouts, and the post author's prediction record.
 
-Runs on NEAR testnet with a mock USDC. **Not audited: do not use with real money.**
+Runs on NEAR testnet with a mock USDC. **Not audited: do not use with real money.** Review results and open issues: [SECURITY.md](SECURITY.md).
 
 ## How a market works
 
 1. `create_market` for a post. The rules are locked and their hash stored. The creator pays the storage and the configured bond (0 on the testnet demo; the owner sets it with `set_config`).
-2. Bet with USDC through `ft_transfer_call`; `sell` until the trade freeze.
+2. Take a position with USDC through `ft_transfer_call`; `sell` until the trade freeze.
 3. After the deadline, the operator posts a `post_receipt`: outcome, reason, the source snapshot's hash, a link to the evidence, and the NEAR AI reading (model, chat id, signed text, signature, signing address).
 4. Anyone can `challenge` within the window, with a bond. The `arbiter` upholds or overturns.
-5. `finalize` settles, returns bonds and updates the author's record. Winners `redeem`; invalid, cancelled and one-sided markets `refund`.
+5. `finalize` settles, returns bonds and updates the author's record. The right side `redeem`s; invalid, cancelled and one-sided markets `refund`.
 
 Off chain, an agent snapshots the source at the deadline, NEAR AI (in a TEE) suggests the outcome, and an admin decides and signs with their NEAR wallet before the operator posts. The operator key is a function-call key limited to `post_receipt` and `finalize`.
 
@@ -30,7 +30,7 @@ Needs Rust (pinned in `rust-toolchain.toml`) and [`cargo-near`](https://github.c
 
 ```bash
 ./build.sh      # target/near/predit_market/predit_market.wasm
-cargo test      # 180 tests: maths, contract, full lifecycle on a local node
+cargo test      # 187 tests: maths, contract, full lifecycle on a local node
 near contract call-function as-read-only predit-markets-market.testnet get_markets json-args '{}' network-config testnet now
 ```
 
