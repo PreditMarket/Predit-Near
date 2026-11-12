@@ -168,7 +168,7 @@ html {
   letter-spacing: -0.02em;
 }
 
-/* ─── Gambling animations ─── */
+/* ─── Card animations ─── */
 @keyframes pulse-glow {
 
   0%,
@@ -231,7 +231,7 @@ html {
   animation: flash-red 1.5s ease-in-out;
 }
 
-/* Card gambling hover — neutral grey for dark theme */
+/* Card hover — neutral grey for dark theme */
 .card-order:hover {
   border-color: hsl(0 0% 100% / 0.18);
   box-shadow: 0 0 12px rgba(255, 255, 255, 0.04), 0 2px 12px rgba(0, 0, 0, 0.25);

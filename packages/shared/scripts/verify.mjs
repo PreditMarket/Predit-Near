@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 // Checks a market's result receipt against its public evidence. No account or key needed.
-//   pnpm verify <market id>
+//   pnpm verify <market id> [--evidence <file or url>]
+// --evidence reads the bundle from somewhere other than the link on chain; the hash on
+// chain still has to match, so a copy proves as much as the original.
 // This shows what NEAR AI read and answered. It cannot show that the result is correct:
 // that rests on the person who confirmed it and on the challenge window.
 import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { recoverMessageAddress } from 'viem';
 
@@ -108,10 +111,17 @@ async function attestedSigner(reading) {
     : 'not in the current report: the enclave may have rotated, check at https://cloud.near.ai/verify';
 }
 
+async function loadEvidence(where) {
+  if (!/^https?:\/\//.test(where)) return JSON.parse(await readFile(where, 'utf8'));
+  const res = await fetch(where);
+  if (!res.ok) throw new Error(`Evidence answered ${res.status}`);
+  return res.json();
+}
+
 async function main() {
-  const id = process.argv[2];
-  if (!id || !/^\d+$/.test(id)) {
-    console.error('Usage: pnpm verify <market id>');
+  const [id, flag, evidenceArg] = process.argv.slice(2);
+  if (!id || !/^\d+$/.test(id) || (flag && (flag !== '--evidence' || !evidenceArg))) {
+    console.error('Usage: pnpm verify <market id> [--evidence <file or url>]');
     process.exit(2);
   }
   const market = await viewMarket(id);
@@ -120,11 +130,11 @@ async function main() {
 
   console.log(`Market ${id}: ${market.rules.question}`);
   console.log(`Result on chain: ${JSON.stringify(market.receipt.outcome)}\nReason: ${market.receipt.reason}`);
-  console.log(`Evidence: ${market.receipt.evidence.uri}\n`);
+  console.log(`Evidence on chain: ${market.receipt.evidence.uri}`);
+  if (evidenceArg) console.log(`Evidence read from: ${evidenceArg}`);
+  console.log('');
 
-  const res = await fetch(market.receipt.evidence.uri);
-  if (!res.ok) throw new Error(`Evidence answered ${res.status}`);
-  const bundle = await res.json();
+  const bundle = await loadEvidence(evidenceArg ?? market.receipt.evidence.uri);
 
   const checks = await checkEvidence(market, bundle);
   for (const { name, ok, detail } of checks) console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? `  (${detail})` : ''}`);
