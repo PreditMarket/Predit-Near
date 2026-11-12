@@ -16,7 +16,12 @@ export async function captureSource(url: string): Promise<CapturedSource> {
   const res = await fetch(`${READER}${url}`, {
     cache: 'no-store',
     signal: AbortSignal.timeout(TIMEOUT_MS),
-    headers: { Accept: 'text/plain', 'X-No-Cache': 'true' },
+    headers: {
+      Accept: 'text/plain',
+      'X-No-Cache': 'true',
+      // Anonymous use is rate limited per domain across all of Jina's users.
+      ...(process.env.JINA_API_KEY?.trim() ? { Authorization: `Bearer ${process.env.JINA_API_KEY.trim()}` } : {}),
+    },
   });
   if (!res.ok) throw new Error(`The reader answered ${res.status}`);
   const text = (await res.text()).trim();
