@@ -28,10 +28,16 @@ test.describe('market page', () => {
     expect(calls[0].methodName).toBe('ft_transfer_call');
   });
 
-  test('an unknown market says so, and a name that is not an id is not found', async ({ page }) => {
-    await page.goto('/market/not-a-number');
-    await expect(page.getByTestId('not-found')).toBeVisible();
-    await page.goto('/market/999999');
-    await expect(page.getByText('Could not load this market. It may not exist.').first()).toBeVisible();
+  test('a market the contract does not have, or a name that is not an id, is not found', async ({ page }) => {
+    for (const path of ['/market/not-a-number', '/market/999999']) {
+      await page.goto(path);
+      await expect(page.getByTestId('not-found')).toBeVisible();
+    }
+  });
+
+  test('a settled market shows its result instead of prices', async ({ page }) => {
+    await page.goto('/market/36');
+    await expect(page.getByText('Result', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText(/YES price/i)).toHaveCount(0);
   });
 });

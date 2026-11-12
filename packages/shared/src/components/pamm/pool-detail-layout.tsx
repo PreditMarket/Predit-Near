@@ -261,6 +261,9 @@ export function PoolDetailLayout({
         cls: 'bg-danger/10 text-danger border-danger/20',
       }
     : getStatus(resolutionCode, expiryTs, yesLabel, noLabel);
+  const isSettled = isResolved || isCancelled;
+  const resultCls =
+    resolutionCode === 1 ? 'text-success' : resolutionCode === 2 ? 'text-danger' : 'text-muted-foreground';
   const countdown = now !== null ? formatCountdown(expiryTs, now) : '--m --s';
   // Fixed at mount so the chart doesn't drift every second.
   const chartNow = useMemo(() => Date.now() / 1000, []);
@@ -380,16 +383,21 @@ export function PoolDetailLayout({
             {/* Stats strip */}
             <div className="flex border-b border-border overflow-x-auto">
               {[
-                {
-                  label: `${yesLabel} price`,
-                  value: pctPair(poolState.priceYes).yes,
-                  cls: 'text-success',
-                },
-                {
-                  label: `${noLabel} price`,
-                  value: pctPair(poolState.priceYes).no,
-                  cls: 'text-danger',
-                },
+                // A settled market has a result, not a price.
+                ...(isSettled
+                  ? [{ label: 'Result', value: status.label, cls: resultCls }]
+                  : [
+                      {
+                        label: `${yesLabel} price`,
+                        value: pctPair(poolState.priceYes).yes,
+                        cls: 'text-success',
+                      },
+                      {
+                        label: `${noLabel} price`,
+                        value: pctPair(poolState.priceYes).no,
+                        cls: 'text-danger',
+                      },
+                    ]),
                 {
                   label: `${collateralSymbol} vault`,
                   value: formatCompact(collateralUSD),
@@ -844,6 +852,11 @@ export function PoolDetailLayout({
         <div className="absolute -top-10 inset-x-0 h-10 bg-linear-to-t from-background to-transparent pointer-events-none" />
         <div className="bg-card/98 backdrop-blur-xl border-t border-white/5 px-4 py-3 flex items-center gap-4">
           {/* YES/NO split bar + labels */}
+          {isSettled ? (
+            <div className={`flex-1 min-w-0 font-mono text-[13px] font-black uppercase ${resultCls}`}>
+              {status.label}
+            </div>
+          ) : (
           <div className="flex-1 min-w-0 space-y-1.5">
             <div className="flex h-0.75 rounded-full overflow-hidden">
               <div
@@ -871,6 +884,7 @@ export function PoolDetailLayout({
               </div>
             </div>
           </div>
+          )}
           {/* CTA */}
           <button
             type="button"

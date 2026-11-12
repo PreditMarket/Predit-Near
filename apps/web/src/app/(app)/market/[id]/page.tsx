@@ -6,6 +6,7 @@ import { buildMetadata } from '@/lib/metadata/build-metadata';
 import {
   fetchPammMarketMeta,
   fetchPammMarketDetail,
+  isMissingMarket,
 } from '@/lib/metadata/market-metadata';
 import { SITE_URL } from '@/lib/site-url';
 
@@ -41,6 +42,7 @@ export default async function Page({
   // Market ids are the contract's sequence numbers.
   if (!/^\d+$/.test(id)) notFound();
   const market = await fetchPammMarketDetail(id);
+  if (!market && (await isMissingMarket(id))) notFound();
   const pagePath = `/market/${id}`;
   const pageUrl = `${SITE_URL}${pagePath}`;
 

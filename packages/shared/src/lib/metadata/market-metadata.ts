@@ -62,6 +62,12 @@ export async function fetchActivePammMarkets(
 const readNearMarket = async (id: string) =>
   /^\d+$/.test(id) ? getNearMarket(id).catch(() => null) : null;
 
+/** True only when the contract answered that the market does not exist, not when RPC failed. */
+export async function isMissingMarket(id: string): Promise<boolean> {
+  if (!/^\d+$/.test(id)) return true;
+  return getNearMarket(id).then((market) => market === null, () => false);
+}
+
 export async function fetchPammMarketMeta(id: string): Promise<MarketMeta | null> {
   const market = await readNearMarket(id);
   if (!market) return null;
