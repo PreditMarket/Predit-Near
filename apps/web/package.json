@@ -14,7 +14,7 @@
     "test:e2e:testnet": "NEAR_E2E_TESTNET=1 playwright test"
   },
   "dependencies": {
-    "@deor/shared": "workspace:*",
+    "@predit/shared": "workspace:*",
     "@hot-labs/near-connect": "0.12.0",
     "@sentry/nextjs": "^10.32.1",
     "@serwist/next": "^9.5.13",

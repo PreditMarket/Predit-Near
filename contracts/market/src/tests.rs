@@ -924,9 +924,9 @@ fn the_default_challenge_window_floor_is_an_hour() {
     assert_eq!(Config::default().min_challenge_window_sec, 3_600);
 }
 
-/// A contract nearly out of spare NEAR refuses bets, but not a challenge.
+/// A contract nearly out of spare NEAR refuses purchases, but not a challenge.
 #[test]
-fn a_challenge_still_works_when_bets_have_filled_the_contract() {
+fn a_challenge_still_works_when_positions_have_filled_the_contract() {
     let mut c = contract();
     let id = two_sided(&mut c);
     receipt(&mut c, id, Side::Yes);
@@ -939,7 +939,7 @@ fn a_challenge_still_works_when_bets_have_filled_the_contract() {
         // 0.5 NEAR of storage, comfortably above what this test rewrites.
         .storage_usage(50_000)
         .attached_deposit(NearToken::from_near(1))
-        // Storage + both bonds + the 0.1 floor, far short of the 1 NEAR bets must leave.
+        // Storage + both bonds + the 0.1 floor, far short of the 1 NEAR purchases must leave.
         .account_balance(NearToken::from_millinear(2_700));
     testing_env!(ctx.build());
     c.challenge(id, "x".into());
@@ -1053,7 +1053,7 @@ fn with_balance(sec: u64, caller: &str, balance: NearToken) {
     testing_env!(ctx.build());
 }
 
-/// One bond is outstanding: a bet may not use the NEAR that backs it.
+/// One bond is outstanding: a purchase may not use the NEAR that backs it.
 #[test]
 #[should_panic(expected = "The contract needs more NEAR for storage")]
 fn a_bet_cannot_eat_into_bonds() {

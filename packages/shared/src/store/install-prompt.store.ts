@@ -7,9 +7,9 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
 }
 
-const STORAGE_KEY = 'deor.pwa.install';
+const STORAGE_KEY = 'predit.pwa.install';
 /** Set for the rest of the tab's session once its visit is counted. */
-const VISIT_COUNTED_KEY = 'deor.pwa.visitCounted';
+const VISIT_COUNTED_KEY = 'predit.pwa.visitCounted';
 
 interface Persisted {
   visits: number;

@@ -3,7 +3,7 @@ name = "predit-market"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.95"
-description = "Social prediction markets on NEAR: locked rules, bonds, USDC bets, receipts, forecasting records"
+description = "Social prediction markets on NEAR: locked rules, bonds, USDC positions, receipts, prediction records"
 license = "MIT"
 
 [lib]

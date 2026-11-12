@@ -1,7 +1,7 @@
 //! Social prediction markets on NEAR.
 //!
 //! A market is created from a post: its rules are locked at creation against a
-//! bond and people bet USDC on it. After expiry NEAR AI reads the source named
+//! bond and people take positions on it in USDC. After expiry NEAR AI reads the source named
 //! in the rules, a person confirms that reading, and the operator posts it as a
 //! receipt with evidence. Anyone can challenge a receipt for a bond, an arbiter
 //! decides, and finalizing opens redemption and updates the post author's
@@ -994,9 +994,9 @@ impl Contract {
         env::storage_byte_cost().saturating_mul(env::storage_usage() as u128)
     }
 
-    /// Bets, receipts and challenges grow storage nobody pays for directly.
+    /// Positions, receipts and challenges grow storage nobody pays for directly.
     /// They stop before touching NEAR held for bonds, and `keep` stays free for
-    /// recording failed payouts. Bets keep the larger amount, so filling the
+    /// recording failed payouts. Purchases keep the larger amount, so filling the
     /// contract with positions can never block a receipt or a challenge.
     /// `leaving` is NEAR in the balance that is about to be refunded.
     fn assert_near_cover(&mut self, leaving: NearToken, keep: NearToken) {

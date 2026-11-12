@@ -294,14 +294,14 @@ def buy(who, i, side, amount, token=None, min_shares="0"):
     return tx(token or USDC, "ft_transfer_call", buy_args(i, side, amount, min_shares), who, deposit=ONE_YOCTO, gas="150.0 Tgas")
 
 
-def bet(name, who, i, side, amount):
+def place(name, who, i, side, amount):
     before = usdc(who)
     out = buy(who, i, side, amount)
-    check(f"bet {name}", "succeeded" in out and usdc(who) == before - amount, out[-300:])
+    check(f"position {name}", "succeeded" in out and usdc(who) == before - amount, out[-300:])
 
 
-def bet_refused(name, who, i, side, amount, **kw):
-    """A bet the contract refuses: no trade recorded, and the money comes back."""
+def place_refused(name, who, i, side, amount, **kw):
+    """A purchase the contract refuses: no trade recorded, and the money comes back."""
     before, trades = usdc(who), market(i)["trades"]
     buy(who, i, side, amount, **kw)
     check(name, usdc(who) == before and market(i)["trades"] == trades,
@@ -397,8 +397,8 @@ for n, i in enumerate(cap):
 
 section("buy: rejections, money comes back")
 m = M["far"]
-bet_refused("below the minimum buy", ALICE, m, "yes", USDC_UNIT - 1)
-bet_refused("slippage limit", ALICE, m, "yes", 2 * USDC_UNIT, min_shares=str(2**63))
+place_refused("below the minimum buy", ALICE, m, "yes", USDC_UNIT - 1)
+place_refused("slippage limit", ALICE, m, "yes", 2 * USDC_UNIT, min_shares=str(2**63))
 before_fake = int(view(FAKE, "ft_balance_of", {"account_id": ALICE}))
 trades = market(m)["trades"]
 buy(ALICE, m, "yes", 5 * USDC_UNIT, token=FAKE)
@@ -410,10 +410,10 @@ tx(USDC, "ft_transfer_call", {"receiver_id": MARKET, "amount": str(USDC_UNIT), "
 time.sleep(3)
 check("malformed message is refunded", usdc(ALICE) == before)
 
-section("bets and fees")
+section("positions and fees")
 claim_before = claimable(OWNER), claimable(TREASURY)
-bet("alice 20", ALICE, m, "yes", 20 * USDC_UNIT)
-bet("bob 10", BOB, m, "no", 10 * USDC_UNIT)
+place("alice 20", ALICE, m, "yes", 20 * USDC_UNIT)
+place("bob 10", BOB, m, "no", 10 * USDC_UNIT)
 check("price moved up", market(m)["price_yes_bps"] > 5000)
 owner_gain, treasury_gain = claimable(OWNER) - claim_before[0], claimable(TREASURY) - claim_before[1]
 fees_expected = fee_in(20 * USDC_UNIT) + fee_in(10 * USDC_UNIT)
@@ -423,8 +423,8 @@ check("listed for the user", any(pair[0]["id"] == str(m) for pair in view(MARKET
 
 section("sell")
 m = M["sell"]
-bet("sell market, alice", ALICE, m, "yes", 10 * USDC_UNIT)
-bet("sell market, bob", BOB, m, "no", 4 * USDC_UNIT)
+place("sell market, alice", ALICE, m, "yes", 10 * USDC_UNIT)
+place("sell market, bob", BOB, m, "no", 4 * USDC_UNIT)
 p = position(m, ALICE)
 shares, cost = int(p["yes_shares"]), int(p["yes_cost"])
 reject("sell needs 1 yocto", "Requires attached deposit of exactly 1 yoctoNEAR", MARKET, "sell",
@@ -444,8 +444,8 @@ check("remaining shares", int(position(m, ALICE)["yes_shares"]) == shares - half
 
 section("failed payout becomes claimable, then withdrawable")
 m = M["failed_payout"]
-bet("carol bets", CAROL, m, "yes", 5 * USDC_UNIT)
-bet("alice bets against", ALICE, m, "no", 2 * USDC_UNIT)
+place("carol buys", CAROL, m, "yes", 5 * USDC_UNIT)
+place("alice buys the other side", ALICE, m, "no", 2 * USDC_UNIT)
 p = position(m, CAROL)
 must("carol leaves the token", USDC, "storage_unregister", {"force": True}, CAROL, deposit=ONE_YOCTO)
 tx(MARKET, "sell", {"market_id": str(m), "side": "yes", "shares": p["yes_shares"], "min_out": "0"}, CAROL, deposit=ONE_YOCTO, gas="150.0 Tgas")
@@ -482,7 +482,7 @@ reject("claim_stuck too early", "Too early", MARKET, "claim_stuck", {"market_id"
 section("pause blocks new risk, not exits")
 must("owner pauses", MARKET, "set_paused", {"paused": True}, OWNER)
 reject("create while paused", "Paused", MARKET, "create_market", create_args(f"paused-{RUN}", "x:bad", rules("event", FAR)), OWNER, deposit="0.3 NEAR")
-bet_refused("buy while paused", ALICE, M["sell"], "yes", 2 * USDC_UNIT)
+place_refused("buy while paused", ALICE, M["sell"], "yes", 2 * USDC_UNIT)
 p = position(M["sell"], BOB)
 reject("sell while paused", "Paused", MARKET, "sell", {"market_id": str(M["sell"]), "side": "no", "shares": p["no_shares"], "min_out": "0"}, BOB, deposit=ONE_YOCTO, gas="150.0 Tgas")
 must("owner resumes", MARKET, "set_paused", {"paused": False}, OWNER)
@@ -493,8 +493,8 @@ reject("only the creator or owner", "Not allowed", MARKET, "cancel_market", {"ma
 must("creator cancels before any trade", MARKET, "cancel_market", {"market_id": str(m)}, OWNER)
 status_is("creator cancel status", m, "cancelled")
 m = M["cancel_owner"]
-bet("alice bets before the owner cancels", ALICE, m, "yes", 3 * USDC_UNIT)
-bet("bob bets before the owner cancels", BOB, m, "no", 5 * USDC_UNIT)
+place("alice buys before the owner cancels", ALICE, m, "yes", 3 * USDC_UNIT)
+place("bob buys before the owner cancels", BOB, m, "no", 5 * USDC_UNIT)
 must("owner cancels after trades", MARKET, "cancel_market", {"market_id": str(m)}, OWNER)
 pay("alice refunds in full", "refund", m, ALICE, expected=net_in(3 * USDC_UNIT))
 pay("bob refunds in full", "refund", m, BOB, expected=net_in(5 * USDC_UNIT))
@@ -524,21 +524,21 @@ M["slash_op"] = create("event market, operator reports ambiguous", f"p7-{RUN}", 
 M["silent_op"] = create("operator goes silent", f"p10-{RUN}", f"{A}-j", rules("event", EXP))
 M["silent_arb"] = create("arbiter goes silent", f"p11-{RUN}", f"{A}-k", rules("event", EXP))
 
-section("bets on the settling markets")
-bet("price YES, alice", ALICE, M["market_yes"], "yes", 20 * USDC_UNIT)
-bet("price YES, bob", BOB, M["market_yes"], "no", 10 * USDC_UNIT)
-bet("same post, alice", ALICE, M["same_post"], "yes", 2 * USDC_UNIT)
-bet("same post, bob", BOB, M["same_post"], "no", 2 * USDC_UNIT)
-bet("price NO, alice", ALICE, M["market_no"], "yes", 3 * USDC_UNIT)
-bet("price NO, bob", BOB, M["market_no"], "no", 6 * USDC_UNIT)
-bet("inverted, alice", ALICE, M["market_third"], "yes", 4 * USDC_UNIT)
-bet("inverted, bob", BOB, M["market_third"], "no", 2 * USDC_UNIT)
+section("positions on the settling markets")
+place("price YES, alice", ALICE, M["market_yes"], "yes", 20 * USDC_UNIT)
+place("price YES, bob", BOB, M["market_yes"], "no", 10 * USDC_UNIT)
+place("same post, alice", ALICE, M["same_post"], "yes", 2 * USDC_UNIT)
+place("same post, bob", BOB, M["same_post"], "no", 2 * USDC_UNIT)
+place("price NO, alice", ALICE, M["market_no"], "yes", 3 * USDC_UNIT)
+place("price NO, bob", BOB, M["market_no"], "no", 6 * USDC_UNIT)
+place("inverted, alice", ALICE, M["market_third"], "yes", 4 * USDC_UNIT)
+place("inverted, bob", BOB, M["market_third"], "no", 2 * USDC_UNIT)
 for key in ("uphold", "overturn", "slash_ch", "slash_op", "source_gone", "silent_arb"):
-    bet(f"{key}, alice", ALICE, M[key], "yes", 2 * USDC_UNIT)
-    bet(f"{key}, bob", BOB, M[key], "no", 2 * USDC_UNIT)
-bet("one side only", ALICE, M["one_sided"], "yes", 3 * USDC_UNIT)
-bet("silent operator, alice", ALICE, M["silent_op"], "yes", 5 * USDC_UNIT)
-bet("silent operator, bob", BOB, M["silent_op"], "no", 4 * USDC_UNIT)
+    place(f"{key}, alice", ALICE, M[key], "yes", 2 * USDC_UNIT)
+    place(f"{key}, bob", BOB, M[key], "no", 2 * USDC_UNIT)
+place("one side only", ALICE, M["one_sided"], "yes", 3 * USDC_UNIT)
+place("silent operator, alice", ALICE, M["silent_op"], "yes", 5 * USDC_UNIT)
+place("silent operator, bob", BOB, M["silent_op"], "no", 4 * USDC_UNIT)
 
 log(f"\n  settling markets are ready {EXP - int(time.time())}s before expiry")
 if time.time() > EXP - 15:
@@ -546,7 +546,7 @@ if time.time() > EXP - 15:
 
 section("freeze window")
 wait_until(EXP - 3)
-bet_refused("buy inside the freeze window", ALICE, M["market_yes"], "yes", 2 * USDC_UNIT)
+place_refused("buy inside the freeze window", ALICE, M["market_yes"], "yes", 2 * USDC_UNIT)
 
 section("receipts: rejected inputs")
 wait_until(EXP + 1)
@@ -694,11 +694,11 @@ keep = 5 * 10**19
 out = near("tokens", MARKET, "send-near", OWNER, f"{free - keep} yoctoNEAR", *NET, "sign-with-legacy-keychain", "send")
 time.sleep(4)
 check("spare NEAR drained", int(view(MARKET, "get_free_near")) < 10**21, out[-200:])
-bet_refused("bet refused rather than spending bonds", ALICE, m, "yes", 2 * USDC_UNIT)
+place_refused("purchase refused rather than spending bonds", ALICE, m, "yes", 2 * USDC_UNIT)
 must_out = near("tokens", OWNER, "send-near", MARKET, "0.5 NEAR", *NET, "sign-with-legacy-keychain", "send")
 check("top up", "successfully" in must_out, must_out[-200:])
 time.sleep(4)
-bet("bet works after a top up", ALICE, m, "yes", 2 * USDC_UNIT)
+place("purchase works after a top up", ALICE, m, "yes", 2 * USDC_UNIT)
 must("owner cancels the reserve market", MARKET, "cancel_market", {"market_id": str(m)}, OWNER)
 pay("reserve market refund", "refund", m, ALICE, expected=net_in(2 * USDC_UNIT))
 

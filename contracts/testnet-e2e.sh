@@ -7,7 +7,7 @@
 # Usage: ./testnet-e2e.sh <account-prefix>
 #   OPERATOR_KEY=<path>  key file of the operator's limited key
 #                        (default: the first function-call key found)
-#   FUNDER=<account>     pay for the two test bettors from this account
+#   FUNDER=<account>     pay for the two test traders from this account
 #                        instead of the faucet (2.5 NEAR each)
 set -uo pipefail
 
@@ -94,7 +94,7 @@ tx "$MARKET" create_market "$(args "e2e-e-$TS" "$EXP" "$AUTHOR" event "$WINDOW")
 [ -n "$PRICE_ID" ] && [ -n "$EVENT_ID" ] || die "no market id"
 ok "price market $PRICE_ID, event market $EVENT_ID"
 
-echo "== bets"
+echo "== positions"
 buy "$ALICE" "$PRICE_ID" yes 20000000; buy "$BOB" "$PRICE_ID" no 10000000
 buy "$ALICE" "$EVENT_ID" yes 10000000; buy "$BOB" "$EVENT_ID" no 20000000
 check "price market trades" "$(view "$MARKET" get_market "{\"market_id\":\"$PRICE_ID\"}" | field trades)" 2

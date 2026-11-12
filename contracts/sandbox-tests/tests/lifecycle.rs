@@ -82,7 +82,7 @@ async fn setup() -> anyhow::Result<Env> {
         .await?
         .into_result()?;
 
-    // The market must hold a USDC balance to receive bets.
+    // The market must hold a USDC balance to receive positions.
     faucet(&usdc, market.as_account()).await?;
     for who in [&alice, &bob, &treasury, &creator] {
         faucet(&usdc, who).await?;

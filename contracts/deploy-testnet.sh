@@ -41,7 +41,7 @@ near contract deploy "$MARKET" use-file target/near/predit_market/predit_market.
   "{\"owner\":\"$OWNER\",\"operator\":\"$OPERATOR\",\"arbiter\":\"$ARBITER\",\"treasury\":\"$TREASURY\",\"collateral\":\"$USDC\",\"config\":$CONFIG}" \
   prepaid-gas '100.0 Tgas' attached-deposit '0 NEAR' $NET $SIGN
 
-# The market needs a USDC balance to receive bets, and the treasury to collect fees.
+# The market needs a USDC balance to receive positions, and the treasury to collect fees.
 for account in "$MARKET" "$TREASURY"; do
   near contract call-function as-transaction "$USDC" storage_deposit \
     json-args "{\"account_id\":\"$account\"}" prepaid-gas '100.0 Tgas' attached-deposit '0.01 NEAR' \

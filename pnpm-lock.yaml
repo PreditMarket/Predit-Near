@@ -172,7 +172,7 @@ importers:
 
   apps/web:
     dependencies:
-      '@deor/shared':
+      '@predit/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       '@hot-labs/near-connect':
