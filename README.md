@@ -2,7 +2,7 @@
 
 **A social feed where every claim can become a prediction market.** A post on X says "NEAR will close above $10 this year" or "submissions will pass 300 by Friday". On Predit anyone can turn that sentence into a YES/NO market under the post in one transaction. People take positions in USDC, so the market price shows what the crowd currently believes. At the deadline the result is settled on NEAR from a signed NEAR AI reading of the source and a person's decision. The result is then written back to the post and to its author's public record.
 
-The feed stops being a stream of opinions. It becomes a **live knowledge layer**: each claim shows its current odds while it is open and its verdict once it settles, and each account carries a track record that nobody can edit.
+The feed stops being a stream of opinions. It becomes a **live knowledge layer**: each claim shows its current odds while it is open and its verdict once it settles, and each account carries a track record kept by the contract.
 
 Built for NEAR HACKATHON (track: Open). Runs on **NEAR testnet** with a mock USDC.
 
@@ -22,7 +22,7 @@ Feeds are full of confident claims about prices, launches, numbers and dates. No
 3. **Positions.** USDC goes straight into the contract with `ft_transfer_call`. Prices come from a CPMM pool, and you can sell until the trade freeze.
 4. **Result.** At the deadline an agent snapshots the source and NEAR AI reads it inside a TEE, returning a signed answer. An admin confirms or overrides it with a NEP-413 wallet signature. A limited operator key posts the receipt: outcome, reason, snapshot hash and the AI signature. Anyone can challenge it with a bond during the challenge window.
 5. **Back to the feed.** Finalized markets pay out. The post shows Right or Wrong, and the author's record (`/u/@handle`) counts it once per post, as the contract decides.
-6. **Check it yourself.** `pnpm verify <market id>` recomputes every hash and recovers the NEAR AI signer from public data, with no key.
+6. **Check it yourself.** `pnpm verify <market id>` recomputes the rules, snapshot, request and response hashes from public data and checks that the NEAR AI signature recovers to the signer recorded on chain, with no key. Proving that signer is a NEAR AI TEE key needs a NEAR AI key or [cloud.near.ai/verify](https://cloud.near.ai/verify).
 
 Around this sit a Predit AI chat that answers only from the app's own markets and posts (answered by NEAR AI and showing its signer), a portfolio, and deposit/withdraw.
 
@@ -39,6 +39,7 @@ Needs Node 20+ and pnpm (`corepack enable`). No keys or accounts.
 `demo.sh` first runs `pnpm verify 36 --evidence evidence/36.json`, which checks a real receipt on testnet:
 
 ```
+PASS  Rules match the hash locked at creation
 PASS  Snapshot matches the hash on chain
 PASS  Evidence is for this market
 PASS  Snapshot is of the source locked in the rules
@@ -65,7 +66,11 @@ Then open http://localhost:3000:
 | Create market on a post with none | One `create_market` puts the market under the post | NEAR AI fills the form with `NEAR_AI_API_KEY`; otherwise fill it by hand |
 | With a wallet connected, ask Predit AI (right column) "what is the hottest market?" | An answer built from the app's markets, with cards to open them and the NEAR AI signer under it | `NEAR_AI_API_KEY` |
 
-The variables are listed in [`apps/web/.env.example`](apps/web/.env.example).
+The variables are listed in [`apps/web/.env.example`](apps/web/.env.example). `PORT=3100 ./demo.sh` starts on another port.
+
+### About the testnet data
+
+The markets on the testnet contract were created by the team to test the app and film the demo. Their deadlines are minutes away, not months, and the contract runs with a 60-second challenge window and free market creation (see `get_config`). The records on author pages such as `/u/NEARProtocol` come from these test markets: they are not real track records of those accounts. Market 36 was created from the owner account with its rules typed in by hand, not drafted by NEAR AI.
 
 ## Where NEAR is used
 
@@ -83,7 +88,7 @@ The variables are listed in [`apps/web/.env.example`](apps/web/.env.example).
 | Sign-in and every transaction | NEAR wallets through `@hot-labs/near-connect`, RPC with `near-api-js` | [`packages/shared/src/lib/near`](packages/shared/src/lib/near) |
 | New users can act at once | 0.25 testnet NEAR sent to new accounts for gas and storage | [`apps/web/src/app/api/onboard`](apps/web/src/app/api/onboard/route.ts) |
 
-There is no other backend: the app reads markets, positions and records from the contract over RPC.
+There is no database. Markets, positions and records are read from the contract over RPC; the Next.js server only reads X and NEAR AI, keeps the evidence files and runs the result agent.
 
 ## What is not on NEAR, or is simulated
 
@@ -91,6 +96,17 @@ There is no other backend: the app reads markets, positions and records from the
 - **Deposits from other chains are simulated.** The Deposit dialog's other-chain tab and the withdrawal to another chain do not bridge anything. A server key limited to the mock token's `simulate_deposit` mints test USDC to the account. A mainnet version would use NEAR Intents.
 - Posts come from X through twitterapi.io. Source pages are read through Jina Reader. Evidence bundles (snapshot, AI request and response) are kept on the web server's disk, and only their hashes and the AI signature are on chain.
 - A person confirms every result. The contract cannot tell whether a result is true; the challenge window and the arbiter are the safeguard.
+
+## Partners
+
+| Partner | Used for |
+|---|---|
+| [NEAR AI Cloud](https://cloud.near.ai) | Private inference in a TEE with a signature on each answer: finding predictions in posts, drafting market rules, reading the source at the deadline, the Predit AI chat |
+| [HOT Labs](https://hot-labs.org), HOT Connector (`@hot-labs/near-connect`) | Wallet sign-in and every transaction |
+| [FastNEAR](https://fastnear.com) | RPC, with drpc and rpc.testnet.near.org as fallbacks |
+| [NearBlocks](https://testnet.nearblocks.io) | Explorer links for accounts and transactions |
+
+A mainnet version would take deposits from other chains through NEAR Intents.
 
 ## How a result is reached
 
@@ -102,6 +118,21 @@ deadline ─► agent snapshots the source in the rules (sha256)
          ─► challenge window: anyone can bond a challenge, the arbiter rules
          ─► finalize: payouts, bonds returned, author record updated
 ```
+
+## Failure cases
+
+| What goes wrong | What happens |
+|---|---|
+| The operator key leaks | The key can only call `post_receipt` and `finalize`; it cannot move funds. A YES or NO receipt needs an evidence hash and a NEAR AI reading (the contract stores the signature; `pnpm verify` checks it), and only after the deadline. A wrong receipt can still be posted: anyone can challenge it with a bond during the window, and the arbiter rules |
+| The operator goes silent | After `stuck_after_sec` (7 days) past the deadline, anyone can call `claim_stuck`: the market is cancelled and everyone gets their money back |
+| The arbiter goes silent | 7 days after the challenge, anyone can call `claim_stuck` and the posted receipt stands, so a challenge alone cannot void a result |
+| The source cannot be read | The agent keeps trying for 15 minutes after the deadline, then proposes Invalid (`source_unavailable`): the market refunds positions at cost |
+| The source page tries prompt injection | NEAR AI is told the snapshot is untrusted data and to judge only by the rules. A person confirms every result, and anyone can challenge it |
+| NEAR AI is down | No reading, so no YES or NO can be posted; the agent retries every 20 seconds and the market waits. If nothing is posted within 7 days, `claim_stuck` refunds |
+| The creator declares the wrong author or side | `author_ref`, `post_id` and `claim_side` are declared by the creator; a challenge only disputes the result. Still open ([SECURITY.md](contracts/SECURITY.md), M2) |
+| Nobody took the winning side | The market refunds, and it does not count in the author's record |
+
+More in [`contracts/SECURITY.md`](contracts/SECURITY.md): the review results, the open issues and the steps before mainnet.
 
 ## Repository
 
@@ -123,13 +154,16 @@ deadline ─► agent snapshots the source in the rules (sha256)
 
 ## Built during NEAR HACKATHON
 
-The first commit holds code that existed before the hackathon: the app files this build reuses and the market maths in `contracts/core`. Everything after it was built during the hackathon: `git diff 5426810 HEAD`.
+The first commit, tagged `pre-hackathon`, holds code that existed before the hackathon: the app files this build reuses and the market maths in `contracts/core`. Everything after it was built during the hackathon: `git diff pre-hackathon HEAD`.
 
 ## Libraries
 
 - Contracts: `near-sdk` and `near-contract-standards` 5.30.1, `cargo-near` 0.23, `near-workspaces` 0.24 (sandbox tests), `tokio`, `anyhow`, `serde_json`.
-- Web: Next.js 15, React 18, `@hot-labs/near-connect`, `near-api-js`, `viem` (signature recovery), TanStack Query, Zustand, Tailwind CSS, Radix UI, vaul, sonner, lucide-react, serwist, Sentry, DOMPurify, Playwright, Vitest.
-- Services: NEAR AI Cloud, twitterapi.io, Jina Reader.
+- Web: Next.js 15, React 18, `@hot-labs/near-connect`, `near-api-js`, `viem` (signature recovery), TanStack Query, Zustand, Tailwind CSS 4 with `@tailwindcss/typography` and `tw-animate-css`, Radix UI, vaul, sonner, lucide-react, `class-variance-authority`, `clsx`, `tailwind-merge`, `next-themes`, `boring-avatars`, `qrcode.react`, `isomorphic-dompurify`, serwist, Sentry.
+- Tooling: TypeScript, ESLint (`eslint-config-next`), Playwright, Vitest, Husky, pnpm.
+- Services: NEAR AI Cloud, twitterapi.io (posts from X), Jina Reader (source snapshots).
+
+Much of the code was written with AI assistance (Claude Code).
 
 ## License
 
