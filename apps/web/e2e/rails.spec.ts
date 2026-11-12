@@ -26,6 +26,21 @@ test.describe('home rails', () => {
     await stubFeed(page);
   });
 
+  test('the side rails stay put while the feed scrolls', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 420 });
+    await page.goto('/');
+    await expect(page.getByTestId('left-rail')).toBeVisible();
+    const top = () => page.getByTestId('left-rail').evaluate((el) => el.getBoundingClientRect().top);
+    const before = await top();
+    await page.locator('#scroll-root').evaluate((el) => el.scrollBy(0, 600));
+    await page.waitForTimeout(400);
+    expect(await page.locator('#scroll-root').evaluate((el) => el.scrollTop)).toBeGreaterThan(100);
+    expect(await top()).toBe(before);
+    await page.locator('#scroll-root').evaluate((el) => el.scrollBy(0, -300));
+    await page.waitForTimeout(400);
+    expect(await top()).toBe(before);
+  });
+
   test('the Markets rail lists open markets and a tap opens a prediction', async ({ page }) => {
     const calls = await injectWallet(page, ALICE);
     const open = (await allMarkets()).filter(isTradable);

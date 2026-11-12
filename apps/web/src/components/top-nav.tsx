@@ -30,10 +30,13 @@ export function TopNav() {
   // Scroll-aware hide/show: topnav slides up when the user scrolls down past
   // a threshold; slides back when they scroll up. Filter bars underneath
   // read `--nav-y` and shift their `sticky` top in lockstep.
+  // Not on the home while its side rails show: they would jump 40px with it.
   useEffect(() => {
     if (typeof document === 'undefined') return;
     const root = document.getElementById('scroll-root');
     if (!root) return;
+    const railsShown = window.matchMedia('(min-width: 768px)');
+    const pinned = () => pathname === '/' && railsShown.matches;
     let last = root.scrollTop;
     let ticking = false;
     const NAV_HEIGHT = 40;
@@ -51,7 +54,10 @@ export function TopNav() {
       requestAnimationFrame(() => {
         const y = root.scrollTop;
         const dy = y - last;
-        if (Math.abs(dy) > THRESHOLD) {
+        if (pinned()) {
+          set(false);
+          last = y;
+        } else if (Math.abs(dy) > THRESHOLD) {
           if (dy > 0 && y > NAV_HEIGHT) set(true);
           else if (dy < 0) set(false);
           last = y;
@@ -64,7 +70,7 @@ export function TopNav() {
       root.removeEventListener('scroll', onScroll);
       document.documentElement.style.removeProperty('--nav-y');
     };
-  }, []);
+  }, [pathname]);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
 
