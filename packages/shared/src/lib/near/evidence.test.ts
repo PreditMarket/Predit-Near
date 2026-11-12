@@ -1,10 +1,21 @@
 import { createHash } from 'node:crypto';
 import { privateKeyToAccount } from 'viem/accounts';
 import { describe, expect, it } from 'vitest';
-import { checkEvidence } from '../../../scripts/verify.mjs';
+import { checkEvidence, rulesHash } from '../../../scripts/verify.mjs';
+import finalized from './__fixtures__/market-finalized-yes.json';
 import { parseSuggestion } from './evidence';
 
 const sha = (text: string) => createHash('sha256').update(text, 'utf8').digest('hex');
+
+describe('rulesHash', () => {
+  it('matches the hash the contract stored for a real market', () => {
+    expect(rulesHash(finalized.rules)).toBe(finalized.rules_hash);
+  });
+
+  it('changes when one word of the rules changes', () => {
+    expect(rulesHash({ ...finalized.rules, yes_condition: `${finalized.rules.yes_condition} ` })).not.toBe(finalized.rules_hash);
+  });
+});
 
 describe('parseSuggestion', () => {
   it('keeps a clear verdict', () => {

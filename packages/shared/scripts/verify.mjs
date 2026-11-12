@@ -16,6 +16,23 @@ const AI_API = 'https://cloud-api.near.ai/v1';
 
 const sha256 = (text) => createHash('sha256').update(text, 'utf8').digest('hex');
 
+// Field order of `Rules` in contracts/market/src/types.rs; the contract stores sha256(borsh(rules)).
+const RULE_TEXT_FIELDS = ['question', 'description', 'yes_label', 'no_label', 'yes_condition', 'no_condition',
+  'resolution_source', 'invalid_conditions', 'category', 'image_url'];
+
+/** The rules hash the contract computed at creation, recomputed from the rules it returns. */
+export function rulesHash(rules) {
+  const text = (value) => {
+    const bytes = Buffer.from(value, 'utf8');
+    const length = Buffer.alloc(4);
+    length.writeUInt32LE(bytes.length);
+    return Buffer.concat([length, bytes]);
+  };
+  const expiry = Buffer.alloc(8);
+  expiry.writeBigUInt64LE(BigInt(rules.expiry_sec));
+  return createHash('sha256').update(Buffer.concat([...RULE_TEXT_FIELDS.map((f) => text(rules[f])), expiry])).digest('hex');
+}
+
 /** What the model was sent, as text, or null when the body isn't a chat request. */
 function promptOf(requestBody) {
   try {
@@ -136,7 +153,11 @@ async function main() {
 
   const bundle = await loadEvidence(evidenceArg ?? market.receipt.evidence.uri);
 
-  const checks = await checkEvidence(market, bundle);
+  const recomputed = rulesHash(market.rules);
+  const checks = [
+    { name: 'Rules match the hash locked at creation', ok: recomputed === market.rules_hash, detail: recomputed },
+    ...(await checkEvidence(market, bundle)),
+  ];
   for (const { name, ok, detail } of checks) console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${detail ? `  (${detail})` : ''}`);
 
   if (market.receipt.evidence.ai) {
