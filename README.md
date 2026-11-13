@@ -36,7 +36,7 @@ Needs Node 20+ and pnpm (`corepack enable`). No keys or accounts.
 ./demo.sh --contracts    # also build the contracts and run the Rust tests (needs Rust and cargo-near 0.23)
 ```
 
-`demo.sh` first runs `pnpm verify 37`, which checks a real receipt on testnet against its public evidence link (or the copy in `evidence/37.json` if the hosted app is down):
+`demo.sh` first runs `pnpm verify 38`, which checks a real receipt on testnet against its public evidence link (or the copy in `evidence/38.json` if the hosted app is down):
 
 ```
 PASS  Rules match the hash locked at creation
@@ -57,7 +57,7 @@ Then open http://localhost:3000:
 | Do | See | Needs |
 |---|---|---|
 | Scroll the home feed | Posts with their markets and live odds, read from the contract | Sample posts without `TWITTER_API_KEY`; their markets are real |
-| Open `/market/37` | A settled market made from a post by Vitalik Buterin: rules drafted by NEAR AI and created by a new account, the result receipt, the NEAR AI reading, the public evidence | Nothing |
+| Open `/market/38` | A settled market made from a post by Vitalik Buterin: rules drafted by NEAR AI, created by a new account through Intear Wallet, the result receipt, the NEAR AI reading of ultrasound.money, the public evidence | Nothing |
 | Open `/u/NEARProtocol` | The author record the contract keeps: hit rate, every post that became a market, which market counted | Nothing |
 | Connect a NEAR testnet wallet | The balance pill; a new account gets 0.25 testnet NEAR for gas and storage | Gas only with `NEAR_ONBOARD_*`; otherwise use the testnet faucet |
 | Balance pill → Deposit → NEAR → "Get 100 tUSDC from the faucet" | 100 tUSDC from the mock token's faucet in your wallet (once an hour) | Nothing |

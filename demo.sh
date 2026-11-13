@@ -31,19 +31,19 @@ echo "node $(node -v), pnpm $(pnpm -v)"
 step "Install"
 pnpm install --frozen-lockfile
 
-step "A settled market, checked from the chain with no key (market 37)"
+step "A settled market, checked from the chain with no key (market 38)"
 # The evidence link on chain is the hosted app; the copy in evidence/ is used if it is down.
-pnpm -s verify 37 || pnpm -s verify 37 --evidence evidence/37.json
+pnpm -s verify 38 || pnpm -s verify 38 --evidence evidence/38.json
 
 step "The same check on a tampered copy of the evidence (should FAIL)"
 TAMPERED="$(mktemp -t predit-evidence.XXXXXX)"
 node -e '
   const fs = require("fs");
-  const b = JSON.parse(fs.readFileSync("evidence/37.json", "utf8"));
-  b.snapshot.text = b.snapshot.text.replace("feat/client-concession-local", "feat/client-concession-remote");
+  const b = JSON.parse(fs.readFileSync("evidence/38.json", "utf8"));
+  b.snapshot.text = b.snapshot.text.replace("223.94 ETH burned", "2,239.40 ETH burned");
   fs.writeFileSync(process.argv[1], JSON.stringify(b));
 ' "$TAMPERED"
-if pnpm -s verify 37 --evidence "$TAMPERED"; then echo "Expected a failure" >&2; exit 1; fi
+if pnpm -s verify 38 --evidence "$TAMPERED"; then echo "Expected a failure" >&2; exit 1; fi
 rm -f "$TAMPERED"
 echo "Rejected, as it should be."
 
@@ -73,7 +73,7 @@ cat <<EOF
 Try:
   1. Open http://localhost:$PORT. The feed shows posts with markets under them, read from
      predit-markets-market.testnet.
-  2. Open http://localhost:$PORT/market/37 to see a settled market: its locked rules,
+  2. Open http://localhost:$PORT/market/38 to see a settled market: its locked rules,
      the result receipt and the NEAR AI reading it was based on.
   3. Open http://localhost:$PORT/u/NEARProtocol to see an author's record kept by the contract.
   4. Connect a NEAR testnet wallet to take a position, create a market from a post
