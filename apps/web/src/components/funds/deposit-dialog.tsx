@@ -163,7 +163,7 @@ function OtherChainsTab({ accountId }: { accountId: string }) {
   };
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex min-w-0 flex-col gap-4">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {SIMULATED_CHAINS.map((c) => (
           <button
@@ -172,12 +172,12 @@ function OtherChainsTab({ accountId }: { accountId: string }) {
             data-testid={`deposit-chain-${c.id}`}
             disabled={running}
             onClick={() => setChain(c.id)}
-            className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-[12.5px] font-semibold transition-colors ${
+            className={`flex min-w-0 items-center gap-2 rounded-lg border px-3 py-2 text-[12.5px] font-semibold transition-colors ${
               chain === c.id ? 'border-primary bg-primary/10 text-foreground' : 'border-border text-muted-foreground hover:text-foreground'
             }`}
           >
             <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: CHAIN_TONE[c.id] }} />
-            {c.name}
+            <span className="truncate">{c.name}</span>
           </button>
         ))}
       </div>
@@ -213,7 +213,7 @@ function OtherChainsTab({ accountId }: { accountId: string }) {
         <div className="flex flex-col gap-1 border-t border-border px-4 py-3">
           <span className={STAT_LABEL}>To · your NEAR account</span>
           <span className="flex items-center justify-between gap-3 text-[13px]">
-            <span className="truncate font-mono">{accountId}</span>
+            <span className="min-w-0 truncate font-mono">{accountId}</span>
             <span className="shrink-0 font-mono font-bold tabular-nums">
               {valid ? value.toLocaleString('en-US') : '–'} {USDC_SYMBOL}
             </span>
@@ -268,7 +268,8 @@ export function DepositDialog({ open, onOpenChange }: { open: boolean; onOpenCha
         <DialogTitle>Deposit</DialogTitle>
         <DialogDescription className="sr-only">Add {USDC_SYMBOL} to your NEAR account.</DialogDescription>
         {accountId && (
-          <div className="flex flex-col gap-4">
+          // min-w-0: a 64-character implicit account id must not widen the dialog.
+          <div className="flex min-w-0 flex-col gap-4">
             <SegmentedTabs value={tab} onChange={setTab} options={TABS} data-testid="deposit-tabs" />
             {tab === 'near' ? <NearTab accountId={accountId} /> : <OtherChainsTab accountId={accountId} />}
           </div>

@@ -96,3 +96,19 @@ test.describe('balance, deposit and withdraw', () => {
     await expect(page.getByTestId('not-found')).toBeVisible();
   });
 });
+
+test('a 64-character implicit account fits the deposit dialog', async ({ page }) => {
+  await injectWallet(page, 'b53a410724e28ca87b77e799576d26875ed648d4adf8f2563ea4c7b3a0c5b99c');
+  await page.goto('/markets');
+  await page.getByTestId('balance-pill').click();
+  await page.getByTestId('balance-deposit').click();
+  const dialog = page.getByTestId('deposit-dialog');
+  await dialog.getByTestId('deposit-tabs').getByText('Other chains').click();
+  const fits = async () =>
+    dialog.evaluate((el) => {
+      const box = el.getBoundingClientRect();
+      return [...el.querySelectorAll('button, input')].every((c) => c.getBoundingClientRect().right <= box.right + 0.5);
+    });
+  await expect(dialog.getByTestId('deposit-chain-bnb')).toBeVisible();
+  expect(await fits()).toBe(true);
+});

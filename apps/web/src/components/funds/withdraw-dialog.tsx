@@ -269,7 +269,7 @@ export function WithdrawDialog({ open, onOpenChange }: { open: boolean; onOpenCh
         <DialogTitle>Withdraw</DialogTitle>
         <DialogDescription className="sr-only">Send {USDC_SYMBOL} out of your NEAR account.</DialogDescription>
         {accountId && (
-          <div className="flex flex-col gap-4">
+          <div className="flex min-w-0 flex-col gap-4">
             <SegmentedTabs value={tab} onChange={setTab} options={TABS} data-testid="withdraw-tabs" />
             {tab === 'near' ? <NearTab accountId={accountId} /> : <OtherChainsTab accountId={accountId} />}
           </div>
